@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// --- RENK PALETİ ---
-const Color kArkaPlanRengi = Color(0xFFFFFDF5);
-const Color kKartRengi = Color(0xFFFFFFFF);
-const Color kAnaRenk = Color(0xFFE67E22);
-const Color kYaziRengi = Color(0xFF3E2723);
-const Color kPasifRenk = Color(0xFFBCAAA4);
-const Color kAktifYesil = Color(0xFF2E7D32);
-const Color kKirmizi = Color(0xFFD32F2F);
+import 'package:share_plus/share_plus.dart'; // PAYLAŞ PAKETİ EKLENDİ
+import '../core/constants/app_colors.dart';
+import '../providers/namaz_provider.dart';
 
 class AyarlarSayfasi extends StatefulWidget {
   const AyarlarSayfasi({super.key});
@@ -19,8 +14,6 @@ class AyarlarSayfasi extends StatefulWidget {
 
 class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
   bool _bildirimlerAcik = true;
-  bool _karanlikMod = false;
-  String _kayitliKonum = "Yükleniyor...";
   String _hesaplamaYontemi = "Diyanet İşleri (Türkiye)";
 
   @override
@@ -33,47 +26,27 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _bildirimlerAcik = prefs.getBool('bildirimler_acik') ?? true;
-      _karanlikMod = prefs.getBool('karanlik_mod') ?? false;
-      _kayitliKonum = prefs.getString('cached_location') ?? "Konum Bilinmiyor";
     });
   }
 
   Future<void> _ayarKaydet(String key, dynamic value) async {
     final prefs = await SharedPreferences.getInstance();
-    if (value is bool) {
-      await prefs.setBool(key, value);
-    } else if (value is String) {
-      await prefs.setString(key, value);
-    }
-  }
-
-  Future<void> _verileriSifirla() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Tüm verileri siler
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Tüm veriler sıfırlandı. Uygulama yeniden başlatılıyor...",
-          ),
-          backgroundColor: kAnaRenk,
-        ),
-      );
-      // Kısa bir gecikme sonrası verileri tekrar yükle (veya ana sayfaya at)
-      Future.delayed(const Duration(seconds: 2), () {
-        _ayarlariYukle();
-      });
-    }
+    if (value is bool) await prefs.setBool(key, value);
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<NamazProvider>();
+
     return Scaffold(
-      backgroundColor: kArkaPlanRengi,
+      backgroundColor: AppColors.arkaPlanRengi,
       appBar: AppBar(
         title: const Text(
           "Ayarlar",
-          style: TextStyle(color: kYaziRengi, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: AppColors.yaziRengi,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -83,7 +56,6 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // 1. GENEL AYARLAR
           _buildSectionHeader("Genel"),
           _buildSettingsCard([
             _buildSwitchTile(
@@ -99,10 +71,10 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
             const Divider(height: 1),
             _buildInfoTile(
               title: "Kayıtlı Konum",
-              subtitle: _kayitliKonum,
+              subtitle: provider.konumBilgisi,
               icon: Icons.location_on_outlined,
               trailing: IconButton(
-                icon: const Icon(Icons.refresh, color: kAnaRenk),
+                icon: const Icon(Icons.refresh, color: AppColors.anaRenk),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -115,8 +87,6 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
           ]),
 
           const SizedBox(height: 20),
-
-          // 2. İBADET AYARLARI
           _buildSectionHeader("Hesaplama"),
           _buildSettingsCard([
             _buildInfoTile(
@@ -126,10 +96,9 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               trailing: const Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: kPasifRenk,
+                color: AppColors.pasifRenk,
               ),
               onTap: () {
-                // İleride buraya BottomSheet açıp yöntem seçtirilebilir
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text("Şu an sadece Diyanet metodu aktiftir."),
@@ -140,30 +109,29 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
           ]),
 
           const SizedBox(height: 20),
-
-          // 3. UYGULAMA HAKKINDA
           _buildSectionHeader("Uygulama"),
           _buildSettingsCard([
             _buildActionTile(
               title: "Bize Ulaşın",
               icon: Icons.mail_outline,
-              onTap: () {
-                // url_launcher ile mail atma kodu buraya gelebilir
-              },
+              onTap: () {},
             ),
             const Divider(height: 1),
             _buildActionTile(
               title: "Uygulamayı Paylaş",
               icon: Icons.share_outlined,
               onTap: () {
-                // share_plus paketi ile paylaşım kodu buraya gelebilir
+                // SHARE PLUS KULLANIMI
+                Share.share(
+                  'Namaz Vakti uygulamasını hemen indir ve namazlarını düzenli takip et! 📱 \n\nhttps://play.google.com/store/apps/details?id=com.example.namaz_app',
+                );
               },
             ),
             const Divider(height: 1),
             _buildActionTile(
               title: "Verileri Sıfırla",
               icon: Icons.delete_outline,
-              color: kKirmizi,
+              color: AppColors.kirmizi,
               onTap: () {
                 showDialog(
                   context: context,
@@ -177,17 +145,23 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
                         onPressed: () => Navigator.pop(context),
                         child: const Text(
                           "İptal",
-                          style: TextStyle(color: kPasifRenk),
+                          style: TextStyle(color: AppColors.pasifRenk),
                         ),
                       ),
                       TextButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          _verileriSifirla();
+                          context.read<NamazProvider>().verileriSifirla();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Veriler sıfırlandı."),
+                              backgroundColor: AppColors.anaRenk,
+                            ),
+                          );
                         },
                         child: const Text(
                           "Sil",
-                          style: TextStyle(color: kKirmizi),
+                          style: TextStyle(color: AppColors.kirmizi),
                         ),
                       ),
                     ],
@@ -196,24 +170,21 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               },
             ),
           ]),
-
           const SizedBox(height: 30),
           Center(
             child: Text(
               "Namaz Vakti v1.0.0",
               style: TextStyle(
-                color: kYaziRengi.withOpacity(0.5),
+                color: AppColors.yaziRengi.withOpacity(0.5),
                 fontSize: 12,
               ),
             ),
           ),
-          const SizedBox(height: 50), // Alt bar payı
+          const SizedBox(height: 50),
         ],
       ),
     );
   }
-
-  // --- YARDIMCI WIDGET'LAR ---
 
   Widget _buildSectionHeader(String title) {
     return Padding(
@@ -221,7 +192,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
-          color: kYaziRengi.withOpacity(0.6),
+          color: AppColors.yaziRengi.withOpacity(0.6),
           fontSize: 13,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
@@ -233,7 +204,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
   Widget _buildSettingsCard(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: kKartRengi,
+        color: AppColors.kartRengi,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -258,23 +229,29 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: kAnaRenk.withOpacity(0.1),
+          color: AppColors.anaRenk.withOpacity(0.1),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: kAnaRenk),
+        child: Icon(icon, color: AppColors.anaRenk),
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.bold, color: kYaziRengi),
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: AppColors.yaziRengi,
+        ),
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(fontSize: 12, color: kYaziRengi.withOpacity(0.6)),
+        style: TextStyle(
+          fontSize: 12,
+          color: AppColors.yaziRengi.withOpacity(0.6),
+        ),
       ),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: kAnaRenk,
+        activeColor: AppColors.anaRenk,
       ),
     );
   }
@@ -291,20 +268,23 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: kPasifRenk.withOpacity(0.2),
+          color: AppColors.pasifRenk.withOpacity(0.2),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: kYaziRengi),
+        child: Icon(icon, color: AppColors.yaziRengi),
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.bold, color: kYaziRengi),
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: AppColors.yaziRengi,
+        ),
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 13,
-          color: kAnaRenk,
+          color: AppColors.anaRenk,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -316,7 +296,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
     required String title,
     required IconData icon,
     required VoidCallback onTap,
-    Color color = kYaziRengi,
+    Color color = AppColors.yaziRengi,
   }) {
     return ListTile(
       onTap: onTap,
@@ -335,7 +315,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       trailing: const Icon(
         Icons.arrow_forward_ios,
         size: 16,
-        color: kPasifRenk,
+        color: AppColors.pasifRenk,
       ),
     );
   }

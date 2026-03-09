@@ -11,6 +11,7 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true // Bu satırı ekle
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -30,6 +31,7 @@ android {
         versionName = flutter.versionName
     }
 
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
@@ -41,4 +43,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Sürümü 2.0.3'ten 2.1.4'e yükseltin
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

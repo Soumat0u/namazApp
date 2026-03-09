@@ -1,27 +1,34 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:provider/provider.dart';
 
-// Sayfalarımızı "views" klasöründen çekiyoruz
+import 'core/constants/app_colors.dart';
+import 'services/namaz_servis.dart';
+import 'services/bildirim_servisi.dart';
+import 'providers/namaz_provider.dart';
 import 'views/ana_sayfa.dart';
-import 'views/statistics_screen.dart'; // Bu dosyayı oluşturduğunu varsayıyorum
-import 'views/settings_screen.dart'; // Bu dosyayı oluşturduğunu varsayıyorum
-
-// --- RENK PALETİ ---
-// (Not: İleride bunları lib/constants.dart içine taşıyıp her yerden oradan çekebilirsin)
-const Color kArkaPlanRengi = Color(0xFFFFFDF5);
-const Color kKartRengi = Color(0xFFFFFFFF);
-const Color kAnaRenk = Color(0xFFE67E22);
-const Color kYaziRengi = Color(0xFF3E2723);
-const Color kPasifRenk = Color(0xFFBCAAA4);
-const Color kAktifYesil = Color(0xFF2E7D32);
+import 'views/statistics_screen.dart';
+import 'views/settings_screen.dart';
+import 'views/kaza_sayfasi.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Tarih formatını başlat
   await initializeDateFormatting('tr_TR', null);
-  runApp(const NamazTakipApp());
+
+  // Bildirim Servisini Başlat
+  await BildirimServisi.init();
+
+  // Dependency Injection Kurulumu
+  final namazServisi = NamazServisi();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => NamazProvider(namazServisi)),
+      ],
+      child: const NamazTakipApp(),
+    ),
+  );
 }
 
 class NamazTakipApp extends StatelessWidget {
@@ -34,22 +41,23 @@ class NamazTakipApp extends StatelessWidget {
       title: 'Namaz Vakti',
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: kArkaPlanRengi,
-        primaryColor: kAnaRenk,
+        scaffoldBackgroundColor:
+            AppColors.arkaPlanRengi, // Sabitlerden çekiliyor
+        primaryColor: AppColors.anaRenk,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: kAnaRenk,
-          surface: kArkaPlanRengi,
+          seedColor: AppColors.anaRenk,
+          surface: AppColors.arkaPlanRengi,
         ),
         fontFamily: 'Roboto',
         textTheme: const TextTheme(
-          bodyMedium: TextStyle(color: kYaziRengi, fontSize: 16),
+          bodyMedium: TextStyle(color: AppColors.yaziRengi, fontSize: 16),
           bodyLarge: TextStyle(
-            color: kYaziRengi,
+            color: AppColors.yaziRengi,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
           displayLarge: TextStyle(
-            color: kYaziRengi,
+            color: AppColors.yaziRengi,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -59,10 +67,8 @@ class NamazTakipApp extends StatelessWidget {
   }
 }
 
-// --- NAVİGASYON VE SAYFA YÖNETİMİ ---
 class AnaUygulamaEkrani extends StatefulWidget {
   const AnaUygulamaEkrani({super.key});
-
   @override
   State<AnaUygulamaEkrani> createState() => _AnaUygulamaEkraniState();
 }
@@ -70,21 +76,22 @@ class AnaUygulamaEkrani extends StatefulWidget {
 class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
   int _seciliSayfaIndex = 0;
 
-  // Sayfaları burada listeliyoruz
+  // Sayfalar views klasöründeki dosyalardan geliyor
   final List<Widget> _sayfalar = [
     const AnaSayfa(),
-    const IstatistikSayfasi(), // views/istatistik_sayfasi.dart dosyasından gelir
-    const AyarlarSayfasi(), // views/ayarlar_sayfasi.dart dosyasından gelir
+    const KazaSayfasi(),
+    const IstatistikSayfasi(),
+    const AyarlarSayfasi(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // IndexedStack, sayfalar arası geçişte durumu (state) korur
+      // IndexedStack sayfa durumlarını korur
       body: IndexedStack(index: _seciliSayfaIndex, children: _sayfalar),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: kKartRengi,
+          color: AppColors.kartRengi,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -97,20 +104,20 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           currentIndex: _seciliSayfaIndex,
-          selectedItemColor: kAnaRenk,
-          unselectedItemColor: kPasifRenk,
-          showUnselectedLabels: false,
+          selectedItemColor: AppColors.anaRenk,
+          unselectedItemColor: AppColors.pasifRenk,
+          showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
-          iconSize: 30,
-          onTap: (index) {
-            setState(() {
-              _seciliSayfaIndex = index;
-            });
-          },
+          iconSize: 26,
+          onTap: (index) => setState(() => _seciliSayfaIndex = index),
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_rounded),
               label: 'Ana Sayfa',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              label: 'Kaza',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.bar_chart_rounded),

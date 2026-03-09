@@ -1,121 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../core/constants/app_colors.dart';
+import '../providers/namaz_provider.dart';
 
-// --- RENK PALETİ ---
-const Color kArkaPlanRengi = Color(0xFFFFFDF5);
-const Color kKartRengi = Color(0xFFFFFFFF);
-const Color kAnaRenk = Color(0xFFE67E22);
-const Color kYaziRengi = Color(0xFF3E2723);
-const Color kAktifYesil = Color(0xFF2E7D32);
-
-class IstatistikSayfasi extends StatefulWidget {
+class IstatistikSayfasi extends StatelessWidget {
   const IstatistikSayfasi({super.key});
 
   @override
-  State<IstatistikSayfasi> createState() => _IstatistikSayfasiState();
-}
-
-class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
-  int _streakCount = 0;
-  int _toplamTamamlanan = 0;
-  bool _isLoading = true;
-
-  List<FlSpot> _grafikNoktalari = [];
-  List<String> _gunIsimleri = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _verileriYukle(); // Sayfa ilk oluşturulduğunda verileri çek
-  }
-
-  // Verileri yükleyen ve arayüzü güncelleyen ana fonksiyon
-  Future<void> _verileriYukle() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Geçmiş veriyi çek ("history_stats" anahtarından)
-    String? historyJson = prefs.getString('history_stats');
-    Map<String, dynamic> history = historyJson != null
-        ? json.decode(historyJson)
-        : {};
-
-    List<FlSpot> tempSpots = [];
-    List<String> tempLabels = [];
-    DateTime bugun = DateTime.now();
-
-    // Haftanın başlangıcını Pazartesi yapacak şekilde 7 günlük döngü
-    int pztUzaklik = bugun.weekday - 1;
-    DateTime buHaftaninPazartesisi = bugun.subtract(Duration(days: pztUzaklik));
-
-    for (int i = 0; i < 7; i++) {
-      DateTime hedefGun = buHaftaninPazartesisi.add(Duration(days: i));
-      String dateKey = DateFormat('yyyy-MM-dd').format(hedefGun);
-
-      int count = history[dateKey] ?? 0;
-      tempSpots.add(FlSpot(i.toDouble(), count.toDouble()));
-      tempLabels.add(DateFormat('E', 'tr_TR').format(hedefGun));
-    }
-
-    if (mounted) {
-      setState(() {
-        _streakCount = prefs.getInt('streakCount') ?? 0;
-        _toplamTamamlanan = prefs.getInt('toplamKilinan') ?? 0;
-        _grafikNoktalari = tempSpots;
-        _gunIsimleri = tempLabels;
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // Sayfa her build edildiğinde (veya IndexedStack içinde görünür olduğunda)
-    // verileri arka planda güncellemek için küçük bir gecikmeyle fonksiyonu çağırıyoruz.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isLoading) {
-        _verileriYukle();
-      }
-    });
+    final provider = context.watch<NamazProvider>();
 
     return Scaffold(
-      backgroundColor: kArkaPlanRengi,
+      backgroundColor: AppColors.arkaPlanRengi,
       appBar: AppBar(
         title: const Text(
           "Performans Analizi",
-          style: TextStyle(color: kYaziRengi, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: AppColors.yaziRengi,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: kAnaRenk))
+      body: provider.isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.anaRenk),
+            )
           : RefreshIndicator(
-              color: kAnaRenk,
-              backgroundColor: kKartRengi,
-              onRefresh: _verileriYukle, // Manuel aşağı çekme
+              color: AppColors.anaRenk,
+              backgroundColor: AppColors.kartRengi,
+              onRefresh: provider.istatistikleriYukle,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildOzetKartlari(),
+                    _buildOzetKartlari(provider),
                     const SizedBox(height: 30),
                     const Text(
                       "Haftalık Performans (Pzt - Paz)",
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: kYaziRengi,
+                        color: AppColors.yaziRengi,
                       ),
                     ),
                     const SizedBox(height: 15),
-                    _buildCizgiGrafigi(),
+                    _buildCizgiGrafigi(provider),
                     const SizedBox(height: 30),
                     _buildMotiveEdiciKart(),
                     const SizedBox(height: 50),
@@ -126,22 +62,21 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
     );
   }
 
-  // --- UI Widget Fonksiyonları (Orijinal yapı korunmuştur) ---
-  Widget _buildOzetKartlari() {
+  Widget _buildOzetKartlari(NamazProvider provider) {
     return Row(
       children: [
         _istatistikKutusu(
           baslik: "Seri",
-          deger: "$_streakCount Gün",
+          deger: "${provider.streakCount} Gün",
           ikon: Icons.local_fire_department,
-          renk: kAnaRenk,
+          renk: AppColors.anaRenk,
         ),
         const SizedBox(width: 15),
         _istatistikKutusu(
           baslik: "Toplam Vakit",
-          deger: "$_toplamTamamlanan",
+          deger: "${provider.toplamTamamlanan}",
           ikon: Icons.check_circle_outline,
-          renk: kAktifYesil,
+          renk: AppColors.aktifYesil,
         ),
       ],
     );
@@ -157,7 +92,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: kKartRengi,
+          color: AppColors.kartRengi,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -184,7 +119,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: kYaziRengi,
+                color: AppColors.yaziRengi,
               ),
             ),
             const SizedBox(height: 5),
@@ -192,7 +127,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
               baslik,
               style: TextStyle(
                 fontSize: 14,
-                color: kYaziRengi.withOpacity(0.6),
+                color: AppColors.yaziRengi.withOpacity(0.6),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -202,12 +137,12 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
     );
   }
 
-  Widget _buildCizgiGrafigi() {
+  Widget _buildCizgiGrafigi(NamazProvider provider) {
     return Container(
       height: 250,
       padding: const EdgeInsets.only(right: 20, left: 10, top: 25, bottom: 10),
       decoration: BoxDecoration(
-        color: kKartRengi,
+        color: AppColors.kartRengi,
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
@@ -235,20 +170,22 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
                 interval: 1,
                 getTitlesWidget: (value, meta) {
                   int index = value.toInt();
-                  if (index >= 0 && index < _gunIsimleri.length) {
+                  if (index >= 0 && index < provider.gunIsimleri.length) {
                     return Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Text(
-                        _gunIsimleri[index],
+                        provider.gunIsimleri[index],
                         style: TextStyle(
-                          color: kYaziRengi.withOpacity(0.5),
+                          color: AppColors.yaziRengi.withOpacity(0.5),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     );
                   }
-                  return const Text('');
+                  return const Text(
+                    'Gün',
+                  ); // Skeleton sırasında hata vermemesi için
                 },
               ),
             ),
@@ -260,7 +197,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
                 getTitlesWidget: (value, meta) => Text(
                   value.toInt().toString(),
                   style: TextStyle(
-                    color: kYaziRengi.withOpacity(0.5),
+                    color: AppColors.yaziRengi.withOpacity(0.5),
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -275,11 +212,11 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
           maxY: 5,
           lineBarsData: [
             LineChartBarData(
-              spots: _grafikNoktalari.isNotEmpty
-                  ? _grafikNoktalari
+              spots: provider.grafikNoktalari.isNotEmpty
+                  ? provider.grafikNoktalari
                   : List.generate(7, (index) => FlSpot(index.toDouble(), 0)),
               isCurved: true,
-              color: kAnaRenk,
+              color: AppColors.anaRenk,
               barWidth: 4,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: true),
@@ -287,8 +224,8 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
                 show: true,
                 gradient: LinearGradient(
                   colors: [
-                    kAnaRenk.withOpacity(0.3),
-                    kAnaRenk.withOpacity(0.0),
+                    AppColors.anaRenk.withOpacity(0.3),
+                    AppColors.anaRenk.withOpacity(0.0),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -307,7 +244,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
       decoration: BoxDecoration(
         color: const Color(0xFFE8F5E9),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kAktifYesil.withOpacity(0.3)),
+        border: Border.all(color: AppColors.aktifYesil.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -317,7 +254,11 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.emoji_events, color: kAktifYesil, size: 28),
+            child: const Icon(
+              Icons.emoji_events,
+              color: AppColors.aktifYesil,
+              size: 28,
+            ),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -329,7 +270,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: kAktifYesil,
+                    color: AppColors.aktifYesil,
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -337,7 +278,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> with RouteAware {
                   "İstikrarını koruduğun her gün, hedefine bir adım daha yaklaşıyorsun.",
                   style: TextStyle(
                     fontSize: 14,
-                    color: kYaziRengi.withOpacity(0.7),
+                    color: AppColors.yaziRengi.withOpacity(0.7),
                   ),
                 ),
               ],
