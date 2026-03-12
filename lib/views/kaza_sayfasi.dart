@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
+import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 
 class KazaSayfasi extends StatelessWidget {
@@ -8,22 +9,24 @@ class KazaSayfasi extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Responsive.init(context);
     final provider = context.watch<NamazProvider>();
+    final r = context.renkler;
 
-    // Toplam kaza sayısını hesapla
     int toplamKaza = provider.kazaNamazlari.values.fold(
       0,
       (sum, item) => sum + item,
     );
 
     return Scaffold(
-      backgroundColor: AppColors.arkaPlanRengi,
+      backgroundColor: r.arkaPlanRengi,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "Kaza Namazları",
           style: TextStyle(
-            color: AppColors.yaziRengi,
+            color: r.yaziRengi,
             fontWeight: FontWeight.bold,
+            fontSize: Responsive.sp(18),
           ),
         ),
         centerTitle: true,
@@ -32,15 +35,17 @@ class KazaSayfasi extends StatelessWidget {
       ),
       body: Column(
         children: [
-          _buildToplamKart(toplamKaza),
+          _buildToplamKart(context, toplamKaza),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(16),
+                vertical: Responsive.h(8),
+              ),
               itemCount: provider.vakitIsimleri.length,
               itemBuilder: (context, index) {
                 String vakit = provider.vakitIsimleri[index];
                 int kazaSayisi = provider.kazaNamazlari[vakit] ?? 0;
-
                 return _buildKazaKart(context, provider, vakit, kazaSayisi);
               },
             ),
@@ -50,13 +55,14 @@ class KazaSayfasi extends StatelessWidget {
     );
   }
 
-  Widget _buildToplamKart(int toplam) {
+  Widget _buildToplamKart(BuildContext context, int toplam) {
+    final r = context.renkler;
     return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(20),
+      margin: EdgeInsets.all(Responsive.w(16)),
+      padding: EdgeInsets.all(Responsive.w(16)),
       decoration: BoxDecoration(
-        color: AppColors.kartRengi,
-        borderRadius: BorderRadius.circular(20),
+        color: r.kartRengi,
+        borderRadius: BorderRadius.circular(Responsive.w(16)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -68,26 +74,29 @@ class KazaSayfasi extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
+          Text(
             "Toplam Bekleyen Kaza",
             style: TextStyle(
-              fontSize: 16,
+              fontSize: Responsive.sp(15),
               fontWeight: FontWeight.bold,
-              color: AppColors.yaziRengi,
+              color: r.yaziRengi,
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.w(12),
+              vertical: Responsive.h(6),
+            ),
             decoration: BoxDecoration(
-              color: AppColors.kirmizi.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(15),
+              color: r.kirmizi.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(Responsive.w(12)),
             ),
             child: Text(
               "$toplam",
-              style: const TextStyle(
-                fontSize: 20,
+              style: TextStyle(
+                fontSize: Responsive.sp(18),
                 fontWeight: FontWeight.bold,
-                color: AppColors.kirmizi,
+                color: r.kirmizi,
               ),
             ),
           ),
@@ -102,51 +111,55 @@ class KazaSayfasi extends StatelessWidget {
     String vakit,
     int sayi,
   ) {
+    final r = context.renkler;
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
+      margin: EdgeInsets.only(bottom: Responsive.h(12)),
+      padding: EdgeInsets.all(Responsive.w(12)),
       decoration: BoxDecoration(
-        color: AppColors.kartRengi,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.pasifRenk.withOpacity(0.3)),
+        color: r.kartRengi,
+        borderRadius: BorderRadius.circular(Responsive.w(12)),
+        border: Border.all(color: r.pasifRenk.withOpacity(0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             vakit,
-            style: const TextStyle(
-              fontSize: 18,
+            style: TextStyle(
+              fontSize: Responsive.sp(16),
               fontWeight: FontWeight.bold,
-              color: AppColors.yaziRengi,
+              color: r.yaziRengi,
             ),
           ),
           Row(
             children: [
               IconButton(
                 onPressed: () => provider.kazaGuncelle(vakit, -1),
-                icon: const Icon(
+                icon: Icon(
                   Icons.remove_circle_outline,
-                  color: AppColors.aktifYesil,
+                  color: r.aktifYesil,
+                  size: Responsive.w(22),
                 ),
               ),
               SizedBox(
-                width: 40,
+                width: Responsive.w(36),
                 child: Center(
                   child: Text(
                     "$sayi",
-                    style: const TextStyle(
-                      fontSize: 20,
+                    style: TextStyle(
+                      fontSize: Responsive.sp(18),
                       fontWeight: FontWeight.bold,
+                      color: r.yaziRengi,
                     ),
                   ),
                 ),
               ),
               IconButton(
                 onPressed: () => provider.kazaGuncelle(vakit, 1),
-                icon: const Icon(
+                icon: Icon(
                   Icons.add_circle_outline,
-                  color: AppColors.kirmizi,
+                  color: r.kirmizi,
+                  size: Responsive.w(22),
                 ),
               ),
             ],

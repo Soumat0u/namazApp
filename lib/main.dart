@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
-import 'core/constants/app_colors.dart';
+import 'core/utils/responsive.dart';
+
 import 'services/namaz_servis.dart';
 import 'services/bildirim_servisi.dart';
 import 'providers/namaz_provider.dart';
+import 'providers/theme_provider.dart';
 import 'views/ana_sayfa.dart';
 import 'views/statistics_screen.dart';
 import 'views/settings_screen.dart';
@@ -25,6 +27,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => NamazProvider(namazServisi)),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: const NamazTakipApp(),
     ),
@@ -36,32 +39,12 @@ class NamazTakipApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Namaz Vakti',
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor:
-            AppColors.arkaPlanRengi, // Sabitlerden çekiliyor
-        primaryColor: AppColors.anaRenk,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.anaRenk,
-          surface: AppColors.arkaPlanRengi,
-        ),
-        fontFamily: 'Roboto',
-        textTheme: const TextTheme(
-          bodyMedium: TextStyle(color: AppColors.yaziRengi, fontSize: 16),
-          bodyLarge: TextStyle(
-            color: AppColors.yaziRengi,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-          displayLarge: TextStyle(
-            color: AppColors.yaziRengi,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      theme: themeProvider.buildThemeData(),
       home: const AnaUygulamaEkrani(),
     );
   }
@@ -86,12 +69,15 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
 
   @override
   Widget build(BuildContext context) {
+    Responsive.init(context);
+    final tema = context.watch<ThemeProvider>().aktifTema;
+
     return Scaffold(
       // IndexedStack sayfa durumlarını korur
       body: IndexedStack(index: _seciliSayfaIndex, children: _sayfalar),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: AppColors.kartRengi,
+          color: tema.kartRengi,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -104,11 +90,13 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           currentIndex: _seciliSayfaIndex,
-          selectedItemColor: AppColors.anaRenk,
-          unselectedItemColor: AppColors.pasifRenk,
+          selectedItemColor: tema.anaRenk,
+          unselectedItemColor: tema.pasifRenk,
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
-          iconSize: 26,
+          iconSize: Responsive.w(22),
+          selectedFontSize: Responsive.sp(11),
+          unselectedFontSize: Responsive.sp(10),
           onTap: (index) => setState(() => _seciliSayfaIndex = index),
           items: const [
             BottomNavigationBarItem(

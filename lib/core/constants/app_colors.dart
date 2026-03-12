@@ -1,5 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
 
+/// BuildContext extension ile dinamik tema renklerine erişim sağlar.
+/// Kullanım: `final renkler = context.renkler;` sonra `renkler.arkaPlanRengi` vb.
+extension AppColorsExtension on BuildContext {
+  AppThemeColors get renkler {
+    final tema = watch<ThemeProvider>().aktifTema;
+    return AppThemeColors(tema);
+  }
+
+  /// listen: false versiyonu (callback, initState gibi yerlerde)
+  AppThemeColors get renklerOku {
+    final tema = read<ThemeProvider>().aktifTema;
+    return AppThemeColors(tema);
+  }
+}
+
+class AppThemeColors {
+  final dynamic _tema;
+
+  AppThemeColors(this._tema);
+
+  Color get arkaPlanRengi => _tema.arkaPlanRengi;
+  Color get kartRengi => _tema.kartRengi;
+  Color get anaRenk => _tema.anaRenk;
+  Color get yaziRengi => _tema.yaziRengi;
+  Color get pasifRenk => _tema.pasifRenk;
+  Color get aktifYesil => _tema.aktifYesil;
+  Color get kirmizi => _tema.kirmizi;
+}
+
+/// Geriye uyumluluk için statik renkler (varsayılan tema).
+/// Tercihen context.renkler kullanın.
 class AppColors {
   static const Color arkaPlanRengi = Color(0xFFFFFDF5);
   static const Color kartRengi = Color(0xFFFFFFFF);

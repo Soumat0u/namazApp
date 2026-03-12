@@ -2,19 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../core/constants/app_colors.dart';
+import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
+import '../providers/theme_provider.dart';
 
 class AnaSayfa extends StatelessWidget {
   const AnaSayfa({super.key});
 
   @override
   Widget build(BuildContext context) {
+    Responsive.init(context);
     final provider = context.watch<NamazProvider>();
-    final ekranYuksekligi = MediaQuery.of(context).size.height;
 
     if (provider.isLoading && provider.vakitler == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.anaRenk),
+      return Center(
+        child: CircularProgressIndicator(color: context.renkler.anaRenk),
       );
     }
 
@@ -34,23 +36,23 @@ class AnaSayfa extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
               child: Text(
                 provider.hataMesaji,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.yaziRengi,
-                  fontSize: 16,
+                style: TextStyle(
+                  color: context.renkler.yaziRengi,
+                  fontSize: Responsive.sp(16),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: Responsive.h(20)),
             ElevatedButton(
               onPressed: () => context.read<NamazProvider>().konumVeApiIstegi(
                 kullaniciTetikledi: true,
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.anaRenk,
+                backgroundColor: context.renkler.anaRenk,
                 foregroundColor: Colors.white,
               ),
               child: const Text("Konum İzni Ver / Tekrar Dene"),
@@ -62,25 +64,26 @@ class AnaSayfa extends StatelessWidget {
 
     return SafeArea(
       child: RefreshIndicator(
-        color: AppColors.anaRenk,
-        backgroundColor: AppColors.kartRengi,
+        color: context.renkler.anaRenk,
+        backgroundColor: context.renkler.kartRengi,
         onRefresh: () => context.read<NamazProvider>().konumVeApiIstegi(
           kullaniciTetikledi: true,
         ),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: EdgeInsets.all(Responsive.w(16)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(provider),
-                const SizedBox(height: 20),
-                _buildMainClock(provider, ekranYuksekligi, context),
-                const SizedBox(height: 20),
-                _buildVakitGrid(provider),
-                const SizedBox(height: 20),
-                _buildPrayerButton(provider, ekranYuksekligi),
+                _buildHeader(context, provider),
+                SizedBox(height: Responsive.h(16)),
+                _buildMainClock(context, provider),
+                SizedBox(height: Responsive.h(16)),
+                _buildVakitGrid(context, provider),
+                SizedBox(height: Responsive.h(16)),
+                _buildPrayerButton(context, provider),
+                SizedBox(height: Responsive.h(10)),
               ],
             ),
           ),
@@ -90,68 +93,63 @@ class AnaSayfa extends StatelessWidget {
   }
 }
 
-Widget _buildHeader(NamazProvider provider) {
+Widget _buildHeader(BuildContext context, NamazProvider provider) {
+  final r = context.renkler;
   return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: _sikKutuDecoration(),
+    padding: EdgeInsets.all(Responsive.w(16)),
+    decoration: _sikKutuDecoration(context),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              provider.ekranTarihi.isNotEmpty
-                  ? provider.ekranTarihi.split(',')[0]
-                  : "Pazartesi",
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.yaziRengi,
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                provider.ekranTarihi.isNotEmpty
+                    ? provider.ekranTarihi.split(',')[0]
+                    : "Pazartesi",
+                style: TextStyle(
+                  fontSize: Responsive.sp(18),
+                  fontWeight: FontWeight.bold,
+                  color: r.yaziRengi,
+                ),
               ),
-            ),
-            // HİCRİ TAKVİM EKLENDİ
-            Text(
-              provider.hicriTarih.isNotEmpty
-                  ? provider.hicriTarih
-                  : "1 Ramazan 1445",
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.anaRenk,
-                fontWeight: FontWeight.w600,
+              Text(
+                provider.ekranTarihi.contains(',')
+                    ? provider.ekranTarihi.split(',')[1].trim()
+                    : "10 Mart",
+                style: TextStyle(
+                  fontSize: Responsive.sp(13),
+                  color: r.yaziRengi.withOpacity(0.7),
+                ),
               ),
-            ),
-            Text(
-              provider.ekranTarihi.contains(',')
-                  ? provider.ekranTarihi.split(',')[1].trim()
-                  : "10 Mart",
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.yaziRengi.withOpacity(0.7),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(12),
+            vertical: Responsive.h(8),
+          ),
           decoration: BoxDecoration(
-            color: AppColors.anaRenk.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(20),
+            color: r.anaRenk.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(Responsive.w(20)),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.local_fire_department,
-                color: AppColors.anaRenk,
-                size: 28,
+                color: r.anaRenk,
+                size: Responsive.w(24),
               ),
-              const SizedBox(width: 5),
+              SizedBox(width: Responsive.w(4)),
               Text(
                 "${provider.streakCount}",
-                style: const TextStyle(
-                  fontSize: 22,
+                style: TextStyle(
+                  fontSize: Responsive.sp(20),
                   fontWeight: FontWeight.bold,
-                  color: AppColors.yaziRengi,
+                  color: r.yaziRengi,
                 ),
               ),
             ],
@@ -162,12 +160,21 @@ Widget _buildHeader(NamazProvider provider) {
   );
 }
 
-Widget _buildMainClock(NamazProvider provider, double h, BuildContext context) {
+Widget _buildMainClock(BuildContext context, NamazProvider provider) {
+  final r = context.renkler;
+  final tema = context.watch<ThemeProvider>().aktifTema;
+  final gradientEnd = tema.brightness == Brightness.dark
+      ? tema.kartRengi.withOpacity(0.8)
+      : const Color(0xFFFFF3E0);
+
   return Container(
-    height: h * 0.35,
-    decoration: _sikKutuDecoration().copyWith(
-      gradient: const LinearGradient(
-        colors: [AppColors.kartRengi, Color(0xFFFFF3E0)],
+    padding: EdgeInsets.symmetric(
+      vertical: Responsive.h(24),
+      horizontal: Responsive.w(16),
+    ),
+    decoration: _sikKutuDecoration(context).copyWith(
+      gradient: LinearGradient(
+        colors: [r.kartRengi, gradientEnd],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -189,7 +196,10 @@ Widget _buildMainClock(NamazProvider provider, double h, BuildContext context) {
           },
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.w(10),
+              vertical: Responsive.h(3),
+            ),
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.05),
               borderRadius: BorderRadius.circular(8),
@@ -199,62 +209,68 @@ Widget _buildMainClock(NamazProvider provider, double h, BuildContext context) {
               children: [
                 Icon(
                   Icons.location_on,
-                  size: 16,
-                  color: AppColors.yaziRengi.withOpacity(0.6),
+                  size: Responsive.w(14),
+                  color: r.yaziRengi.withOpacity(0.6),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  provider.konumBilgisi,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.yaziRengi.withOpacity(0.6),
-                    letterSpacing: 1,
+                SizedBox(width: Responsive.w(4)),
+                Flexible(
+                  child: Text(
+                    provider.konumBilgisi,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: Responsive.sp(12),
+                      fontWeight: FontWeight.w600,
+                      color: r.yaziRengi.withOpacity(0.6),
+                      letterSpacing: 1,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: Responsive.w(4)),
                 Icon(
                   Icons.refresh,
-                  size: 14,
-                  color: AppColors.yaziRengi.withOpacity(0.4),
+                  size: Responsive.w(12),
+                  color: r.yaziRengi.withOpacity(0.4),
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: Responsive.h(8)),
         Text(
           provider.aktifVakit.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 28,
+          style: TextStyle(
+            fontSize: Responsive.sp(24),
             letterSpacing: 5,
-            color: AppColors.anaRenk,
+            color: r.anaRenk,
             fontWeight: FontWeight.w900,
           ),
         ),
         Text(
           DateFormat("HH:mm").format(DateTime.now()),
-          style: const TextStyle(
-            fontSize: 75,
+          style: TextStyle(
+            fontSize: Responsive.sp(64),
             fontWeight: FontWeight.bold,
-            color: AppColors.yaziRengi,
+            color: r.yaziRengi,
             letterSpacing: -2,
             height: 1.0,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: Responsive.h(8)),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(16),
+            vertical: Responsive.h(6),
+          ),
           decoration: BoxDecoration(
-            color: AppColors.yaziRengi.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(15),
+            color: r.yaziRengi.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(Responsive.w(15)),
           ),
           child: Text(
             "Kalan Süre: ${provider.kalanSure}",
-            style: const TextStyle(
-              fontSize: 18,
+            style: TextStyle(
+              fontSize: Responsive.sp(15),
               fontWeight: FontWeight.bold,
-              color: AppColors.yaziRengi,
+              color: r.yaziRengi,
             ),
           ),
         ),
@@ -263,92 +279,76 @@ Widget _buildMainClock(NamazProvider provider, double h, BuildContext context) {
   );
 }
 
-Widget _buildVakitGrid(NamazProvider provider) {
+Widget _buildVakitGrid(BuildContext context, NamazProvider provider) {
   return Container(
-    height: 130,
-    padding: const EdgeInsets.symmetric(vertical: 15),
-    decoration: _sikKutuDecoration(),
+    padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+    decoration: _sikKutuDecoration(context),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _vakitKutusu(
-          "Sabah",
-          Icons.wb_twilight,
-          provider.vakitler?["Sabah"] ?? "05:00",
-          provider,
-        ),
-        _vakitKutusu(
-          "Öğle",
-          Icons.wb_sunny,
-          provider.vakitler?["Öğle"] ?? "13:00",
-          provider,
-        ),
-        _vakitKutusu(
-          "İkindi",
-          Icons.wb_twighlight,
-          provider.vakitler?["İkindi"] ?? "16:00",
-          provider,
-        ),
-        _vakitKutusu(
-          "Akşam",
-          Icons.bedtime,
-          provider.vakitler?["Akşam"] ?? "19:00",
-          provider,
-        ),
-        _vakitKutusu(
-          "Yatsı",
-          Icons.nights_stay,
-          provider.vakitler?["Yatsı"] ?? "20:30",
-          provider,
-        ),
+        _vakitKutusu(context, "Sabah", Icons.wb_twilight,
+            provider.vakitler?["Sabah"] ?? "05:00", provider),
+        _vakitKutusu(context, "Öğle", Icons.wb_sunny,
+            provider.vakitler?["Öğle"] ?? "13:00", provider),
+        _vakitKutusu(context, "İkindi", Icons.wb_twighlight,
+            provider.vakitler?["İkindi"] ?? "16:00", provider),
+        _vakitKutusu(context, "Akşam", Icons.bedtime,
+            provider.vakitler?["Akşam"] ?? "19:00", provider),
+        _vakitKutusu(context, "Yatsı", Icons.nights_stay,
+            provider.vakitler?["Yatsı"] ?? "20:30", provider),
       ],
     ),
   );
 }
 
-Widget _buildPrayerButton(NamazProvider provider, double h) {
-  return SizedBox(
-    height: h * 0.15,
-    child: _AnimatedPrayerButton(
-      isDone: provider.kildiMi[provider.aktifVakit] ?? false,
-      onTap: () {
-        bool suanki = provider.kildiMi[provider.aktifVakit] ?? false;
-        provider.vaktiKildimIsaretle(provider.aktifVakit, !suanki);
-      },
-    ),
+Widget _buildPrayerButton(BuildContext context, NamazProvider provider) {
+  return _AnimatedPrayerButton(
+    isDone: provider.kildiMi[provider.aktifVakit] ?? false,
+    onTap: () {
+      bool suanki = provider.kildiMi[provider.aktifVakit] ?? false;
+      provider.vaktiKildimIsaretle(provider.aktifVakit, !suanki);
+    },
   );
 }
 
-BoxDecoration _sikKutuDecoration() => BoxDecoration(
-  color: AppColors.kartRengi,
-  borderRadius: BorderRadius.circular(25),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.08),
-      blurRadius: 15,
-      offset: const Offset(0, 5),
-    ),
-  ],
-);
+BoxDecoration _sikKutuDecoration(BuildContext context) {
+  final r = context.renkler;
+  return BoxDecoration(
+    color: r.kartRengi,
+    borderRadius: BorderRadius.circular(Responsive.w(20)),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.08),
+        blurRadius: 15,
+        offset: const Offset(0, 5),
+      ),
+    ],
+  );
+}
 
 Widget _vakitKutusu(
+  BuildContext context,
   String ad,
   IconData ikon,
   String saat,
   NamazProvider provider,
 ) {
+  final r = context.renkler;
   bool kildi = provider.kildiMi[ad] ?? false;
   bool suan = provider.aktifVakit == ad;
   String temizSaat = saat.contains(" ") ? saat.split(" ")[0] : saat;
 
   return AnimatedContainer(
     duration: const Duration(milliseconds: 400),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    padding: EdgeInsets.symmetric(
+      horizontal: Responsive.w(8),
+      vertical: Responsive.h(6),
+    ),
     decoration: BoxDecoration(
-      color: suan ? AppColors.aktifYesil.withOpacity(0.2) : Colors.transparent,
-      borderRadius: BorderRadius.circular(15),
+      color: suan ? r.aktifYesil.withOpacity(0.2) : Colors.transparent,
+      borderRadius: BorderRadius.circular(Responsive.w(12)),
       border: suan
-          ? Border.all(color: AppColors.aktifYesil.withOpacity(0.5), width: 1.5)
+          ? Border.all(color: r.aktifYesil.withOpacity(0.5), width: 1.5)
           : null,
     ),
     child: Column(
@@ -357,28 +357,26 @@ Widget _vakitKutusu(
       children: [
         Icon(
           ikon,
-          size: 28,
+          size: Responsive.w(24),
           color: kildi
-              ? AppColors.aktifYesil
-              : (suan ? AppColors.anaRenk : AppColors.pasifRenk),
+              ? r.aktifYesil
+              : (suan ? r.anaRenk : r.pasifRenk),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: Responsive.h(6)),
         Text(
           temizSaat,
           style: TextStyle(
-            fontSize: 15,
+            fontSize: Responsive.sp(13),
             fontWeight: suan ? FontWeight.bold : FontWeight.w500,
-            color: suan
-                ? AppColors.yaziRengi
-                : AppColors.yaziRengi.withOpacity(0.5),
+            color: suan ? r.yaziRengi : r.yaziRengi.withOpacity(0.5),
           ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: Responsive.h(3)),
         Text(
           ad,
           style: TextStyle(
-            fontSize: 12,
-            color: suan ? AppColors.anaRenk : Colors.transparent,
+            fontSize: Responsive.sp(10),
+            color: suan ? r.anaRenk : Colors.transparent,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -420,6 +418,11 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
 
   @override
   Widget build(BuildContext context) {
+    final r = context.renkler;
+    final btnHeight = Responsive.h(120);
+    final circleSize = Responsive.w(60);
+    final iconSize = Responsive.w(36);
+
     return GestureDetector(
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) => _controller.reverse(),
@@ -429,19 +432,20 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
         scale: _scaleAnimation,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
+          height: btnHeight,
           decoration: BoxDecoration(
-            color: widget.isDone ? AppColors.aktifYesil : AppColors.kartRengi,
-            borderRadius: BorderRadius.circular(30),
+            color: widget.isDone ? r.aktifYesil : r.kartRengi,
+            borderRadius: BorderRadius.circular(Responsive.w(25)),
             border: widget.isDone
                 ? null
                 : Border.all(
-                    color: AppColors.anaRenk.withOpacity(0.3),
+                    color: r.anaRenk.withOpacity(0.3),
                     width: 2,
                   ),
             boxShadow: [
               BoxShadow(
                 color: widget.isDone
-                    ? AppColors.aktifYesil.withOpacity(0.4)
+                    ? r.aktifYesil.withOpacity(0.4)
                     : Colors.black.withOpacity(0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
@@ -453,31 +457,29 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                width: 75,
-                height: 75,
+                width: circleSize,
+                height: circleSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.arkaPlanRengi,
+                  color: r.arkaPlanRengi,
                   border: Border.all(
-                    color: widget.isDone ? Colors.white : AppColors.pasifRenk,
-                    width: 4,
+                    color: widget.isDone ? Colors.white : r.pasifRenk,
+                    width: 3,
                   ),
                 ),
                 child: Icon(
                   Icons.check_rounded,
-                  size: 45,
-                  color: widget.isDone
-                      ? AppColors.aktifYesil
-                      : AppColors.pasifRenk,
+                  size: iconSize,
+                  color: widget.isDone ? r.aktifYesil : r.pasifRenk,
                 ),
               ),
-              const SizedBox(height: 15),
+              SizedBox(height: Responsive.h(10)),
               Text(
                 widget.isDone ? "ALLAH KABUL ETSİN!" : "VAKTİ KILDIM",
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: Responsive.sp(15),
                   fontWeight: FontWeight.w900,
-                  color: widget.isDone ? Colors.white : AppColors.yaziRengi,
+                  color: widget.isDone ? Colors.white : r.yaziRengi,
                   letterSpacing: 1,
                 ),
               ),

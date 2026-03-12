@@ -5,7 +5,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
-import 'package:hijri/hijri_calendar.dart'; // EKLENDİ
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/namaz_servis.dart';
 import '../services/bildirim_servisi.dart';
@@ -24,7 +23,6 @@ class NamazProvider extends ChangeNotifier {
   String aktifVakit = "Sabah";
   String kalanSure = "--:--:--";
   String ekranTarihi = "";
-  String hicriTarih = ""; // EKLENDİ
   String konumBilgisi = "Yükleniyor...";
 
   int streakCount = 0;
@@ -197,18 +195,6 @@ class NamazProvider extends ChangeNotifier {
     final simdi = DateTime.now();
     ekranTarihi = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(simdi);
 
-    // Hicri takvimi ayarla
-    try {
-      HijriCalendar.setLocal('tr');
-      // .now() yerine manuel tarih vererek başlatmak daha güvenlidir
-      var bugunHicri = HijriCalendar.fromDate(simdi);
-      hicriTarih =
-          "${bugunHicri.hDay} ${bugunHicri.longMonthName} ${bugunHicri.hYear}";
-    } catch (e) {
-      // Eğer paket yine hata verirse uygulama çökmesin diye boş bırakıyoruz
-      hicriTarih = "";
-      debugPrint("Hicri takvim hatası: $e");
-    }
     streakCount = prefs.getInt('streakCount') ?? 0;
     toplamTamamlanan = prefs.getInt('toplamKilinan') ?? 0;
     sonSifirlamaTarihi = prefs.getString('lastResetDate') ?? "";
