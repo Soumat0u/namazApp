@@ -5,6 +5,7 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
+import 'widgets/vakit_background.dart';
 
 class AnaSayfa extends StatelessWidget {
   const AnaSayfa({super.key});
@@ -63,6 +64,8 @@ class AnaSayfa extends StatelessWidget {
     }
 
     return SafeArea(
+      left: false,
+      right: false,
       child: RefreshIndicator(
         color: context.renkler.anaRenk,
         backgroundColor: context.renkler.kartRengi,
@@ -71,21 +74,36 @@ class AnaSayfa extends StatelessWidget {
         ),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: EdgeInsets.all(Responsive.w(16)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeader(context, provider),
-                SizedBox(height: Responsive.h(16)),
-                _buildMainClock(context, provider),
-                SizedBox(height: Responsive.h(16)),
-                _buildVakitGrid(context, provider),
-                SizedBox(height: Responsive.h(16)),
-                _buildPrayerButton(context, provider),
-                SizedBox(height: Responsive.h(10)),
-              ],
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.w(16),
+                  Responsive.h(16),
+                  Responsive.w(16),
+                  0,
+                ),
+                child: _buildHeader(context, provider),
+              ),
+              SizedBox(height: Responsive.h(16)),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+                child: _buildMainClock(context, provider),
+              ),
+              Padding(
+                padding: EdgeInsets.all(Responsive.w(16)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildVakitGrid(context, provider),
+                    SizedBox(height: Responsive.h(16)),
+                    _buildPrayerButton(context, provider),
+                    SizedBox(height: Responsive.h(10)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -167,114 +185,128 @@ Widget _buildMainClock(BuildContext context, NamazProvider provider) {
       ? tema.kartRengi.withOpacity(0.8)
       : const Color(0xFFFFF3E0);
 
-  return Container(
-    padding: EdgeInsets.symmetric(
-      vertical: Responsive.h(24),
-      horizontal: Responsive.w(16),
-    ),
-    decoration: _sikKutuDecoration(context).copyWith(
-      gradient: LinearGradient(
-        colors: [r.kartRengi, gradientEnd],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+  return VakitBackground(
+    tema: provider.vaktinTemasi,
+    borderRadius: BorderRadius.circular(Responsive.w(20)),
+    child: Container(
+      padding: EdgeInsets.symmetric(
+        vertical: Responsive.h(24),
+        horizontal: Responsive.w(16),
       ),
-    ),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        InkWell(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Konum güncelleniyor..."),
-                duration: Duration(seconds: 1),
-              ),
-            );
-            context.read<NamazProvider>().konumVeApiIstegi(
-              kullaniciTetikledi: true,
-            );
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: Responsive.w(10),
-              vertical: Responsive.h(3),
-            ),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.location_on,
-                  size: Responsive.w(14),
-                  color: r.yaziRengi.withOpacity(0.6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          InkWell(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Konum güncelleniyor..."),
+                  duration: Duration(seconds: 1),
                 ),
-                SizedBox(width: Responsive.w(4)),
-                Flexible(
-                  child: Text(
-                    provider.konumBilgisi,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: Responsive.sp(12),
-                      fontWeight: FontWeight.w600,
-                      color: r.yaziRengi.withOpacity(0.6),
-                      letterSpacing: 1,
+              );
+              context.read<NamazProvider>().konumVeApiIstegi(
+                kullaniciTetikledi: true,
+              );
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(10),
+                vertical: Responsive.h(3),
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.location_on,
+                    size: Responsive.w(14),
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                  SizedBox(width: Responsive.w(4)),
+                  Flexible(
+                    child: Text(
+                      provider.konumBilgisi,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: Responsive.sp(12),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        letterSpacing: 1,
+                        shadows: [
+                          Shadow(blurRadius: 4, color: Colors.black26),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(width: Responsive.w(4)),
-                Icon(
-                  Icons.refresh,
-                  size: Responsive.w(12),
-                  color: r.yaziRengi.withOpacity(0.4),
-                ),
+                  SizedBox(width: Responsive.w(4)),
+                  Icon(
+                    Icons.refresh,
+                    size: Responsive.w(12),
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: Responsive.h(8)),
+          Text(
+            provider.aktifVakit.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: Responsive.sp(24),
+              letterSpacing: 5,
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              shadows: [
+                Shadow(blurRadius: 10, color: Colors.black45, offset: Offset(0, 2)),
               ],
             ),
           ),
-        ),
-        SizedBox(height: Responsive.h(8)),
-        Text(
-          provider.aktifVakit.toUpperCase(),
-          style: TextStyle(
-            fontSize: Responsive.sp(24),
-            letterSpacing: 5,
-            color: r.anaRenk,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        Text(
-          DateFormat("HH:mm").format(DateTime.now()),
-          style: TextStyle(
-            fontSize: Responsive.sp(64),
-            fontWeight: FontWeight.bold,
-            color: r.yaziRengi,
-            letterSpacing: -2,
-            height: 1.0,
-          ),
-        ),
-        SizedBox(height: Responsive.h(8)),
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.w(16),
-            vertical: Responsive.h(6),
-          ),
-          decoration: BoxDecoration(
-            color: r.yaziRengi.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(Responsive.w(15)),
-          ),
-          child: Text(
-            "Kalan Süre: ${provider.kalanSure}",
+          Text(
+            DateFormat("HH:mm").format(DateTime.now()),
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: Responsive.sp(15),
+              fontSize: Responsive.sp(64),
               fontWeight: FontWeight.bold,
-              color: r.yaziRengi,
+              color: Colors.white,
+              letterSpacing: -2,
+              height: 1.0,
+              shadows: [
+                Shadow(blurRadius: 15, color: Colors.black38, offset: Offset(0, 4)),
+              ],
             ),
           ),
-        ),
-      ],
+          SizedBox(height: Responsive.h(8)),
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.w(16),
+              vertical: Responsive.h(6),
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(Responsive.w(15)),
+            ),
+            child: Text(
+              "Kalan Süre: ${provider.kalanSure}",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: Responsive.sp(15),
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                shadows: [
+                  Shadow(blurRadius: 4, color: Colors.black26),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

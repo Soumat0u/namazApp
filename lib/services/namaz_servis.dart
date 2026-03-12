@@ -47,10 +47,12 @@ class NamazServisi {
       final data = json.decode(response.body)['data']['timings'];
       return {
         "Sabah": data['Fajr'],
+        "Güneş": data['Sunrise'],
         "Öğle": data['Dhuhr'],
         "İkindi": data['Asr'],
         "Akşam": data['Maghrib'],
         "Yatsı": data['Isha'],
+        "GünBatımı": data['Sunset'],
       };
     } else {
       throw Exception('API hatası: ${response.statusCode}');

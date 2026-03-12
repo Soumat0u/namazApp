@@ -24,6 +24,7 @@ class NamazProvider extends ChangeNotifier {
   String kalanSure = "--:--:--";
   String ekranTarihi = "";
   String konumBilgisi = "Yükleniyor...";
+  String vaktinTemasi = "night";
 
   int streakCount = 0;
   int toplamTamamlanan = 0;
@@ -343,8 +344,43 @@ class NamazProvider extends ChangeNotifier {
 
       // Her saniye state yenilememek için sadece saat değiştiğinde UI güncelle (Performans için)
       // Ancak sayaç aktığı için mecburen saniyede bir güncelliyoruz
+      _temaGuncelle();
       notifyListeners();
     });
+  }
+
+  void _temaGuncelle() {
+    if (vakitler == null) return;
+    final simdi = DateTime.now();
+    try {
+      final sabah = _parseTime(vakitler!['Sabah']!);
+      final gunes = vakitler!.containsKey('Güneş') ? _parseTime(vakitler!['Güneş']!) : sabah.add(const Duration(hours: 1));
+      final ogle = _parseTime(vakitler!['Öğle']!);
+      final ikindi = _parseTime(vakitler!['İkindi']!);
+      final aksam = _parseTime(vakitler!['Akşam']!);
+      final yatsi = _parseTime(vakitler!['Yatsı']!);
+
+      String yeniTema = "night";
+      if (simdi.isAfter(sabah) && simdi.isBefore(gunes)) {
+        yeniTema = "dawn";
+      } else if (simdi.isAfter(gunes) && simdi.isBefore(ogle)) {
+        yeniTema = "morning";
+      } else if (simdi.isAfter(ogle) && simdi.isBefore(ikindi)) {
+        yeniTema = "day";
+      } else if (simdi.isAfter(ikindi) && simdi.isBefore(aksam)) {
+        yeniTema = "afternoon";
+      } else if (simdi.isAfter(aksam) && simdi.isBefore(yatsi)) {
+        yeniTema = "sunset";
+      } else {
+        yeniTema = "night";
+      }
+
+      if (vaktinTemasi != yeniTema) {
+        vaktinTemasi = yeniTema;
+      }
+    } catch (_) {
+      vaktinTemasi = "night";
+    }
   }
 
   Future<void> istatistikleriYukle() async {
