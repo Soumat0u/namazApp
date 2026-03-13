@@ -21,10 +21,12 @@ class NamazProvider extends ChangeNotifier {
   String hataMesaji = "";
   Map<String, String>? vakitler;
   String aktifVakit = "Sabah";
-  String kalanSure = "--:--:--";
+  ValueNotifier<String> kalanSureNotifier = ValueNotifier("--:--:--");
+  ValueNotifier<String> guncelSaatNotifier = ValueNotifier("");
   String ekranTarihi = "";
   String konumBilgisi = "Yükleniyor...";
   String vaktinTemasi = "night";
+  String seciliSehir = "";
 
   int streakCount = 0;
   int toplamTamamlanan = 0;
@@ -59,6 +61,8 @@ class NamazProvider extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    kalanSureNotifier.dispose();
+    guncelSaatNotifier.dispose();
     super.dispose();
   }
 
@@ -87,14 +91,20 @@ class NamazProvider extends ChangeNotifier {
       );
 
       if (position == null) {
+        if (seciliSehir.isNotEmpty) {
+          await sehirVakitleriniGetir(seciliSehir);
+          return;
+        }
+        
         if (vakitler == null) {
           konumBilgisi = "Konum İzni Gerekli";
-          hataMesaji = "Konum izni verilmediği için vakitler hesaplanamıyor.";
+          hataMesaji = "Konum izni verilmediği için vakitler hesaplanamıyor. Lütfen bir şehir seçin.";
           isLoading = false;
           notifyListeners();
         } else {
-          if (konumBilgisi == "Yükleniyor...")
+          if (konumBilgisi == "Yükleniyor...") {
             konumBilgisi = "Konum İzni Bekleniyor (Önbellek)";
+          }
           notifyListeners();
         }
         return;
@@ -103,7 +113,9 @@ class NamazProvider extends ChangeNotifier {
       final veriler = await _namazServisi.vakitleriGetir(position);
       final prefs = await SharedPreferences.getInstance();
       vakitler = veriler;
+      seciliSehir = ""; // GPS ile alındığı için şehri geçersiz kıl
       await prefs.setString('cached_vakitler', json.encode(vakitler));
+      await prefs.remove('secili_sehir');
 
       bool bildirimAcik = prefs.getBool('bildirimler_acik') ?? true;
       if (bildirimAcik) BildirimServisi.vakitBildirimleriniKur(vakitler!);
@@ -117,16 +129,53 @@ class NamazProvider extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     } catch (e) {
-      if (vakitler == null) {
+      if (seciliSehir.isNotEmpty) {
+        await sehirVakitleriniGetir(seciliSehir);
+      } else if (vakitler == null) {
         _varsayilanKonumKullan(e.toString());
       } else {
         isLoading = false;
         if (kullaniciTetikledi) {
-          hataMesaji =
-              "İnternet bağlantısı yok, çevrimdışı veriler kullanılıyor.";
+          hataMesaji = "İnternet bağlantısı yok, çevrimdışı veriler kullanılıyor.";
         }
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> sehirVakitleriniGetir(String sehir) async {
+    isLoading = true;
+    hataMesaji = "";
+    notifyListeners();
+
+    try {
+      final veriler = await _namazServisi.vakitleriGetirSehirle(sehir);
+      final prefs = await SharedPreferences.getInstance();
+      
+      vakitler = veriler;
+      seciliSehir = sehir;
+      konumBilgisi = "TÜRKİYE, ${sehir.toUpperCase()}";
+      
+      await prefs.setString('cached_vakitler', json.encode(vakitler));
+      await prefs.setString('secili_sehir', sehir);
+      await prefs.setString('cached_location', konumBilgisi);
+
+      bool bildirimAcik = prefs.getBool('bildirimler_acik') ?? true;
+      if (bildirimAcik) BildirimServisi.vakitBildirimleriniKur(vakitler!);
+
+      _sabahVaktiSifirlamaKontrolu();
+      _ilkVakitHesapla();
+      _sayaciBaslat();
+
+      isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      isLoading = false;
+      hataMesaji = "Şehir verileri alınamadı. Lütfen internet bağlantınızı kontrol edin.";
+      if (vakitler == null) {
+        konumBilgisi = "Şehir Seçilmeli";
+      }
+      notifyListeners();
     }
   }
 
@@ -172,8 +221,9 @@ class NamazProvider extends ChangeNotifier {
 
     if (distance < 5000 &&
         konumBilgisi != "Yükleniyor..." &&
-        !konumBilgisi.contains("İzni"))
+        !konumBilgisi.contains("İzni")) {
       return;
+    }
 
     try {
       List<Placemark> p = await placemarkFromCoordinates(
@@ -200,15 +250,23 @@ class NamazProvider extends ChangeNotifier {
     toplamTamamlanan = prefs.getInt('toplamKilinan') ?? 0;
     sonSifirlamaTarihi = prefs.getString('lastResetDate') ?? "";
     konumBilgisi = prefs.getString('cached_location') ?? "Yükleniyor...";
+    seciliSehir = prefs.getString('secili_sehir') ?? "";
 
     String? cachedVakitlerString = prefs.getString('cached_vakitler');
     if (cachedVakitlerString != null) {
-      vakitler = Map<String, String>.from(json.decode(cachedVakitlerString));
+      try {
+        vakitler = Map<String, String>.from(json.decode(cachedVakitlerString));
+      } catch (e) {
+        vakitler = null;
+        await prefs.remove('cached_vakitler');
+      }
     }
-    for (var vkt in vakitIsimleri)
+    for (var vkt in vakitIsimleri) {
       kildiMi[vkt] = prefs.getBool('kildi_$vkt') ?? false;
-    for (var vkt in vakitIsimleri)
+    }
+    for (var vkt in vakitIsimleri) {
       kazaNamazlari[vkt] = prefs.getInt('kaza_$vkt') ?? 0;
+    }
 
     await istatistikleriYukle();
   }
@@ -252,7 +310,9 @@ class NamazProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     kildiMi.updateAll((key, value) => false);
     sonSifirlamaTarihi = bugunStr;
-    for (var vkt in vakitIsimleri) await prefs.setBool('kildi_$vkt', false);
+    for (var vkt in vakitIsimleri) {
+      await prefs.setBool('kildi_$vkt', false);
+    }
     await prefs.setString('lastResetDate', bugunStr);
     notifyListeners();
   }
@@ -333,19 +393,18 @@ class NamazProvider extends ChangeNotifier {
 
       if (aktifVakit != bulunanVakit) {
         if (!(kildiMi[aktifVakit] ?? false)) _streakSifirla();
-        if (bulunanVakit == "Sabah" && sonSifirlamaTarihi != bugunStr)
+        if (bulunanVakit == "Sabah" && sonSifirlamaTarihi != bugunStr) {
           _kutucuklariSifirla(bugunStr);
+        }
         aktifVakit = bulunanVakit;
       }
 
       final fark = bitisZamani.difference(simdi);
-      kalanSure =
+      kalanSureNotifier.value =
           "${fark.inHours.toString().padLeft(2, '0')}:${(fark.inMinutes % 60).toString().padLeft(2, '0')}:${(fark.inSeconds % 60).toString().padLeft(2, '0')}";
+      guncelSaatNotifier.value = DateFormat("HH:mm").format(simdi);
 
-      // Her saniye state yenilememek için sadece saat değiştiğinde UI güncelle (Performans için)
-      // Ancak sayaç aktığı için mecburen saniyede bir güncelliyoruz
       _temaGuncelle();
-      notifyListeners();
     });
   }
 
@@ -354,7 +413,9 @@ class NamazProvider extends ChangeNotifier {
     final simdi = DateTime.now();
     try {
       final sabah = _parseTime(vakitler!['Sabah']!);
-      final gunes = vakitler!.containsKey('Güneş') ? _parseTime(vakitler!['Güneş']!) : sabah.add(const Duration(hours: 1));
+      final gunes = vakitler!.containsKey('Güneş')
+          ? _parseTime(vakitler!['Güneş']!)
+          : sabah.add(const Duration(hours: 1));
       final ogle = _parseTime(vakitler!['Öğle']!);
       final ikindi = _parseTime(vakitler!['İkindi']!);
       final aksam = _parseTime(vakitler!['Akşam']!);
@@ -377,9 +438,13 @@ class NamazProvider extends ChangeNotifier {
 
       if (vaktinTemasi != yeniTema) {
         vaktinTemasi = yeniTema;
+        notifyListeners();
       }
     } catch (_) {
-      vaktinTemasi = "night";
+      if (vaktinTemasi != "night") {
+        vaktinTemasi = "night";
+        notifyListeners();
+      }
     }
   }
 

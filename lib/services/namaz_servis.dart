@@ -45,17 +45,35 @@ class NamazServisi {
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body)['data']['timings'];
-      return {
-        "Sabah": data['Fajr'],
-        "Güneş": data['Sunrise'],
-        "Öğle": data['Dhuhr'],
-        "İkindi": data['Asr'],
-        "Akşam": data['Maghrib'],
-        "Yatsı": data['Isha'],
-        "GünBatımı": data['Sunset'],
-      };
+      return _parseAladhanData(data);
     } else {
       throw Exception('API hatası: ${response.statusCode}');
     }
+  }
+
+  Future<Map<String, String>> vakitleriGetirSehirle(String sehir) async {
+    final url = Uri.parse(
+      'https://api.aladhan.com/v1/timingsByCity?city=$sehir&country=Turkey&method=13',
+    );
+    final response = await http.get(url).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body)['data']['timings'];
+      return _parseAladhanData(data);
+    } else {
+      throw Exception('API hatası: ${response.statusCode}');
+    }
+  }
+
+  Map<String, String> _parseAladhanData(Map<String, dynamic> data) {
+    return {
+      "Sabah": data['Fajr'],
+      "Güneş": data['Sunrise'],
+      "Öğle": data['Dhuhr'],
+      "İkindi": data['Asr'],
+      "Akşam": data['Maghrib'],
+      "Yatsı": data['Isha'],
+      "GünBatımı": data['Sunset'],
+    };
   }
 }

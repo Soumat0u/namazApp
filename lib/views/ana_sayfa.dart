@@ -33,32 +33,72 @@ class AnaSayfa extends StatelessWidget {
 
     if (provider.vakitler == null && provider.hataMesaji.isNotEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-              child: Text(
-                provider.hataMesaji,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: context.renkler.yaziRengi,
-                  fontSize: Responsive.sp(16),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                child: Text(
+                  provider.hataMesaji,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.renkler.yaziRengi,
+                    fontSize: Responsive.sp(16),
+                  ),
                 ),
               ),
-            ),
-            SizedBox(height: Responsive.h(20)),
-            ElevatedButton(
-              onPressed: () => context.read<NamazProvider>().konumVeApiIstegi(
-                kullaniciTetikledi: true,
+              SizedBox(height: Responsive.h(20)),
+              ElevatedButton(
+                onPressed: () => context.read<NamazProvider>().konumVeApiIstegi(
+                  kullaniciTetikledi: true,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.renkler.anaRenk,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text("Konum İzni Ver / Tekrar Dene"),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.renkler.anaRenk,
-                foregroundColor: Colors.white,
+              SizedBox(height: Responsive.h(30)),
+              Text(
+                "veya Manuel Şehir Seçin:",
+                style: TextStyle(
+                  color: context.renkler.yaziRengi,
+                  fontSize: Responsive.sp(14),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              child: const Text("Konum İzni Ver / Tekrar Dene"),
-            ),
-          ],
+              SizedBox(height: Responsive.h(10)),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(40)),
+                child: DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: context.renkler.kartRengi,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  hint: const Text("Şehir Seç"),
+                  items: [
+                    "Adana", "Ankara", "Antalya", "Bursa", "Diyarbakır", 
+                    "Erzurum", "Eskişehir", "Gaziantep", "İstanbul", "İzmir", 
+                    "Kayseri", "Konya", "Mersin", "Samsun", "Trabzon", "Van"
+                  ].map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      context.read<NamazProvider>().sehirVakitleriniGetir(newValue);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -179,12 +219,6 @@ Widget _buildHeader(BuildContext context, NamazProvider provider) {
 }
 
 Widget _buildMainClock(BuildContext context, NamazProvider provider) {
-  final r = context.renkler;
-  final tema = context.watch<ThemeProvider>().aktifTema;
-  final gradientEnd = tema.brightness == Brightness.dark
-      ? tema.kartRengi.withOpacity(0.8)
-      : const Color(0xFFFFF3E0);
-
   return VakitBackground(
     tema: provider.vaktinTemasi,
     borderRadius: BorderRadius.circular(Responsive.w(20)),
@@ -238,9 +272,7 @@ Widget _buildMainClock(BuildContext context, NamazProvider provider) {
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                         letterSpacing: 1,
-                        shadows: [
-                          Shadow(blurRadius: 4, color: Colors.black26),
-                        ],
+                        shadows: [Shadow(blurRadius: 4, color: Colors.black26)],
                       ),
                     ),
                   ),
@@ -264,23 +296,36 @@ Widget _buildMainClock(BuildContext context, NamazProvider provider) {
               color: Colors.white,
               fontWeight: FontWeight.w900,
               shadows: [
-                Shadow(blurRadius: 10, color: Colors.black45, offset: Offset(0, 2)),
+                Shadow(
+                  blurRadius: 10,
+                  color: Colors.black45,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
           ),
-          Text(
-            DateFormat("HH:mm").format(DateTime.now()),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: Responsive.sp(64),
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: -2,
-              height: 1.0,
-              shadows: [
-                Shadow(blurRadius: 15, color: Colors.black38, offset: Offset(0, 4)),
-              ],
-            ),
+          ValueListenableBuilder<String>(
+            valueListenable: provider.guncelSaatNotifier,
+            builder: (context, guncelSaat, child) {
+              return Text(
+                guncelSaat,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: Responsive.sp(64),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: -2,
+                  height: 1.0,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 15,
+                      color: Colors.black38,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           SizedBox(height: Responsive.h(8)),
           Container(
@@ -292,17 +337,20 @@ Widget _buildMainClock(BuildContext context, NamazProvider provider) {
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(Responsive.w(15)),
             ),
-            child: Text(
-              "Kalan Süre: ${provider.kalanSure}",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: Responsive.sp(15),
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                shadows: [
-                  Shadow(blurRadius: 4, color: Colors.black26),
-                ],
-              ),
+            child: ValueListenableBuilder<String>(
+              valueListenable: provider.kalanSureNotifier,
+              builder: (context, kalanSure, child) {
+                return Text(
+                  "Kalan Süre: $kalanSure",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: Responsive.sp(15),
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [Shadow(blurRadius: 4, color: Colors.black26)],
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -318,16 +366,41 @@ Widget _buildVakitGrid(BuildContext context, NamazProvider provider) {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _vakitKutusu(context, "Sabah", Icons.wb_twilight,
-            provider.vakitler?["Sabah"] ?? "05:00", provider),
-        _vakitKutusu(context, "Öğle", Icons.wb_sunny,
-            provider.vakitler?["Öğle"] ?? "13:00", provider),
-        _vakitKutusu(context, "İkindi", Icons.wb_twighlight,
-            provider.vakitler?["İkindi"] ?? "16:00", provider),
-        _vakitKutusu(context, "Akşam", Icons.bedtime,
-            provider.vakitler?["Akşam"] ?? "19:00", provider),
-        _vakitKutusu(context, "Yatsı", Icons.nights_stay,
-            provider.vakitler?["Yatsı"] ?? "20:30", provider),
+        _vakitKutusu(
+          context,
+          "Sabah",
+          Icons.wb_twilight,
+          provider.vakitler?["Sabah"] ?? "05:00",
+          provider,
+        ),
+        _vakitKutusu(
+          context,
+          "Öğle",
+          Icons.wb_sunny,
+          provider.vakitler?["Öğle"] ?? "13:00",
+          provider,
+        ),
+        _vakitKutusu(
+          context,
+          "İkindi",
+          Icons.wb_twighlight,
+          provider.vakitler?["İkindi"] ?? "16:00",
+          provider,
+        ),
+        _vakitKutusu(
+          context,
+          "Akşam",
+          Icons.bedtime,
+          provider.vakitler?["Akşam"] ?? "19:00",
+          provider,
+        ),
+        _vakitKutusu(
+          context,
+          "Yatsı",
+          Icons.nights_stay,
+          provider.vakitler?["Yatsı"] ?? "20:30",
+          provider,
+        ),
       ],
     ),
   );
@@ -387,12 +460,11 @@ Widget _vakitKutusu(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          ikon,
+        _VakitIkonu(
+          ikon: ikon,
           size: Responsive.w(24),
-          color: kildi
-              ? r.aktifYesil
-              : (suan ? r.anaRenk : r.pasifRenk),
+          color: kildi ? r.aktifYesil : (suan ? r.anaRenk : r.pasifRenk),
+          isActive: suan,
         ),
         SizedBox(height: Responsive.h(6)),
         Text(
@@ -470,10 +542,7 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
             borderRadius: BorderRadius.circular(Responsive.w(25)),
             border: widget.isDone
                 ? null
-                : Border.all(
-                    color: r.anaRenk.withOpacity(0.3),
-                    width: 2,
-                  ),
+                : Border.all(color: r.anaRenk.withOpacity(0.3), width: 2),
             boxShadow: [
               BoxShadow(
                 color: widget.isDone
@@ -518,6 +587,90 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _VakitIkonu extends StatefulWidget {
+  final IconData ikon;
+  final double size;
+  final Color color;
+  final bool isActive;
+
+  const _VakitIkonu({
+    required this.ikon,
+    required this.size,
+    required this.color,
+    required this.isActive,
+  });
+
+  @override
+  State<_VakitIkonu> createState() => _VakitIkonuState();
+}
+
+class _VakitIkonuState extends State<_VakitIkonu> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _animation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOutSine,
+      ),
+    );
+
+    if (widget.isActive) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(_VakitIkonu oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    } else if (!widget.isActive && _controller.isAnimating) {
+      _controller.stop();
+      _controller.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isActive) {
+      return Icon(
+        widget.ikon,
+        size: widget.size,
+        color: widget.color,
+      );
+    }
+
+    return ScaleTransition(
+      scale: _animation,
+      child: Icon(
+        widget.ikon,
+        size: widget.size,
+        color: widget.color,
+        shadows: [
+          Shadow(
+            color: widget.color.withOpacity(0.5),
+            blurRadius: 10,
+          ),
+        ],
       ),
     );
   }

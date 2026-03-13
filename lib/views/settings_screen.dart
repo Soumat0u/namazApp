@@ -16,7 +16,7 @@ class AyarlarSayfasi extends StatefulWidget {
 
 class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
   bool _bildirimlerAcik = true;
-  String _hesaplamaYontemi = "Diyanet İşleri (Türkiye)";
+  final String _hesaplamaYontemi = "Diyanet İşleri (Türkiye)";
 
   @override
   void initState() {
@@ -82,8 +82,11 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               subtitle: provider.konumBilgisi,
               icon: Icons.location_on_outlined,
               trailing: IconButton(
-                icon: Icon(Icons.refresh, color: r.anaRenk,
-                    size: Responsive.w(20)),
+                icon: Icon(
+                  Icons.refresh,
+                  color: r.anaRenk,
+                  size: Responsive.w(20),
+                ),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -153,13 +156,19 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     backgroundColor: r.kartRengi,
-                    title: Text("Emin misiniz?",
-                        style: TextStyle(color: r.yaziRengi,
-                            fontSize: Responsive.sp(16))),
+                    title: Text(
+                      "Emin misiniz?",
+                      style: TextStyle(
+                        color: r.yaziRengi,
+                        fontSize: Responsive.sp(16),
+                      ),
+                    ),
                     content: Text(
                       "Tüm kayıtlı namaz takibi verileriniz ve ayarlarınız silinecek.",
-                      style: TextStyle(color: r.yaziRengi.withOpacity(0.7),
-                          fontSize: Responsive.sp(14)),
+                      style: TextStyle(
+                        color: r.yaziRengi.withOpacity(0.7),
+                        fontSize: Responsive.sp(14),
+                      ),
                     ),
                     actions: [
                       TextButton(
@@ -180,10 +189,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
                             ),
                           );
                         },
-                        child: Text(
-                          "Sil",
-                          style: TextStyle(color: r.kirmizi),
-                        ),
+                        child: Text("Sil", style: TextStyle(color: r.kirmizi)),
                       ),
                     ],
                   ),
@@ -232,8 +238,11 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
                   color: r.anaRenk.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.palette_outlined, color: r.anaRenk,
-                    size: Responsive.w(20)),
+                child: Icon(
+                  Icons.palette_outlined,
+                  color: r.anaRenk,
+                  size: Responsive.w(20),
+                ),
               ),
               SizedBox(width: Responsive.w(10)),
               Text(
@@ -282,13 +291,16 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
                                     color: tema.anaRenk.withOpacity(0.4),
                                     blurRadius: 8,
                                     spreadRadius: 1,
-                                  )
+                                  ),
                                 ]
                               : [],
                         ),
                         child: secili
-                            ? Icon(Icons.check, color: Colors.white,
-                                size: Responsive.w(20))
+                            ? Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: Responsive.w(20),
+                              )
                             : null,
                       ),
                     ),
@@ -297,8 +309,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
                       tema.isim,
                       style: TextStyle(
                         fontSize: Responsive.sp(10),
-                        fontWeight:
-                            secili ? FontWeight.bold : FontWeight.w500,
+                        fontWeight: secili ? FontWeight.bold : FontWeight.w500,
                         color: secili
                             ? tema.anaRenk
                             : r.yaziRengi.withOpacity(0.6),
@@ -316,10 +327,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
 
   Widget _buildSectionHeader(AppThemeColors r, String title) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: Responsive.w(8),
-        bottom: Responsive.h(8),
-      ),
+      padding: EdgeInsets.only(left: Responsive.w(8), bottom: Responsive.h(8)),
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
@@ -384,7 +392,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: r.anaRenk,
+        activeThumbColor: r.anaRenk,
       ),
     );
   }

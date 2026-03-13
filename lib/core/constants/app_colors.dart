@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../theme/app_theme.dart';
 
 /// BuildContext extension ile dinamik tema renklerine erişim sağlar.
 /// Kullanım: `final renkler = context.renkler;` sonra `renkler.arkaPlanRengi` vb.
@@ -18,7 +19,7 @@ extension AppColorsExtension on BuildContext {
 }
 
 class AppThemeColors {
-  final dynamic _tema;
+  final AppThemeData _tema;
 
   AppThemeColors(this._tema);
 
