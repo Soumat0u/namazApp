@@ -6,6 +6,7 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/bildirim_servisi.dart';
 
 class AyarlarSayfasi extends StatefulWidget {
   const AyarlarSayfasi({super.key});
@@ -70,16 +71,24 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               subtitle: "Vakit girdiğinde bildirim gönder",
               icon: Icons.notifications_active_outlined,
               value: _bildirimlerAcik,
-              onChanged: (val) {
+              onChanged: (val) async {
                 setState(() => _bildirimlerAcik = val);
-                _ayarKaydet('bildirimler_acik', val);
+                await _ayarKaydet('bildirimler_acik', val);
+
+                if (val && provider.vakitler != null) {
+                  await BildirimServisi.vakitBildirimleriniKur(
+                    provider.vakitler!,
+                  );
+                } else {
+                  await BildirimServisi.bildirimleriIptalEt();
+                }
               },
             ),
             const Divider(height: 1),
             _buildInfoTile(
               r,
               title: "Kayıtlı Konum",
-              subtitle: provider.konumBilgisi,
+              subtitle: provider.konumBilgisi.toUpperCase(),
               icon: Icons.location_on_outlined,
               trailing: IconButton(
                 icon: Icon(
@@ -87,21 +96,22 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
                   color: r.anaRenk,
                   size: Responsive.w(20),
                 ),
+
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text("Konum Ana Sayfa üzerinden güncellenir."),
+                      content: Text(
+                        "Konum güncelleme için Ana Sayfa'yı yenileyin.",
+                      ),
                     ),
                   );
                 },
               ),
             ),
           ]),
-
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Görünüm"),
           _buildThemeSelector(r, themeProvider),
-
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Hesaplama"),
           _buildSettingsCard(r, [
@@ -124,7 +134,6 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               },
             ),
           ]),
-
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Uygulama"),
           _buildSettingsCard(r, [
@@ -141,11 +150,34 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               icon: Icons.share_outlined,
               onTap: () {
                 Share.share(
-                  'Namaz Vakti uygulamasını hemen indir ve namazlarını düzenli takip et! 📱 \n\nhttps://play.google.com/store/apps/details?id=com.example.namaz_app',
+                  'Namaz Vakti uygulamasını indir! \n\nhttps://play.google.com/store/apps/details?id=com.example.namaz_app',
                 );
               },
             ),
             const Divider(height: 1),
+
+            // 🔥 TEST BUTONU BURAYA EKLENDİ 🔥
+            _buildActionTile(
+              r,
+              title: "60 Saniye Kapalı Testi",
+              icon: Icons.timer,
+              color: Colors.orange,
+              onTap: () async {
+                await BildirimServisi.testBildirimiKur();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        "⏳ Alarm kuruldu! Uygulamayı ŞİMDİ tamamen kapat ve 60 sn bekle.",
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+            ),
+            const Divider(height: 1),
+
             _buildActionTile(
               r,
               title: "Verileri Sıfırla",
@@ -219,13 +251,6 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       decoration: BoxDecoration(
         color: r.kartRengi,
         borderRadius: BorderRadius.circular(Responsive.w(16)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,15 +285,17 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: themeProvider.tumTemalar.map((tema) {
               bool secili = themeProvider.aktifTema.id == tema.id;
-              final circleSize = Responsive.w(42);
+
+              // 🔥 circleSize hatası burada çözüldü 🔥
+              final double circleSize = Responsive.w(42);
+
               return GestureDetector(
                 onTap: () => themeProvider.temaDegistir(tema.id),
                 child: Column(
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                      padding: EdgeInsets.all(Responsive.w(3)),
+                    Container(
+                      width: circleSize,
+                      height: circleSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: secili
@@ -296,10 +323,10 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
                               : [],
                         ),
                         child: secili
-                            ? Icon(
+                            ? const Icon(
                                 Icons.check,
                                 color: Colors.white,
-                                size: Responsive.w(20),
+                                size: 20,
                               )
                             : null,
                       ),
@@ -345,13 +372,6 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       decoration: BoxDecoration(
         color: r.kartRengi,
         borderRadius: BorderRadius.circular(Responsive.w(16)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(children: children),
     );
@@ -407,14 +427,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
   }) {
     return ListTile(
       onTap: onTap,
-      leading: Container(
-        padding: EdgeInsets.all(Responsive.w(7)),
-        decoration: BoxDecoration(
-          color: r.pasifRenk.withOpacity(0.2),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: r.yaziRengi, size: Responsive.w(20)),
-      ),
+      leading: Icon(icon, color: r.yaziRengi),
       title: Text(
         title,
         style: TextStyle(
@@ -445,14 +458,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
     final c = color ?? r.yaziRengi;
     return ListTile(
       onTap: onTap,
-      leading: Container(
-        padding: EdgeInsets.all(Responsive.w(7)),
-        decoration: BoxDecoration(
-          color: c.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: c, size: Responsive.w(20)),
-      ),
+      leading: Icon(icon, color: c),
       title: Text(
         title,
         style: TextStyle(

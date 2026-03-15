@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/namaz_servis.dart';
 import '../services/bildirim_servisi.dart';
+import '../services/seviye_servisi.dart'; // Seviye servisini ekledik
 
 class NamazProvider extends ChangeNotifier {
   final NamazServisi _namazServisi;
@@ -30,6 +31,13 @@ class NamazProvider extends ChangeNotifier {
 
   int streakCount = 0;
   int toplamTamamlanan = 0;
+
+  // 🔥 SEVİYE SİSTEMİ DEĞİŞKENLERİ
+  int _toplamXp = 0;
+  int get toplamXp => _toplamXp;
+  String get mevcutUnvan => SeviyeServisi.unvanGetir(_toplamXp);
+  double get seviyeIlerleme => SeviyeServisi.ilerlemeHesapla(_toplamXp);
+
   String sonSifirlamaTarihi = "";
 
   Map<String, bool> kildiMi = {
@@ -95,10 +103,11 @@ class NamazProvider extends ChangeNotifier {
           await sehirVakitleriniGetir(seciliSehir);
           return;
         }
-        
+
         if (vakitler == null) {
           konumBilgisi = "Konum İzni Gerekli";
-          hataMesaji = "Konum izni verilmediği için vakitler hesaplanamıyor. Lütfen bir şehir seçin.";
+          hataMesaji =
+              "Konum izni verilmediği için vakitler hesaplanamıyor. Lütfen bir şehir seçin.";
           isLoading = false;
           notifyListeners();
         } else {
@@ -136,7 +145,8 @@ class NamazProvider extends ChangeNotifier {
       } else {
         isLoading = false;
         if (kullaniciTetikledi) {
-          hataMesaji = "İnternet bağlantısı yok, çevrimdışı veriler kullanılıyor.";
+          hataMesaji =
+              "İnternet bağlantısı yok, çevrimdışı veriler kullanılıyor.";
         }
         notifyListeners();
       }
@@ -151,11 +161,11 @@ class NamazProvider extends ChangeNotifier {
     try {
       final veriler = await _namazServisi.vakitleriGetirSehirle(sehir);
       final prefs = await SharedPreferences.getInstance();
-      
+
       vakitler = veriler;
       seciliSehir = sehir;
       konumBilgisi = "TÜRKİYE, ${sehir.toUpperCase()}";
-      
+
       await prefs.setString('cached_vakitler', json.encode(vakitler));
       await prefs.setString('secili_sehir', sehir);
       await prefs.setString('cached_location', konumBilgisi);
@@ -171,7 +181,8 @@ class NamazProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       isLoading = false;
-      hataMesaji = "Şehir verileri alınamadı. Lütfen internet bağlantınızı kontrol edin.";
+      hataMesaji =
+          "Şehir verileri alınamadı. Lütfen internet bağlantınızı kontrol edin.";
       if (vakitler == null) {
         konumBilgisi = "Şehir Seçilmeli";
       }
@@ -248,6 +259,10 @@ class NamazProvider extends ChangeNotifier {
 
     streakCount = prefs.getInt('streakCount') ?? 0;
     toplamTamamlanan = prefs.getInt('toplamKilinan') ?? 0;
+
+    // 🔥 XP YÜKLEME
+    _toplamXp = prefs.getInt('toplam_xp') ?? 0;
+
     sonSifirlamaTarihi = prefs.getString('lastResetDate') ?? "";
     konumBilgisi = prefs.getString('cached_location') ?? "Yükleniyor...";
     seciliSehir = prefs.getString('secili_sehir') ?? "";
@@ -280,6 +295,14 @@ class NamazProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 🔥 XP KAZANMA FONKSİYONU
+  Future<void> xpKazandir() async {
+    final prefs = await SharedPreferences.getInstance();
+    _toplamXp += SeviyeServisi.namazXp; // Servisten 10 XP çekiyoruz
+    await prefs.setInt('toplam_xp', _toplamXp);
+    notifyListeners();
+  }
+
   Future<void> vaktiKildimIsaretle(String vakitIsmi, bool yeniDurum) async {
     final prefs = await SharedPreferences.getInstance();
     kildiMi[vakitIsmi] = yeniDurum;
@@ -288,9 +311,16 @@ class NamazProvider extends ChangeNotifier {
     if (yeniDurum) {
       streakCount++;
       toplamTamamlanan++;
+      await xpKazandir(); // 🔥 NAMAZ KILINCA XP VERİYORUZ
     } else {
       if (streakCount > 0) streakCount--;
       if (toplamTamamlanan > 0) toplamTamamlanan--;
+
+      // Geri alınan namazda XP'yi de geri alabiliriz (Opsiyonel)
+      if (_toplamXp >= 10) {
+        _toplamXp -= 10;
+        await prefs.setInt('toplam_xp', _toplamXp);
+      }
     }
     await prefs.setInt('streakCount', streakCount);
     await prefs.setInt('toplamKilinan', toplamTamamlanan);
@@ -405,6 +435,7 @@ class NamazProvider extends ChangeNotifier {
       guncelSaatNotifier.value = DateFormat("HH:mm").format(simdi);
 
       _temaGuncelle();
+      notifyListeners();
     });
   }
 
