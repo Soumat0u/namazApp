@@ -12,6 +12,7 @@ import 'views/ana_sayfa.dart';
 import 'views/statistics_screen.dart';
 import 'views/settings_screen.dart';
 import 'views/kaza_sayfasi.dart';
+import 'views/gorevler_sayfasi.dart'; // 🔥 YENİ: Görevler sayfasını import ettik
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,10 +60,11 @@ class AnaUygulamaEkrani extends StatefulWidget {
 class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
   int _seciliSayfaIndex = 0;
 
-  // Sayfalar views klasöründeki dosyalardan geliyor
+  // 🔥 Sayfalar listesini 5'e çıkardık
   final List<Widget> _sayfalar = [
     const AnaSayfa(),
     const KazaSayfasi(),
+    const GorevlerSayfasi(), // 🔥 2. indekse Görevler geldi
     const IstatistikSayfasi(),
     const AyarlarSayfasi(),
   ];
@@ -93,7 +95,7 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
           selectedItemColor: tema.anaRenk,
           unselectedItemColor: tema.pasifRenk,
           showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
+          type: BottomNavigationBarType.fixed, // 5 eleman için bu şart
           iconSize: Responsive.w(22),
           selectedFontSize: Responsive.sp(11),
           unselectedFontSize: Responsive.sp(10),
@@ -106,6 +108,11 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
             BottomNavigationBarItem(
               icon: Icon(Icons.history_rounded),
               label: 'Kaza',
+            ),
+            // 🔥 YENİ: Alt barın tam ortasına Görevler düğmesini ekledik
+            BottomNavigationBarItem(
+              icon: Icon(Icons.emoji_events_rounded), 
+              label: 'Görevler',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.bar_chart_rounded),
