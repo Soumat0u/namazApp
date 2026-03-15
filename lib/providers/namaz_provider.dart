@@ -92,8 +92,9 @@ class NamazProvider extends ChangeNotifier {
           isLoading = false;
           notifyListeners();
         } else {
-          if (konumBilgisi == "Yükleniyor...")
+          if (konumBilgisi == "Yükleniyor...") {
             konumBilgisi = "Konum İzni Bekleniyor (Önbellek)";
+          }
           notifyListeners();
         }
         return;
@@ -171,8 +172,9 @@ class NamazProvider extends ChangeNotifier {
 
     if (distance < 5000 &&
         konumBilgisi != "Yükleniyor..." &&
-        !konumBilgisi.contains("İzni"))
+        !konumBilgisi.contains("İzni")) {
       return;
+    }
 
     try {
       List<Placemark> p = await placemarkFromCoordinates(
@@ -204,10 +206,12 @@ class NamazProvider extends ChangeNotifier {
     if (cachedVakitlerString != null) {
       vakitler = Map<String, String>.from(json.decode(cachedVakitlerString));
     }
-    for (var vkt in vakitIsimleri)
+    for (var vkt in vakitIsimleri) {
       kildiMi[vkt] = prefs.getBool('kildi_$vkt') ?? false;
-    for (var vkt in vakitIsimleri)
+    }
+    for (var vkt in vakitIsimleri) {
       kazaNamazlari[vkt] = prefs.getInt('kaza_$vkt') ?? 0;
+    }
 
     await istatistikleriYukle();
   }
@@ -251,7 +255,9 @@ class NamazProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     kildiMi.updateAll((key, value) => false);
     sonSifirlamaTarihi = bugunStr;
-    for (var vkt in vakitIsimleri) await prefs.setBool('kildi_$vkt', false);
+    for (var vkt in vakitIsimleri) {
+      await prefs.setBool('kildi_$vkt', false);
+    }
     await prefs.setString('lastResetDate', bugunStr);
     notifyListeners();
   }
@@ -332,8 +338,9 @@ class NamazProvider extends ChangeNotifier {
 
       if (aktifVakit != bulunanVakit) {
         if (!(kildiMi[aktifVakit] ?? false)) _streakSifirla();
-        if (bulunanVakit == "Sabah" && sonSifirlamaTarihi != bugunStr)
+        if (bulunanVakit == "Sabah" && sonSifirlamaTarihi != bugunStr) {
           _kutucuklariSifirla(bugunStr);
+        }
         aktifVakit = bulunanVakit;
       }
 

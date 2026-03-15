@@ -6,6 +6,7 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/bildirim_servisi.dart';
 
 class AyarlarSayfasi extends StatefulWidget {
   const AyarlarSayfasi({super.key});
@@ -16,7 +17,7 @@ class AyarlarSayfasi extends StatefulWidget {
 
 class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
   bool _bildirimlerAcik = true;
-  String _hesaplamaYontemi = "Diyanet İşleri (Türkiye)";
+  final String _hesaplamaYontemi = "Diyanet İşleri (Türkiye)";
 
   @override
   void initState() {
@@ -70,35 +71,36 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               subtitle: "Vakit girdiğinde bildirim gönder",
               icon: Icons.notifications_active_outlined,
               value: _bildirimlerAcik,
-              onChanged: (val) {
+              onChanged: (val) async {
                 setState(() => _bildirimlerAcik = val);
-                _ayarKaydet('bildirimler_acik', val);
+                await _ayarKaydet('bildirimler_acik', val);
+
+                if (val && provider.vakitler != null) {
+                  await BildirimServisi.vakitBildirimleriniKur(provider.vakitler!);
+                } else {
+                  await BildirimServisi.bildirimleriIptalEt();
+                }
               },
             ),
             const Divider(height: 1),
             _buildInfoTile(
               r,
               title: "Kayıtlı Konum",
-              subtitle: provider.konumBilgisi,
+              subtitle: provider.konumBilgisi.toUpperCase(),
               icon: Icons.location_on_outlined,
               trailing: IconButton(
-                icon: Icon(Icons.refresh, color: r.anaRenk,
-                    size: Responsive.w(20)),
+                icon: Icon(Icons.refresh, color: r.anaRenk, size: Responsive.w(20)),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Konum Ana Sayfa üzerinden güncellenir."),
-                    ),
+                    const SnackBar(content: Text("Konum güncelleme için Ana Sayfa'yı yenileyin.")),
                   );
                 },
               ),
             ),
           ]),
-
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Görünüm"),
           _buildThemeSelector(r, themeProvider),
-
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Hesaplama"),
           _buildSettingsCard(r, [
@@ -107,98 +109,62 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               title: "Hesaplama Yöntemi",
               subtitle: _hesaplamaYontemi,
               icon: Icons.mosque_outlined,
-              trailing: Icon(
-                Icons.arrow_forward_ios,
-                size: Responsive.w(14),
-                color: r.pasifRenk,
-              ),
+              trailing: Icon(Icons.arrow_forward_ios, size: Responsive.w(14), color: r.pasifRenk),
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Şu an sadece Diyanet metodu aktiftir."),
-                  ),
+                  const SnackBar(content: Text("Şu an sadece Diyanet metodu aktiftir.")),
                 );
               },
             ),
           ]),
-
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Uygulama"),
           _buildSettingsCard(r, [
-            _buildActionTile(
-              r,
-              title: "Bize Ulaşın",
-              icon: Icons.mail_outline,
-              onTap: () {},
-            ),
+            _buildActionTile(r, title: "Bize Ulaşın", icon: Icons.mail_outline, onTap: () {}),
             const Divider(height: 1),
             _buildActionTile(
               r,
               title: "Uygulamayı Paylaş",
               icon: Icons.share_outlined,
               onTap: () {
-                Share.share(
-                  'Namaz Vakti uygulamasını hemen indir ve namazlarını düzenli takip et! 📱 \n\nhttps://play.google.com/store/apps/details?id=com.example.namaz_app',
-                );
+                Share.share('Namaz Vakti uygulamasını indir! \n\nhttps://play.google.com/store/apps/details?id=com.example.namaz_app');
               },
             ),
             const Divider(height: 1),
+            
+            // 🔥 TEST BUTONU BURAYA EKLENDİ 🔥
+            _buildActionTile(
+              r,
+              title: "60 Saniye Kapalı Testi",
+              icon: Icons.timer,
+              color: Colors.orange,
+              onTap: () async {
+                await BildirimServisi.testBildirimiKur();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("⏳ Alarm kuruldu! Uygulamayı ŞİMDİ tamamen kapat ve 60 sn bekle."),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+            ),
+            const Divider(height: 1),
+
             _buildActionTile(
               r,
               title: "Verileri Sıfırla",
               icon: Icons.delete_outline,
               color: r.kirmizi,
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: r.kartRengi,
-                    title: Text("Emin misiniz?",
-                        style: TextStyle(color: r.yaziRengi,
-                            fontSize: Responsive.sp(16))),
-                    content: Text(
-                      "Tüm kayıtlı namaz takibi verileriniz ve ayarlarınız silinecek.",
-                      style: TextStyle(color: r.yaziRengi.withOpacity(0.7),
-                          fontSize: Responsive.sp(14)),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: Text(
-                          "İptal",
-                          style: TextStyle(color: r.pasifRenk),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          context.read<NamazProvider>().verileriSifirla();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text("Veriler sıfırlandı."),
-                              backgroundColor: r.anaRenk,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          "Sil",
-                          style: TextStyle(color: r.kirmizi),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              onTap: () => _verileriSifirlaDialog(context, r),
             ),
           ]),
           SizedBox(height: Responsive.h(24)),
           Center(
             child: Text(
               "Namaz Vakti v1.0.0",
-              style: TextStyle(
-                color: r.yaziRengi.withOpacity(0.5),
-                fontSize: Responsive.sp(11),
-              ),
+              style: TextStyle(color: r.yaziRengi.withOpacity(0.5), fontSize: Responsive.sp(11)),
             ),
           ),
           SizedBox(height: Responsive.h(40)),
@@ -207,43 +173,39 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
     );
   }
 
-  Widget _buildThemeSelector(AppThemeColors r, ThemeProvider themeProvider) {
-    return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: r.kartRengi,
-        borderRadius: BorderRadius.circular(Responsive.w(16)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+  void _verileriSifirlaDialog(BuildContext context, dynamic r) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: r.kartRengi,
+        title: Text("Emin misiniz?", style: TextStyle(color: r.yaziRengi, fontSize: Responsive.sp(16))),
+        content: Text("Tüm verileriniz silinecek.", style: TextStyle(color: r.yaziRengi.withAlpha(178), fontSize: Responsive.sp(14))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("İptal", style: TextStyle(color: r.pasifRenk))),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<NamazProvider>().verileriSifirla();
+            },
+            child: Text("Sil", style: TextStyle(color: r.kirmizi)),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildThemeSelector(AppThemeColors r, ThemeProvider themeProvider) {
+    return Container(
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(16))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: EdgeInsets.all(Responsive.w(7)),
-                decoration: BoxDecoration(
-                  color: r.anaRenk.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.palette_outlined, color: r.anaRenk,
-                    size: Responsive.w(20)),
-              ),
+              Icon(Icons.palette_outlined, color: r.anaRenk, size: Responsive.w(20)),
               SizedBox(width: Responsive.w(10)),
-              Text(
-                "Tema Seçimi",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.sp(15),
-                  color: r.yaziRengi,
-                ),
-              ),
+              Text("Tema Seçimi", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(15), color: r.yaziRengi)),
             ],
           ),
           SizedBox(height: Responsive.h(14)),
@@ -251,59 +213,22 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: themeProvider.tumTemalar.map((tema) {
               bool secili = themeProvider.aktifTema.id == tema.id;
-              final circleSize = Responsive.w(42);
               return GestureDetector(
                 onTap: () => themeProvider.temaDegistir(tema.id),
                 child: Column(
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                      padding: EdgeInsets.all(Responsive.w(3)),
+                    Container(
+                      width: Responsive.w(42),
+                      height: Responsive.w(42),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: secili
-                            ? Border.all(color: tema.anaRenk, width: 2.5)
-                            : Border.all(color: Colors.transparent, width: 2.5),
+                        color: tema.anaRenk,
+                        border: Border.all(color: secili ? Colors.white : Colors.transparent, width: 2),
                       ),
-                      child: Container(
-                        width: circleSize,
-                        height: circleSize,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [tema.arkaPlanRengi, tema.anaRenk],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: secili
-                              ? [
-                                  BoxShadow(
-                                    color: tema.anaRenk.withOpacity(0.4),
-                                    blurRadius: 8,
-                                    spreadRadius: 1,
-                                  )
-                                ]
-                              : [],
-                        ),
-                        child: secili
-                            ? Icon(Icons.check, color: Colors.white,
-                                size: Responsive.w(20))
-                            : null,
-                      ),
+                      child: secili ? const Icon(Icons.check, color: Colors.white) : null,
                     ),
                     SizedBox(height: Responsive.h(6)),
-                    Text(
-                      tema.isim,
-                      style: TextStyle(
-                        fontSize: Responsive.sp(10),
-                        fontWeight:
-                            secili ? FontWeight.bold : FontWeight.w500,
-                        color: secili
-                            ? tema.anaRenk
-                            : r.yaziRengi.withOpacity(0.6),
-                      ),
-                    ),
+                    Text(tema.isim, style: TextStyle(fontSize: Responsive.sp(10), color: r.yaziRengi)),
                   ],
                 ),
               );
@@ -316,148 +241,44 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
 
   Widget _buildSectionHeader(AppThemeColors r, String title) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: Responsive.w(8),
-        bottom: Responsive.h(8),
-      ),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          color: r.yaziRengi.withOpacity(0.6),
-          fontSize: Responsive.sp(12),
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-        ),
-      ),
+      padding: EdgeInsets.only(left: Responsive.w(8), bottom: Responsive.h(8)),
+      child: Text(title.toUpperCase(), style: TextStyle(color: r.yaziRengi.withAlpha(153), fontSize: Responsive.sp(12), fontWeight: FontWeight.bold, letterSpacing: 1.2)),
     );
   }
 
   Widget _buildSettingsCard(AppThemeColors r, List<Widget> children) {
     return Container(
-      decoration: BoxDecoration(
-        color: r.kartRengi,
-        borderRadius: BorderRadius.circular(Responsive.w(16)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(16))),
       child: Column(children: children),
     );
   }
 
-  Widget _buildSwitchTile(
-    AppThemeColors r, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool value,
-    required Function(bool) onChanged,
-  }) {
+  Widget _buildSwitchTile(AppThemeColors r, {required String title, required String subtitle, required IconData icon, required bool value, required Function(bool) onChanged}) {
     return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(Responsive.w(7)),
-        decoration: BoxDecoration(
-          color: r.anaRenk.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: r.anaRenk, size: Responsive.w(20)),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: r.yaziRengi,
-          fontSize: Responsive.sp(14),
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: Responsive.sp(11),
-          color: r.yaziRengi.withOpacity(0.6),
-        ),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: r.anaRenk,
-      ),
+      leading: Icon(icon, color: r.anaRenk),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: Responsive.sp(11), color: r.yaziRengi.withAlpha(153))),
+      trailing: Switch(value: value, onChanged: onChanged, activeThumbColor: r.anaRenk),
     );
   }
 
-  Widget _buildInfoTile(
-    AppThemeColors r, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    Widget? trailing,
-    VoidCallback? onTap,
-  }) {
+  Widget _buildInfoTile(AppThemeColors r, {required String title, required String subtitle, required IconData icon, Widget? trailing, VoidCallback? onTap}) {
     return ListTile(
       onTap: onTap,
-      leading: Container(
-        padding: EdgeInsets.all(Responsive.w(7)),
-        decoration: BoxDecoration(
-          color: r.pasifRenk.withOpacity(0.2),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: r.yaziRengi, size: Responsive.w(20)),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: r.yaziRengi,
-          fontSize: Responsive.sp(14),
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: Responsive.sp(12),
-          color: r.anaRenk,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+      leading: Icon(icon, color: r.yaziRengi),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: Responsive.sp(12), color: r.anaRenk, fontWeight: FontWeight.w500)),
       trailing: trailing,
     );
   }
 
-  Widget _buildActionTile(
-    AppThemeColors r, {
-    required String title,
-    required IconData icon,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
+  Widget _buildActionTile(AppThemeColors r, {required String title, required IconData icon, required VoidCallback onTap, Color? color}) {
     final c = color ?? r.yaziRengi;
     return ListTile(
       onTap: onTap,
-      leading: Container(
-        padding: EdgeInsets.all(Responsive.w(7)),
-        decoration: BoxDecoration(
-          color: c.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: c, size: Responsive.w(20)),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: c,
-          fontSize: Responsive.sp(14),
-        ),
-      ),
-      trailing: Icon(
-        Icons.arrow_forward_ios,
-        size: Responsive.w(14),
-        color: r.pasifRenk,
-      ),
+      leading: Icon(icon, color: c),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: Responsive.sp(14))),
+      trailing: Icon(Icons.arrow_forward_ios, size: Responsive.w(14), color: r.pasifRenk),
     );
   }
 }
