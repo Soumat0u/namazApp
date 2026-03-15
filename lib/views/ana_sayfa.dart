@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
+import '../services/seviye_servisi.dart';
 import 'gorevler_sayfasi.dart'; // 🔥 Sayfa yönlendirmesi için gerekli
 
 class AnaSayfa extends StatelessWidget {
@@ -54,7 +55,7 @@ class AnaSayfa extends StatelessWidget {
     );
   }
 
-  // --- 🔥 YARDIMCI WIDGET METODLARI (HATALARI ÇÖZEN KISIM) ---
+  // --- 🔥 YARDIMCI WIDGET METODLARI ---
 
   Widget _buildLevelCard(BuildContext context, NamazProvider provider) {
     final r = context.renkler;
@@ -206,7 +207,7 @@ class AnaSayfa extends StatelessWidget {
                         if (gorev.tamamlandiMi && !gorev.odulAlindiMi)
                           GestureDetector(
                             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const GorevlerSayfasi())),
-                            child: Container(padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: r.anaRenk, borderRadius: BorderRadius.circular(4)), child: Text("AL", style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold))),
+                            child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: r.anaRenk, borderRadius: BorderRadius.circular(4)), child: const Text("AL", style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold))),
                           )
                         else
                           Text("+${gorev.xpOdulu} XP", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(11))),
@@ -230,7 +231,7 @@ class AnaSayfa extends StatelessWidget {
     return GestureDetector(
       onTap: () => provider.vaktiKildimIsaretle(provider.aktifVakit, !isDone),
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 300),
         height: Responsive.h(80),
         decoration: BoxDecoration(color: isDone ? r.aktifYesil : r.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(20)), border: isDone ? null : Border.all(color: r.anaRenk.withOpacity(0.3), width: 2)),
         child: Center(child: Text(isDone ? "ALLAH KABUL ETSİN!" : "VAKTİ KILDIM", style: TextStyle(fontSize: Responsive.sp(16), fontWeight: FontWeight.bold, color: isDone ? Colors.white : r.yaziRengi))),
@@ -241,7 +242,7 @@ class AnaSayfa extends StatelessWidget {
   // --- TEMEL TASARIM VE DİĞER FONKSİYONLAR ---
 
   BoxDecoration _sikKutuDecoration(BuildContext context) {
-    return BoxDecoration(color: context.renkler.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(20)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4))]);
+    return BoxDecoration(color: context.renkler.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(20)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]);
   }
 
   Widget _vakitKutusu(BuildContext context, String ad, IconData ikon, String saat, NamazProvider provider) {
@@ -251,30 +252,109 @@ class AnaSayfa extends StatelessWidget {
     return Column(
       children: [
         Icon(ikon, color: kildi ? r.aktifYesil : (suan ? r.anaRenk : r.pasifRenk), size: Responsive.w(24)),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(saat.split(' ')[0], style: TextStyle(color: r.yaziRengi, fontWeight: suan ? FontWeight.bold : FontWeight.normal, fontSize: Responsive.sp(12))),
         Text(ad, style: TextStyle(color: suan ? r.anaRenk : r.pasifRenk, fontSize: Responsive.sp(10))),
       ],
     );
   }
 
+  // 🔥 ESKİ EFSANE RÜTBE GÖRÜNÜMÜ GERİ GELDİ 🔥
   void _unvanlariGoster(BuildContext context, NamazProvider provider, AppThemeColors r) {
     showModalBottomSheet(
       context: context,
       backgroundColor: r.arkaPlanRengi,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Container(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("RÜTBELER", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: 20)),
-            SizedBox(height: 20),
-            Text("Mevcut Rütben: ${provider.mevcutUnvan}", style: TextStyle(color: r.yaziRengi)),
-            // Buraya rütbe listesi ListView eklenebilir
-          ],
-        ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
+      isScrollControlled: true, 
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7, 
+          maxChildSize: 0.9,     
+          expand: false,
+          builder: (sheetContext, scrollController) {
+            final sortedKeys = SeviyeServisi.unvanlar.keys.toList()..sort();
+
+            return Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  height: 4, width: 40,
+                  decoration: BoxDecoration(color: r.pasifRenk, borderRadius: BorderRadius.circular(10)),
+                ),
+                Text(
+                  "VAKİT SAVAŞÇISI RÜTBELERİ",
+                  style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(18)),
+                ),
+                const SizedBox(height: 20),
+                
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: sortedKeys.length,
+                    itemBuilder: (listContext, index) {
+                      int xpLimit = sortedKeys[index];
+                      String unvanIsmi = SeviyeServisi.unvanlar[xpLimit]!;
+                      
+                      bool kilitli = provider.toplamXp < xpLimit;
+                      bool suanki = provider.mevcutUnvan == unvanIsmi;
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: suanki ? r.anaRenk.withOpacity(0.1) : r.kartRengi,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(
+                            color: suanki ? r.anaRenk : (kilitli ? Colors.transparent : r.anaRenk.withOpacity(0.3)),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              kilitli ? Icons.lock_outline : Icons.military_tech,
+                              color: kilitli ? r.pasifRenk : r.anaRenk,
+                              size: 30,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    unvanIsmi,
+                                    style: TextStyle(
+                                      color: kilitli ? r.yaziRengi.withOpacity(0.4) : r.yaziRengi,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: Responsive.sp(16),
+                                    ),
+                                  ),
+                                  Text(
+                                    kilitli ? "$xpLimit XP Gerekiyor" : "Kazanıldı!",
+                                    style: TextStyle(color: r.anaRenk.withOpacity(0.7), fontSize: Responsive.sp(12)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (suanki)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(color: r.anaRenk, borderRadius: BorderRadius.circular(8)),
+                                child: const Text("ŞU ANKİ", style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
