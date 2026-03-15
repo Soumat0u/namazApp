@@ -5,6 +5,7 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/seviye_servisi.dart';
 
 class AnaSayfa extends StatelessWidget {
   const AnaSayfa({super.key});
@@ -76,6 +77,8 @@ class AnaSayfa extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _buildLevelCard(context, provider),
+                SizedBox(height: Responsive.h(16)),
                 _buildHeader(context, provider),
                 SizedBox(height: Responsive.h(16)),
                 _buildMainClock(context, provider),
@@ -93,6 +96,196 @@ class AnaSayfa extends StatelessWidget {
   }
 }
 
+// 🔥 XP BARI VE SEVİYE KARTI
+Widget _buildLevelCard(BuildContext context, NamazProvider provider) {
+  final r = context.renkler; // Güvenli renk okuması (build içinde)
+  
+  return InkWell(
+    // 🔥 ÇÖZÜM BURADA: r değişkenini doğrudan fonksiyona yolluyoruz
+    onTap: () => _unvanlariGoster(context, provider, r), 
+    borderRadius: BorderRadius.circular(Responsive.w(16)),
+    child: Container(
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: r.kartRengi,
+        borderRadius: BorderRadius.circular(Responsive.w(16)),
+        border: Border.all(color: r.anaRenk.withOpacity(0.2), width: 1),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.military_tech_rounded, color: r.anaRenk, size: Responsive.w(22)),
+                  SizedBox(width: Responsive.w(8)),
+                  Text(
+                    provider.mevcutUnvan,
+                    style: TextStyle(
+                      color: r.yaziRengi,
+                      fontWeight: FontWeight.bold,
+                      fontSize: Responsive.sp(15),
+                    ),
+                  ),
+                ],
+              ),
+              TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 800),
+                tween: Tween<double>(begin: 0, end: provider.seviyeIlerleme),
+                builder: (context, value, child) {
+                  return Text(
+                    "%${(value * 100).toStringAsFixed(0)}",
+                    style: TextStyle(
+                        color: r.anaRenk,
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.sp(12)),
+                  );
+                },
+              ),
+            ],
+          ),
+          SizedBox(height: Responsive.h(12)),
+          TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeInOutCubic,
+            tween: Tween<double>(begin: 0, end: provider.seviyeIlerleme),
+            builder: (context, value, child) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: value,
+                  backgroundColor: r.arkaPlanRengi,
+                  valueColor: AlwaysStoppedAnimation<Color>(r.anaRenk),
+                  minHeight: Responsive.h(8),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// 🔥 ÜNVANLARI LİSTELEYEN ŞIK BOTTOMSHEET
+// ÇÖZÜM: AppThemeColors r parametresini buraya ekledik. Böylece içeride tekrar context.renkler çağırmıyoruz.
+void _unvanlariGoster(BuildContext context, NamazProvider provider, AppThemeColors r) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: r.arkaPlanRengi,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+    ),
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      return DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (sheetContext, scrollController) {
+          // Ünvanları XP sırasına göre listeleme
+          final sortedKeys = SeviyeServisi.unvanlar.keys.toList()..sort();
+
+          return Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                height: 4,
+                width: 40,
+                decoration: BoxDecoration(
+                    color: r.pasifRenk, borderRadius: BorderRadius.circular(10)),
+              ),
+              Text(
+                "VAKİT SAVAŞÇISI RÜTBELERİ",
+                style: TextStyle(
+                    color: r.anaRenk,
+                    fontWeight: FontWeight.bold,
+                    fontSize: Responsive.sp(18)),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: sortedKeys.length,
+                  itemBuilder: (listContext, index) {
+                    int xpLimit = sortedKeys[index];
+                    String unvanIsmi = SeviyeServisi.unvanlar[xpLimit]!;
+                    bool kilitli = provider.toplamXp < xpLimit;
+                    bool suanki = provider.mevcutUnvan == unvanIsmi;
+
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: suanki ? r.anaRenk.withOpacity(0.1) : r.kartRengi,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: suanki
+                              ? r.anaRenk
+                              : (kilitli ? Colors.transparent : r.anaRenk.withOpacity(0.3)),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            kilitli ? Icons.lock_outline : Icons.military_tech,
+                            color: kilitli ? r.pasifRenk : r.anaRenk,
+                            size: 30,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  unvanIsmi,
+                                  style: TextStyle(
+                                    color: kilitli
+                                        ? r.yaziRengi.withOpacity(0.4)
+                                        : r.yaziRengi,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: Responsive.sp(16),
+                                  ),
+                                ),
+                                Text(
+                                  kilitli ? "$xpLimit XP Gerekiyor" : "Kazanıldı!",
+                                  style: TextStyle(
+                                      color: r.anaRenk.withOpacity(0.7),
+                                      fontSize: Responsive.sp(12)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (suanki)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                  color: r.anaRenk,
+                                  borderRadius: BorderRadius.circular(8)),
+                              child: const Text("ŞU ANKİ",
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+// --- DİĞER WIDGET METODLARI (HEADER, CLOCK VB.) AYNEN DEVAM EDİYOR ---
 Widget _buildHeader(BuildContext context, NamazProvider provider) {
   final r = context.renkler;
   return Container(
