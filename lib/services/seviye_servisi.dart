@@ -1,5 +1,5 @@
 class SeviyeServisi {
-  static const int namazXp = 10; // Her vaktin ödülü
+  static const int namazXp = 20; // Her vaktin ödülü
 
   // Beğendiğin o efsane liste
   static final Map<int, String> unvanlar = {

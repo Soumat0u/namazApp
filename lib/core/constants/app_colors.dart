@@ -28,7 +28,7 @@ class AppThemeColors {
   Color get anaRenk => _tema.anaRenk;
   Color get yaziRengi => _tema.yaziRengi;
   Color get pasifRenk => _tema.pasifRenk;
-  Color get aktifYesil => _tema.aktifYesil;
+  Color get aktifYesil => _tema.aktifRenk;
   Color get kirmizi => _tema.kirmizi;
 }
 
@@ -40,6 +40,6 @@ class AppColors {
   static const Color anaRenk = Color(0xFFE67E22);
   static const Color yaziRengi = Color(0xFF3E2723);
   static const Color pasifRenk = Color(0xFFBCAAA4);
-  static const Color aktifYesil = Color(0xFF2E7D32);
+  static const Color aktifRenk = Color(0xFF2E7D32);
   static const Color kirmizi = Color(0xFFD32F2F);
 }

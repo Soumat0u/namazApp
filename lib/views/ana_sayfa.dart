@@ -642,14 +642,14 @@ Widget _buildVakitGrid(BuildContext context, NamazProvider provider) {
         _vakitKutusu(
           context,
           "Akşam",
-          Icons.bedtime,
+          Icons.nights_stay,
           provider.vakitler?["Akşam"] ?? "19:00",
           provider,
         ),
         _vakitKutusu(
           context,
           "Yatsı",
-          Icons.nights_stay,
+          Icons.bedtime,
           provider.vakitler?["Yatsı"] ?? "20:30",
           provider,
         ),

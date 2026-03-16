@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
-import '../providers/theme_provider.dart';
+import 'package:intl/intl.dart';
 
 class IstatistikSayfasi extends StatelessWidget {
   const IstatistikSayfasi({super.key});
@@ -19,7 +18,7 @@ class IstatistikSayfasi extends StatelessWidget {
       backgroundColor: r.arkaPlanRengi,
       appBar: AppBar(
         title: Text(
-          "Performans Analizi",
+          "Vakit Analizi",
           style: TextStyle(
             color: r.yaziRengi,
             fontWeight: FontWeight.bold,
@@ -31,66 +30,57 @@ class IstatistikSayfasi extends StatelessWidget {
         elevation: 0,
         automaticallyImplyLeading: false,
       ),
-      body: provider.isLoading
-          ? Center(
-              child: CircularProgressIndicator(color: r.anaRenk),
-            )
-          : RefreshIndicator(
-              color: r.anaRenk,
-              backgroundColor: r.kartRengi,
-              onRefresh: provider.istatistikleriYukle,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.all(Responsive.w(16)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildOzetKartlari(context, provider),
-                    SizedBox(height: Responsive.h(24)),
-                    Text(
-                      "Haftalık Performans (Pzt - Paz)",
-                      style: TextStyle(
-                        fontSize: Responsive.sp(16),
-                        fontWeight: FontWeight.bold,
-                        color: r.yaziRengi,
-                      ),
-                    ),
-                    SizedBox(height: Responsive.h(12)),
-                    _buildCizgiGrafigi(context, provider),
-                    SizedBox(height: Responsive.h(24)),
-                    _buildMotiveEdiciKart(context),
-                    SizedBox(height: Responsive.h(40)),
-                  ],
-                ),
-              ),
-            ),
+      body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.all(Responsive.w(16)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Üstteki sayaçlar
+            _buildKucukOzetKartlari(context, provider),
+
+            SizedBox(height: Responsive.h(24)),
+
+            // Aylık Takvim Bölümü
+            _buildAylikTakvim(context, provider),
+
+            SizedBox(height: Responsive.h(24)),
+
+            // Renk Skalası Bilgilendirmesi
+            _buildRenkLejanti(context),
+
+            SizedBox(height: Responsive.h(40)),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildOzetKartlari(BuildContext context, NamazProvider provider) {
+  // Üstteki seri ve toplam sayaçlarının küçültülmüş hali
+  Widget _buildKucukOzetKartlari(BuildContext context, NamazProvider provider) {
     final r = context.renkler;
     return Row(
       children: [
-        _istatistikKutusu(
+        _kucukIstatistikKutusu(
           context,
-          baslik: "Seri",
-          deger: "${provider.streakCount} Gün",
+          baslik: "Günlük Seri",
+          deger: "${provider.streakCount}",
           ikon: Icons.local_fire_department,
           renk: r.anaRenk,
         ),
         SizedBox(width: Responsive.w(12)),
-        _istatistikKutusu(
+        _kucukIstatistikKutusu(
           context,
           baslik: "Toplam Vakit",
           deger: "${provider.toplamTamamlanan}",
-          ikon: Icons.check_circle_outline,
+          ikon: Icons.check_circle_rounded,
           renk: r.aktifYesil,
         ),
       ],
     );
   }
 
-  Widget _istatistikKutusu(
+  Widget _kucukIstatistikKutusu(
     BuildContext context, {
     required String baslik,
     required String deger,
@@ -100,46 +90,41 @@ class IstatistikSayfasi extends StatelessWidget {
     final r = context.renkler;
     return Expanded(
       child: Container(
-        padding: EdgeInsets.all(Responsive.w(16)),
+        padding: EdgeInsets.all(Responsive.w(12)),
         decoration: BoxDecoration(
           color: r.kartRengi,
-          borderRadius: BorderRadius.circular(Responsive.w(16)),
+          borderRadius: BorderRadius.circular(Responsive.w(12)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Container(
-              padding: EdgeInsets.all(Responsive.w(8)),
-              decoration: BoxDecoration(
-                color: renk.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(ikon, color: renk, size: Responsive.w(20)),
-            ),
-            SizedBox(height: Responsive.h(12)),
-            Text(
-              deger,
-              style: TextStyle(
-                fontSize: Responsive.sp(20),
-                fontWeight: FontWeight.bold,
-                color: r.yaziRengi,
-              ),
-            ),
-            SizedBox(height: Responsive.h(4)),
-            Text(
-              baslik,
-              style: TextStyle(
-                fontSize: Responsive.sp(13),
-                color: r.yaziRengi.withOpacity(0.6),
-                fontWeight: FontWeight.w500,
-              ),
+            Icon(ikon, color: renk, size: Responsive.w(18)),
+            SizedBox(width: Responsive.w(8)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  deger,
+                  style: TextStyle(
+                    fontSize: Responsive.sp(15),
+                    fontWeight: FontWeight.bold,
+                    color: r.yaziRengi,
+                  ),
+                ),
+                Text(
+                  baslik,
+                  style: TextStyle(
+                    fontSize: Responsive.sp(10),
+                    color: r.yaziRengi.withOpacity(0.5),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -147,16 +132,19 @@ class IstatistikSayfasi extends StatelessWidget {
     );
   }
 
-  Widget _buildCizgiGrafigi(BuildContext context, NamazProvider provider) {
+  // Ana Takvim Widget'ı
+  Widget _buildAylikTakvim(BuildContext context, NamazProvider provider) {
     final r = context.renkler;
+    final simdi = DateTime.now();
+    final ayAdi = DateFormat('MMMM yyyy', 'tr_TR').format(simdi);
+
+    // Ayın kaç gün olduğunu ve hangi günle başladığını bulalım
+    final ayinIlkGunu = DateTime(simdi.year, simdi.month, 1);
+    final ayinSonGunu = DateTime(simdi.year, simdi.month + 1, 0).day;
+    final baslangicBoslugu = ayinIlkGunu.weekday - 1; // Pazartesi = 0
+
     return Container(
-      height: Responsive.h(220),
-      padding: EdgeInsets.only(
-        right: Responsive.w(16),
-        left: Responsive.w(8),
-        top: Responsive.h(20),
-        bottom: Responsive.h(8),
-      ),
+      padding: EdgeInsets.all(Responsive.w(16)),
       decoration: BoxDecoration(
         color: r.kartRengi,
         borderRadius: BorderRadius.circular(Responsive.w(20)),
@@ -168,141 +156,151 @@ class IstatistikSayfasi extends StatelessWidget {
           ),
         ],
       ),
-      child: LineChart(
-        LineChartData(
-          gridData: const FlGridData(show: false),
-          titlesData: FlTitlesData(
-            show: true,
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: Responsive.h(24),
-                interval: 1,
-                getTitlesWidget: (value, meta) {
-                  int index = value.toInt();
-                  if (index >= 0 && index < provider.gunIsimleri.length) {
-                    return Padding(
-                      padding: EdgeInsets.only(top: Responsive.h(6)),
-                      child: Text(
-                        provider.gunIsimleri[index],
-                        style: TextStyle(
-                          color: r.yaziRengi.withOpacity(0.5),
-                          fontSize: Responsive.sp(10),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    );
-                  }
-                  return const Text('Gün');
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 1,
-                reservedSize: Responsive.w(24),
-                getTitlesWidget: (value, meta) => Text(
-                  value.toInt().toString(),
-                  style: TextStyle(
-                    color: r.yaziRengi.withOpacity(0.5),
-                    fontSize: Responsive.sp(10),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+      child: Column(
+        children: [
+          Text(
+            ayAdi.toUpperCase(),
+            style: TextStyle(
+              fontSize: Responsive.sp(16),
+              fontWeight: FontWeight.w900,
+              color: r.anaRenk,
+              letterSpacing: 1.2,
             ),
           ),
-          borderData: FlBorderData(show: false),
-          minX: 0,
-          maxX: 6,
-          minY: 0,
-          maxY: 5,
-          lineBarsData: [
-            LineChartBarData(
-              spots: provider.grafikNoktalari.isNotEmpty
-                  ? provider.grafikNoktalari
-                  : List.generate(7, (index) => FlSpot(index.toDouble(), 0)),
-              isCurved: true,
-              color: r.anaRenk,
-              barWidth: 3,
-              isStrokeCapRound: true,
-              dotData: const FlDotData(show: true),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  colors: [
-                    r.anaRenk.withOpacity(0.3),
-                    r.anaRenk.withOpacity(0.0),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+          SizedBox(height: Responsive.h(4)),
+          Divider(color: r.anaRenk.withOpacity(0.1), thickness: 1),
+          SizedBox(height: Responsive.h(12)),
+
+          // Gün İsimleri (Pzt, Sal...)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((
+              g,
+            ) {
+              return SizedBox(
+                width: Responsive.w(35),
+                child: Text(
+                  g,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: Responsive.sp(11),
+                    fontWeight: FontWeight.bold,
+                    color: r.yaziRengi.withOpacity(0.4),
+                  ),
                 ),
-              ),
+              );
+            }).toList(),
+          ),
+          SizedBox(height: Responsive.h(10)),
+
+          // Takvim Grid'i
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
             ),
-          ],
+            itemCount: ayinSonGunu + baslangicBoslugu,
+            itemBuilder: (context, index) {
+              if (index < baslangicBoslugu) return const SizedBox();
+
+              final gun = index - baslangicBoslugu + 1;
+
+              // ŞİMDİLİK TASARIM İÇİN RASTGELE VAKİT SAYISI (Mantık sonra eklenecek)
+              // Örn: Bugünden önceki günler için 0-5 arası değer
+              int vakitSayisi = (gun % 6);
+
+              return _buildTakvimGunu(context, gun, vakitSayisi);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTakvimGunu(BuildContext context, int gun, int vakitSayisi) {
+    final r = context.renkler;
+
+    // Belirlediğin renk skalası
+    final Map<int, Color> renkSkalasi = {
+      0: const Color(0xFFFF6961),
+      1: const Color(0xFFFCA364),
+      2: const Color(0xFFF8D66D),
+      3: const Color(0xFFD0D473),
+      4: const Color(0xFFB0D476),
+      5: const Color(0xFF8CD47E),
+    };
+
+    return Container(
+      decoration: BoxDecoration(
+        color: renkSkalasi[vakitSayisi],
+        borderRadius: BorderRadius.circular(Responsive.w(8)),
+      ),
+      child: Center(
+        child: Text(
+          "$gun",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: Responsive.sp(12),
+            shadows: const [Shadow(blurRadius: 2, color: Colors.black26)],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildMotiveEdiciKart(BuildContext context) {
+  // Renklerin ne anlama geldiğini gösteren alt kısım
+  Widget _buildRenkLejanti(BuildContext context) {
     final r = context.renkler;
-    final tema = context.watch<ThemeProvider>().aktifTema;
-    final motiveBg = tema.brightness == Brightness.dark
-        ? r.aktifYesil.withOpacity(0.15)
-        : const Color(0xFFE8F5E9);
-
     return Container(
-      padding: EdgeInsets.all(Responsive.w(16)),
-      decoration: BoxDecoration(
-        color: motiveBg,
-        borderRadius: BorderRadius.circular(Responsive.w(16)),
-        border: Border.all(color: r.aktifYesil.withOpacity(0.3)),
-      ),
-      child: Row(
+      padding: EdgeInsets.all(Responsive.w(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: EdgeInsets.all(Responsive.w(10)),
-            decoration: BoxDecoration(
-              color: r.kartRengi,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.emoji_events,
-              color: r.aktifYesil,
-              size: Responsive.w(24),
+          Text(
+            "Vakit Takibi Renk Skalası",
+            style: TextStyle(
+              fontSize: Responsive.sp(12),
+              fontWeight: FontWeight.bold,
+              color: r.yaziRengi.withOpacity(0.6),
             ),
           ),
-          SizedBox(width: Responsive.w(12)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Harika Gidiyorsun!",
-                  style: TextStyle(
-                    fontSize: Responsive.sp(14),
-                    fontWeight: FontWeight.bold,
-                    color: r.aktifYesil,
+          SizedBox(height: Responsive.h(10)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(6, (i) {
+              final Map<int, Color> renkler = {
+                0: const Color(0xFFFF6961),
+                1: const Color(0xFFFCA364),
+                2: const Color(0xFFF8D66D),
+                3: const Color(0xFFD0D473),
+                4: const Color(0xFFB0D476),
+                5: const Color(0xFF8CD47E),
+              };
+              return Column(
+                children: [
+                  Container(
+                    width: Responsive.w(25),
+                    height: Responsive.h(10),
+                    decoration: BoxDecoration(
+                      color: renkler[i],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
-                ),
-                SizedBox(height: Responsive.h(4)),
-                Text(
-                  "İstikrarını koruduğun her gün, hedefine bir adım daha yaklaşıyorsun.",
-                  style: TextStyle(
-                    fontSize: Responsive.sp(12),
-                    color: r.yaziRengi.withOpacity(0.7),
+                  SizedBox(height: Responsive.h(4)),
+                  Text(
+                    "$i Vakit",
+                    style: TextStyle(
+                      fontSize: Responsive.sp(9),
+                      color: r.yaziRengi.withOpacity(0.5),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              );
+            }),
           ),
         ],
       ),
