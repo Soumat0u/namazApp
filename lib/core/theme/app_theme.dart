@@ -48,7 +48,7 @@ class AppThemeData {
     kartRengi: Color(0xFFFFFFFF),
     anaRenk: Color(0xFF2E7D32),
     yaziRengi: Color(0xFF1B5E20),
-    pasifRenk: Color(0xFFA5D6A7),
+    pasifRenk: Color(0xFFBDBDBD), // Daha belirgin gri
     aktifRenk: Color.fromARGB(255, 126, 186, 133),
     kirmizi: Color(0xFFD32F2F),
     brightness: Brightness.light,
@@ -62,7 +62,7 @@ class AppThemeData {
     kartRengi: Color(0xFFFFFFFF),
     anaRenk: Color(0xFF1565C0),
     yaziRengi: Color(0xFF0D47A1),
-    pasifRenk: Color(0xFF90CAF9),
+    pasifRenk: Color(0xFFBDBDBD), // Daha belirgin gri
     aktifRenk: Color.fromARGB(255, 130, 205, 255),
     kirmizi: Color(0xFFD32F2F),
     brightness: Brightness.light,

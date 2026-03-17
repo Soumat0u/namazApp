@@ -715,7 +715,7 @@ Widget _vakitKutusu(
         _VakitIkonu(
           ikon: ikon,
           size: Responsive.w(24),
-          color: kildi ? r.aktifYesil : (suan ? r.anaRenk : r.pasifRenk),
+          color: kildi ? r.anaRenk : (suan ? r.aktifYesil : r.pasifRenk),
           isActive: suan,
         ),
         SizedBox(height: Responsive.h(6)),
@@ -732,7 +732,7 @@ Widget _vakitKutusu(
           ad,
           style: TextStyle(
             fontSize: Responsive.sp(10),
-            color: suan ? r.anaRenk : Colors.transparent,
+            color: suan ? r.aktifYesil : Colors.transparent,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -790,7 +790,7 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
           duration: const Duration(milliseconds: 300),
           height: btnHeight,
           decoration: BoxDecoration(
-            color: widget.isDone ? r.aktifYesil : r.kartRengi,
+            color: widget.isDone ? r.anaRenk : r.kartRengi,
             borderRadius: BorderRadius.circular(Responsive.w(25)),
             border: widget.isDone
                 ? null
@@ -798,7 +798,7 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
             boxShadow: [
               BoxShadow(
                 color: widget.isDone
-                    ? r.aktifYesil.withOpacity(0.4)
+                    ? r.anaRenk.withOpacity(0.4)
                     : Colors.black.withOpacity(0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
@@ -823,7 +823,7 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
                 child: Icon(
                   Icons.check_rounded,
                   size: iconSize,
-                  color: widget.isDone ? r.aktifYesil : r.pasifRenk,
+                  color: widget.isDone ? r.anaRenk : r.pasifRenk,
                 ),
               ),
               SizedBox(height: Responsive.h(10)),

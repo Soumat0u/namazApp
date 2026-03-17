@@ -6,36 +6,12 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
-import '../services/bildirim_servisi.dart';
 
-class AyarlarSayfasi extends StatefulWidget {
+class AyarlarSayfasi extends StatelessWidget {
   const AyarlarSayfasi({super.key});
 
-  @override
-  State<AyarlarSayfasi> createState() => _AyarlarSayfasiState();
-}
-
-class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
-  bool _bildirimlerAcik = true;
   final String _hesaplamaYontemi = "Diyanet İşleri (Türkiye)";
 
-  @override
-  void initState() {
-    super.initState();
-    _ayarlariYukle();
-  }
-
-  Future<void> _ayarlariYukle() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _bildirimlerAcik = prefs.getBool('bildirimler_acik') ?? true;
-    });
-  }
-
-  Future<void> _ayarKaydet(String key, dynamic value) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (value is bool) await prefs.setBool(key, value);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,19 +46,8 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
               title: "Bildirimler",
               subtitle: "Vakit girdiğinde bildirim gönder",
               icon: Icons.notifications_active_outlined,
-              value: _bildirimlerAcik,
-              onChanged: (val) async {
-                setState(() => _bildirimlerAcik = val);
-                await _ayarKaydet('bildirimler_acik', val);
-
-                if (val && provider.vakitler != null) {
-                  await BildirimServisi.vakitBildirimleriniKur(
-                    provider.vakitler!,
-                  );
-                } else {
-                  await BildirimServisi.bildirimleriIptalEt();
-                }
-              },
+              value: provider.bildirimlerAcik, 
+              onChanged: (val) => provider.bildirimAyariDegistir(val),
             ),
             const Divider(height: 1),
             _buildInfoTile(
@@ -156,26 +121,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
             ),
             const Divider(height: 1),
 
-            // 🔥 TEST BUTONU BURAYA EKLENDİ 🔥
-            _buildActionTile(
-              r,
-              title: "60 Saniye Kapalı Testi",
-              icon: Icons.timer,
-              color: Colors.orange,
-              onTap: () async {
-                await BildirimServisi.testBildirimiKur();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "⏳ Alarm kuruldu! Uygulamayı ŞİMDİ tamamen kapat ve 60 sn bekle.",
-                      ),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                }
-              },
-            ),
+            
             const Divider(height: 1),
 
             _buildActionTile(

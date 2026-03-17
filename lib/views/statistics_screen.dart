@@ -135,13 +135,12 @@ class IstatistikSayfasi extends StatelessWidget {
   // Ana Takvim Widget'ı
   Widget _buildAylikTakvim(BuildContext context, NamazProvider provider) {
     final r = context.renkler;
-    final simdi = DateTime.now();
-    final ayAdi = DateFormat('MMMM yyyy', 'tr_TR').format(simdi);
+    final sanalBugun = provider.getSanalSimdi();
+    final ayAdi = DateFormat('MMMM yyyy', 'tr_TR').format(sanalBugun);
 
-    // Ayın kaç gün olduğunu ve hangi günle başladığını bulalım
-    final ayinIlkGunu = DateTime(simdi.year, simdi.month, 1);
-    final ayinSonGunu = DateTime(simdi.year, simdi.month + 1, 0).day;
-    final baslangicBoslugu = ayinIlkGunu.weekday - 1; // Pazartesi = 0
+    final ayinIlkGunu = DateTime(sanalBugun.year, sanalBugun.month, 1);
+    final ayinSonGunu = DateTime(sanalBugun.year, sanalBugun.month + 1, 0).day;
+    final baslangicBoslugu = ayinIlkGunu.weekday - 1;
 
     return Container(
       padding: EdgeInsets.all(Responsive.w(16)),
@@ -171,7 +170,6 @@ class IstatistikSayfasi extends StatelessWidget {
           Divider(color: r.anaRenk.withOpacity(0.1), thickness: 1),
           SizedBox(height: Responsive.h(12)),
 
-          // Gün İsimleri (Pzt, Sal...)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((
@@ -193,7 +191,6 @@ class IstatistikSayfasi extends StatelessWidget {
           ),
           SizedBox(height: Responsive.h(10)),
 
-          // Takvim Grid'i
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -207,12 +204,33 @@ class IstatistikSayfasi extends StatelessWidget {
               if (index < baslangicBoslugu) return const SizedBox();
 
               final gun = index - baslangicBoslugu + 1;
+              final hucreTarihi = DateTime(sanalBugun.year, sanalBugun.month, gun);
 
-              // ŞİMDİLİK TASARIM İÇİN RASTGELE VAKİT SAYISI (Mantık sonra eklenecek)
-              // Örn: Bugünden önceki günler için 0-5 arası değer
-              int vakitSayisi = (gun % 6);
+              final sanalBugunStr = provider.getSanalGun();
+              final sanalBugunObj = DateFormat('yyyy-MM-dd').parse(sanalBugunStr);
 
-              return _buildTakvimGunu(context, gun, vakitSayisi);
+              int vakitSayisi;
+
+              if (hucreTarihi.isAfter(sanalBugunObj)) {
+                vakitSayisi = -1; // Gelecek günler
+              } else if (provider.ilkAcilisTarihi != null &&
+                  hucreTarihi.isBefore(provider.ilkAcilisTarihi!)) {
+                vakitSayisi = -1; // Uygulama açılışından öncesi
+              } else {
+                String dateKey = DateFormat('yyyy-MM-dd').format(hucreTarihi);
+                vakitSayisi = provider.aylikGecmis[dateKey] ?? 0;
+              }
+
+              bool isSanalBugun = DateFormat('yyyy-MM-dd').format(hucreTarihi) == sanalBugunStr;
+
+              return _buildTakvimGunu(
+                context,
+                gun,
+                vakitSayisi,
+                hucreTarihi,
+                provider,
+                isSanalBugun: isSanalBugun,
+              );
             },
           ),
         ],
@@ -220,37 +238,137 @@ class IstatistikSayfasi extends StatelessWidget {
     );
   }
 
-  Widget _buildTakvimGunu(BuildContext context, int gun, int vakitSayisi) {
-    final r = context.renkler;
+  Widget _buildTakvimGunu(
+  BuildContext context,
+  int gun,
+  int vakitSayisi,
+  DateTime hucreTarihi,
+  NamazProvider provider, {
+  bool isSanalBugun = false,
+}) {
+  final r = context.renkler;
 
-    // Belirlediğin renk skalası
-    final Map<int, Color> renkSkalasi = {
-      0: const Color(0xFFFF6961),
-      1: const Color(0xFFFCA364),
-      2: const Color(0xFFF8D66D),
-      3: const Color(0xFFD0D473),
-      4: const Color(0xFFB0D476),
-      5: const Color(0xFF8CD47E),
-    };
+  final Map<int, Color> renkSkalasi = {
+    -1: r.pasifRenk.withOpacity(0.15),
+    0: const Color(0xFFFF6961),
+    1: const Color(0xFFFCA364),
+    2: const Color(0xFFF8D66D),
+    3: const Color(0xFFD0D473),
+    4: const Color(0xFFB0D476),
+    5: const Color(0xFF8CD47E),
+  };
 
-    return Container(
+  Color hucreRengi;
+  if (isSanalBugun) {
+    // Bugün renksiz (pasif kutucuklarla aynı) ama çerçeveli
+    hucreRengi = r.pasifRenk.withOpacity(0.15);
+  } else {
+    hucreRengi = renkSkalasi[vakitSayisi] ?? r.pasifRenk.withOpacity(0.15);
+  }
+
+  // Sadece kesinleşmiş geçmiş günler (vakitSayisi != -1) ve bugün olmayan günler tıklanabilir.
+  bool tiklanabilir = vakitSayisi != -1 && !isSanalBugun;
+
+  return GestureDetector(
+    onTap: tiklanabilir 
+        ? () => _gunDetayiGoster(context, hucreTarihi, provider, vakitSayisi)
+        : null,
+    child: AnimatedContainer( // Görsel geri bildirim için AnimatedContainer
+      duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: renkSkalasi[vakitSayisi],
+        color: hucreRengi,
         borderRadius: BorderRadius.circular(Responsive.w(8)),
+        border: isSanalBugun
+            ? Border.all(color: r.anaRenk, width: 2)
+            : (tiklanabilir ? Border.all(color: Colors.black.withOpacity(0.05)) : null),
       ),
       child: Center(
         child: Text(
           "$gun",
           style: TextStyle(
-            color: Colors.white,
+            color: isSanalBugun 
+                ? r.yaziRengi 
+                : (tiklanabilir ? Colors.white : r.yaziRengi.withOpacity(0.4)),
             fontWeight: FontWeight.bold,
             fontSize: Responsive.sp(12),
-            shadows: const [Shadow(blurRadius: 2, color: Colors.black26)],
           ),
         ),
       ),
-    );
+    ),
+  );
+}
+
+  void _gunDetayiGoster(
+  BuildContext context,
+  DateTime tarih,
+  NamazProvider provider,
+  int toplamVakit,
+) {
+  // 🔥 HATA BURADAYDI: watch kullanan 'renkler' yerine 'renklerOku' kullanmalısın
+  final r = context.renklerOku; 
+  
+  String dateKey = DateFormat('yyyy-MM-dd').format(tarih);
+  String displayDate = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(tarih);
+  String bugunKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+  // Veriyi güvenli çekme
+  Map<String, dynamic> detaylar;
+  if (dateKey == bugunKey) {
+    detaylar = provider.kildiMi;
+  } else {
+    var data = provider.gunlukDetaylar[dateKey];
+    detaylar = data != null ? Map<String, dynamic>.from(data) : {};
   }
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: r.arkaPlanRengi,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+    ),
+    builder: (context) {
+      return Container(
+        padding: EdgeInsets.all(Responsive.w(20)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, 
+              height: 5, 
+              decoration: BoxDecoration(
+                color: r.pasifRenk.withOpacity(0.5), 
+                borderRadius: BorderRadius.circular(10)
+              )
+            ),
+            SizedBox(height: 20),
+            Text(displayDate, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: r.yaziRengi)),
+            Text("$toplamVakit / 5 Vakit Kılındı", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            
+            if (detaylar.isEmpty && toplamVakit > 0)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text("Bu güne ait detaylı veri bulunamadı.", textAlign: TextAlign.center),
+              )
+            else
+              ...provider.vakitIsimleri.map((vakit) {
+                bool kilindiMi = detaylar[vakit] == true;
+                return ListTile(
+                  leading: Icon(
+                    kilindiMi ? Icons.check_circle : Icons.radio_button_unchecked, 
+                    color: kilindiMi ? r.aktifYesil : r.pasifRenk
+                  ),
+                  title: Text(vakit, style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w500)),
+                );
+              }).toList(),
+            SizedBox(height: Responsive.h(20)),
+          ],
+        ),
+      );
+    },
+  );
+}
 
   // Renklerin ne anlama geldiğini gösteren alt kısım
   Widget _buildRenkLejanti(BuildContext context) {

@@ -7,15 +7,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/namaz_servis.dart';
-import '../services/bildirim_servisi.dart';
-import '../services/seviye_servisi.dart'; // Seviye servisini ekledik
+import '../services/seviye_servisi.dart';
+import '../services/notification_service.dart';
 
 class NamazProvider extends ChangeNotifier {
   final NamazServisi _namazServisi;
-
-  NamazProvider(this._namazServisi) {
-    _uygulamayiBaslat();
-  }
+  final NotificationService _notificationService;
 
   // --- STATE DEĞİŞKENLERİ ---
   bool isLoading = true;
@@ -28,6 +25,7 @@ class NamazProvider extends ChangeNotifier {
   String konumBilgisi = "Yükleniyor...";
   String vaktinTemasi = "night";
   String seciliSehir = "";
+  bool bildirimlerAcik = true;
 
   int streakCount = 0;
   int toplamTamamlanan = 0;
@@ -39,6 +37,12 @@ class NamazProvider extends ChangeNotifier {
   double get seviyeIlerleme => SeviyeServisi.ilerlemeHesapla(_toplamXp);
 
   String sonSifirlamaTarihi = "";
+
+  // 🔥 İSTATİSTİK VE TAKVİM İÇİN YENİ EKLENENLER
+  DateTime? ilkAcilisTarihi;
+  Map<String, int> aylikGecmis = {};
+  Map<String, dynamic> gunlukDetaylar =
+      {}; // Hangi gün hangi vakit kılındı detayını tutar
 
   Map<String, bool> kildiMi = {
     "Sabah": false,
@@ -74,6 +78,10 @@ class NamazProvider extends ChangeNotifier {
     super.dispose();
   }
 
+  NamazProvider(this._namazServisi, this._notificationService) {
+    _uygulamayiBaslat();
+  }
+
   Future<void> _uygulamayiBaslat() async {
     await loadData();
 
@@ -81,6 +89,7 @@ class NamazProvider extends ChangeNotifier {
       isLoading = false;
       _ilkVakitHesapla();
       _sayaciBaslat();
+      _bildirimleriGuncelle();
       notifyListeners();
     }
 
@@ -126,13 +135,13 @@ class NamazProvider extends ChangeNotifier {
       await prefs.setString('cached_vakitler', json.encode(vakitler));
       await prefs.remove('secili_sehir');
 
-      bool bildirimAcik = prefs.getBool('bildirimler_acik') ?? true;
-      if (bildirimAcik) BildirimServisi.vakitBildirimleriniKur(vakitler!);
+      //bool bildirimAcik = prefs.getBool('bildirimler_acik') ?? true;
 
       _adresGuncelle(position);
       _sabahVaktiSifirlamaKontrolu();
       _ilkVakitHesapla();
       _sayaciBaslat();
+      await _bildirimleriGuncelle();
 
       hataMesaji = "";
       isLoading = false;
@@ -170,12 +179,12 @@ class NamazProvider extends ChangeNotifier {
       await prefs.setString('secili_sehir', sehir);
       await prefs.setString('cached_location', konumBilgisi);
 
-      bool bildirimAcik = prefs.getBool('bildirimler_acik') ?? true;
-      if (bildirimAcik) BildirimServisi.vakitBildirimleriniKur(vakitler!);
+      //bool bildirimAcik = prefs.getBool('bildirimler_acik') ?? true;
 
       _sabahVaktiSifirlamaKontrolu();
       _ilkVakitHesapla();
       _sayaciBaslat();
+      await _bildirimleriGuncelle();
 
       isLoading = false;
       notifyListeners();
@@ -257,6 +266,15 @@ class NamazProvider extends ChangeNotifier {
     final simdi = DateTime.now();
     ekranTarihi = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(simdi);
 
+    // 🔥 İLK AÇILIŞ TARİHİNİ KONTROL ET VE KAYDET
+    String? ilkTarihStr = prefs.getString('ilk_acilis_tarihi');
+    if (ilkTarihStr == null) {
+      // Eğer daha önce kaydedilmemişse (ilk girişse) bugünü kaydet
+      ilkTarihStr = DateFormat('yyyy-MM-dd').format(simdi);
+      await prefs.setString('ilk_acilis_tarihi', ilkTarihStr);
+    }
+    ilkAcilisTarihi = DateFormat('yyyy-MM-dd').parse(ilkTarihStr);
+
     streakCount = prefs.getInt('streakCount') ?? 0;
     toplamTamamlanan = prefs.getInt('toplamKilinan') ?? 0;
 
@@ -282,6 +300,8 @@ class NamazProvider extends ChangeNotifier {
     for (var vkt in vakitIsimleri) {
       kazaNamazlari[vkt] = prefs.getInt('kaza_$vkt') ?? 0;
     }
+
+    bildirimlerAcik = prefs.getBool('bildirimler_acik') ?? true;
 
     await istatistikleriYukle();
   }
@@ -325,36 +345,81 @@ class NamazProvider extends ChangeNotifier {
     await prefs.setInt('streakCount', streakCount);
     await prefs.setInt('toplamKilinan', toplamTamamlanan);
 
-    final bugun = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    String? historyJson = prefs.getString('history_stats');
-    Map<String, dynamic> history = historyJson != null
-        ? json.decode(historyJson)
-        : {};
-    history[bugun] = kildiMi.values.where((v) => v).length;
-    await prefs.setString('history_stats', json.encode(history));
     await istatistikleriYukle();
     notifyListeners();
   }
 
-  Future<void> _kutucuklariSifirla(String bugunStr) async {
+  Future<void> _kutucuklariSifirla(String sanalBugunStr) async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // --- YENİ: SIFIRLAMADAN ÖNCE BİTEN GÜNÜN VERİLERİNİ KAYDET ---
+    if (sonSifirlamaTarihi.isNotEmpty) {
+      // İstatistik özetini kaydet
+      String? historyJson = prefs.getString('history_stats');
+      Map<String, dynamic> history = historyJson != null ? json.decode(historyJson) : {};
+      history[sonSifirlamaTarihi] = kildiMi.values.where((v) => v).length;
+      await prefs.setString('history_stats', json.encode(history));
+
+      // Detaylı kayıt
+      String? detailsJson = prefs.getString('history_details');
+      Map<String, dynamic> details = detailsJson != null ? json.decode(detailsJson) : {};
+      details[sonSifirlamaTarihi] = Map<String, bool>.from(kildiMi);
+      await prefs.setString('history_details', json.encode(details));
+    }
+
     kildiMi.updateAll((key, value) => false);
-    sonSifirlamaTarihi = bugunStr;
+    sonSifirlamaTarihi = sanalBugunStr;
     for (var vkt in vakitIsimleri) {
       await prefs.setBool('kildi_$vkt', false);
     }
-    await prefs.setString('lastResetDate', bugunStr);
+    await prefs.setString('lastResetDate', sanalBugunStr);
+    
+    await istatistikleriYukle();
     notifyListeners();
+  }
+
+  DateTime getSanalSimdi() {
+    final simdi = DateTime.now();
+    if (vakitler == null) return simdi;
+
+    final sabahVakti = _parseTime(vakitler!['Sabah']!);
+    // Eğer şu anki saat Sabah vaktinden önceyse, henüz dünkü "dini" gündeyiz.
+    if (simdi.isBefore(sabahVakti)) {
+      return simdi.subtract(const Duration(days: 1));
+    }
+    return simdi;
+  }
+
+  String getSanalGun() {
+    return DateFormat('yyyy-MM-dd').format(getSanalSimdi());
   }
 
   void _sabahVaktiSifirlamaKontrolu() {
     if (vakitler == null) return;
-    final bugunStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    if (sonSifirlamaTarihi != bugunStr) {
+    final sanalBugunStr = getSanalGun();
+    if (sonSifirlamaTarihi != sanalBugunStr) {
       bool dunuTamamladiMi = kildiMi.values.every((v) => v == true);
       if (!dunuTamamladiMi && streakCount > 0) _streakSifirla();
-      _kutucuklariSifirla(bugunStr);
+      _kutucuklariSifirla(sanalBugunStr);
     }
+  }
+
+  bool _gunIcindeKacirilanVarMi(String hedefVakit) {
+    if (vakitler == null) return false;
+    // Sabah'tan önceysek (gece yarısı ile sabah arası) kontrol edilecek bir şey yok
+    if (hedefVakit == "Sabah") return false;
+
+    int hedefIndex = vakitIsimleri.indexOf(hedefVakit);
+    if (hedefIndex == -1) return false;
+
+    // Hedef vakte kadar olan önceki vakitleri kontrol et
+    for (int i = 0; i < hedefIndex; i++) {
+      String kontrolVakti = vakitIsimleri[i];
+      if (!(kildiMi[kontrolVakti] ?? false)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   void _streakSifirla() async {
@@ -380,6 +445,12 @@ class NamazProvider extends ChangeNotifier {
       }
     }
     aktifVakit = bulunan;
+    
+    // Uygulama açıldığında, o anki vakte kadar olan vakitler kılanmamışsa streak bozulsun
+    if (_gunIcindeKacirilanVarMi(aktifVakit)) {
+      _streakSifirla();
+    }
+    
     notifyListeners();
   }
 
@@ -422,9 +493,20 @@ class NamazProvider extends ChangeNotifier {
       bitisZamani ??= sabahVakti.add(const Duration(days: 1));
 
       if (aktifVakit != bulunanVakit) {
-        if (!(kildiMi[aktifVakit] ?? false)) _streakSifirla();
-        if (bulunanVakit == "Sabah" && sonSifirlamaTarihi != bugunStr) {
-          _kutucuklariSifirla(bugunStr);
+        // Vakit değiştiğinde, önceki vakit (aktifVakit) kılınmamışsa streak bozulsun
+        if (!(kildiMi[aktifVakit] ?? false)) {
+          _streakSifirla();
+        }
+        
+        // Eğer birden fazla vakit atlandıysa (örn: uygulama uzun süre kapalı kaldıysa)
+        // aradaki vakitlerin de kontrol edilmesi gerekir
+        if (_gunIcindeKacirilanVarMi(bulunanVakit)) {
+          _streakSifirla();
+        }
+
+        final sanalBugunStr = getSanalGun();
+        if (bulunanVakit == "Sabah" && sonSifirlamaTarihi != sanalBugunStr) {
+          _kutucuklariSifirla(sanalBugunStr);
         }
         aktifVakit = bulunanVakit;
       }
@@ -433,6 +515,7 @@ class NamazProvider extends ChangeNotifier {
       kalanSureNotifier.value =
           "${fark.inHours.toString().padLeft(2, '0')}:${(fark.inMinutes % 60).toString().padLeft(2, '0')}:${(fark.inSeconds % 60).toString().padLeft(2, '0')}";
       guncelSaatNotifier.value = DateFormat("HH:mm").format(simdi);
+      ekranTarihi = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(simdi);
 
       _temaGuncelle();
       notifyListeners();
@@ -486,16 +569,41 @@ class NamazProvider extends ChangeNotifier {
         ? json.decode(historyJson)
         : {};
 
+    // 🔥 TÜM GEÇMİŞİ AYLIK TAKVİM İÇİN HARİTAYA AKTAR
+    aylikGecmis.clear();
+
+    // YENİ EKLENEN: GÜNLÜK DETAYLARI YÜKLE
+    String? detailsJson = prefs.getString('history_details');
+    if (detailsJson != null) {
+      gunlukDetaylar = Map<String, dynamic>.from(json.decode(detailsJson));
+    }
+
+    history.forEach((key, value) {
+      aylikGecmis[key] = (value as num).toInt();
+    });
+
     List<FlSpot> tempSpots = [];
     List<String> tempLabels = [];
     DateTime bugun = DateTime.now();
-    int pztUzaklik = bugun.weekday - 1;
-    DateTime buHaftaninPazartesisi = bugun.subtract(Duration(days: pztUzaklik));
+    // Sanal bugünü bulalım ki grafik ona göre bitsin
+    final sanalBugunStr = getSanalGun();
+    DateTime sanalBugun = DateFormat('yyyy-MM-dd').parse(sanalBugunStr);
+    
+    int pztUzaklik = sanalBugun.weekday - 1;
+    DateTime buHaftaninPazartesisi = sanalBugun.subtract(Duration(days: pztUzaklik));
 
     for (int i = 0; i < 7; i++) {
       DateTime hedefGun = buHaftaninPazartesisi.add(Duration(days: i));
       String dateKey = DateFormat('yyyy-MM-dd').format(hedefGun);
-      int count = history[dateKey] ?? 0;
+      
+      int count;
+      if (dateKey == sanalBugunStr) {
+        // Eğer hedef gün "sanal bugün" ise ve kalıcı kaydı henüz oluşmadıysa, live datayı göster
+        count = history[dateKey] ?? kildiMi.values.where((v) => v).length;
+      } else {
+        count = history[dateKey] ?? 0;
+      }
+      
       tempSpots.add(FlSpot(i.toDouble(), count.toDouble()));
       tempLabels.add(DateFormat('E', 'tr_TR').format(hedefGun));
     }
@@ -507,6 +615,49 @@ class NamazProvider extends ChangeNotifier {
   Future<void> verileriSifirla() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    await _notificationService.cancelAll();
     await _uygulamayiBaslat();
+  }
+
+  // lib/providers/namaz_provider.dart içindeki ilgili kısmı güncelliyorum
+Future<void> _bildirimleriGuncelle() async {
+  // 1. Tüm eski bildirimleri temizle
+  await _notificationService.cancelAll();
+  // 2. Eğer bildirimler kapalıysa veya vakitler yüklenmemişse çık
+  if (!bildirimlerAcik || vakitler == null) return;
+  final simdi = DateTime.now();
+  final bugunStr = DateFormat('yyyy-MM-dd').format(simdi);
+  for (int i = 0; i < vakitIsimleri.length; i++) {
+    final vakitAdi = vakitIsimleri[i];
+    String? vakitSaati = vakitler![vakitAdi];
+    
+    if (vakitSaati != null) {
+      // 3. KRİTİK: Saati temizle (Örn: "05:30 (EEST)" -> "05:30")
+      vakitSaati = vakitSaati.split(" ")[0]; 
+      
+      try {
+        final vakitDateTime = DateFormat('yyyy-MM-dd HH:mm').parse('$bugunStr $vakitSaati');
+        
+        if (vakitDateTime.isAfter(simdi)) {
+          await _notificationService.scheduleNotification(
+            id: i,
+            title: 'Namaz Vakti: $vakitAdi',
+            body: '$vakitAdi vakti girdi. Namazını kılmayı unutma.',
+            scheduledDate: vakitDateTime,
+          );
+        }
+      } catch (e) {
+        debugPrint("Hata: $vakitAdi vakti formatlanamadı -> $e");
+      }
+    }
+  }
+}
+
+  Future<void> bildirimAyariDegistir(bool acik) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('bildirimler_acik', acik);
+    bildirimlerAcik = acik;
+    await _bildirimleriGuncelle();
+    notifyListeners();
   }
 }

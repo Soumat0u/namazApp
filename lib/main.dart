@@ -5,28 +5,28 @@ import 'package:provider/provider.dart';
 import 'core/utils/responsive.dart';
 
 import 'services/namaz_servis.dart';
-import 'services/bildirim_servisi.dart';
+import 'services/notification_service.dart';
 import 'providers/namaz_provider.dart';
 import 'providers/theme_provider.dart';
 import 'views/ana_sayfa.dart';
 import 'views/statistics_screen.dart';
 import 'views/settings_screen.dart';
-import 'views/kaza_sayfasi.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('tr_TR', null);
 
-  // Bildirim Servisini Başlat
-  await BildirimServisi.init();
-
-  // Dependency Injection Kurulumu
+  // Servisleri Kur
   final namazServisi = NamazServisi();
+  final notificationService = NotificationService();
+  await notificationService.init();
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => NamazProvider(namazServisi)),
+        ChangeNotifierProvider(
+          create: (_) => NamazProvider(namazServisi, notificationService),
+        ),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: const NamazTakipApp(),
@@ -62,7 +62,6 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
   // Sayfalar views klasöründeki dosyalardan geliyor
   final List<Widget> _sayfalar = [
     const AnaSayfa(),
-    const KazaSayfasi(),
     const IstatistikSayfasi(),
     const AyarlarSayfasi(),
   ];
@@ -102,10 +101,6 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
             BottomNavigationBarItem(
               icon: Icon(Icons.home_rounded),
               label: 'Ana Sayfa',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded),
-              label: 'Kaza',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.bar_chart_rounded),
