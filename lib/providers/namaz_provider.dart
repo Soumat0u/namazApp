@@ -324,8 +324,11 @@ class NamazProvider extends ChangeNotifier {
   }
 
   Future<void> vaktiKildimIsaretle(String vakitIsmi, bool yeniDurum) async {
-    final prefs = await SharedPreferences.getInstance();
+    // 🔥 XP SUİSTİMALİNİ ÖNLEME: Zaten aynı durumdaysa işlem yapma
+    // 🔥 DURUMU HEMEN GÜNCELLE (Race condition önlemek için await öncesinde)
     kildiMi[vakitIsmi] = yeniDurum;
+
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('kildi_$vakitIsmi', yeniDurum);
 
     if (yeniDurum) {
@@ -336,9 +339,9 @@ class NamazProvider extends ChangeNotifier {
       if (streakCount > 0) streakCount--;
       if (toplamTamamlanan > 0) toplamTamamlanan--;
 
-      // Geri alınan namazda XP'yi de geri alabiliriz (Opsiyonel)
-      if (_toplamXp >= 10) {
-        _toplamXp -= 10;
+      // Geri alınan namazda XP'yi de geri alıyoruz
+      if (_toplamXp >= SeviyeServisi.namazXp) {
+        _toplamXp -= SeviyeServisi.namazXp;
         await prefs.setInt('toplam_xp', _toplamXp);
       }
     }
@@ -446,10 +449,8 @@ class NamazProvider extends ChangeNotifier {
     }
     aktifVakit = bulunan;
     
-    // Uygulama açıldığında, o anki vakte kadar olan vakitler kılanmamışsa streak bozulsun
-    if (_gunIcindeKacirilanVarMi(aktifVakit)) {
-      _streakSifirla();
-    }
+    // NOT: _gunIcindeKacirilanVarMi kontrolü buradan kaldırıldı. 
+    // Seri (streak) artık yalnızca vakit geçişlerinde veya gün başında bozulacak.
     
     notifyListeners();
   }
@@ -495,12 +496,6 @@ class NamazProvider extends ChangeNotifier {
       if (aktifVakit != bulunanVakit) {
         // Vakit değiştiğinde, önceki vakit (aktifVakit) kılınmamışsa streak bozulsun
         if (!(kildiMi[aktifVakit] ?? false)) {
-          _streakSifirla();
-        }
-        
-        // Eğer birden fazla vakit atlandıysa (örn: uygulama uzun süre kapalı kaldıysa)
-        // aradaki vakitlerin de kontrol edilmesi gerekir
-        if (_gunIcindeKacirilanVarMi(bulunanVakit)) {
           _streakSifirla();
         }
 

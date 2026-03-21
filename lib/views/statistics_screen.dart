@@ -63,7 +63,7 @@ class IstatistikSayfasi extends StatelessWidget {
       children: [
         _kucukIstatistikKutusu(
           context,
-          baslik: "Günlük Seri",
+          baslik: "Seri",
           deger: "${provider.streakCount}",
           ikon: Icons.local_fire_department,
           renk: r.anaRenk,
