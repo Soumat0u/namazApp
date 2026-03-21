@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/namaz_servis.dart';
 import '../services/seviye_servisi.dart';
 import '../services/notification_service.dart';
+import 'package:quran/quran.dart' as quran;
+import 'dart:math';
 
 class NamazProvider extends ChangeNotifier {
   final NamazServisi _namazServisi;
@@ -29,6 +31,8 @@ class NamazProvider extends ChangeNotifier {
 
   int streakCount = 0;
   int toplamTamamlanan = 0;
+  String gununAyetiMeali = "";
+  String gununAyetiReferans = "";
 
   // 🔥 SEVİYE SİSTEMİ DEĞİŞKENLERİ
   int _toplamXp = 0;
@@ -37,6 +41,17 @@ class NamazProvider extends ChangeNotifier {
   double get seviyeIlerleme => SeviyeServisi.ilerlemeHesapla(_toplamXp);
 
   String sonSifirlamaTarihi = "";
+
+  // 🔥 ZİKİRMATİK DEĞİŞKENLERİ
+  int _zikirSayaci = 0;
+  int _zikirHedefi = 33;
+  int _zikirXpKazanilan = 0;
+  Map<String, int> _zikirGecmisi = {};
+
+  int get zikirSayaci => _zikirSayaci;
+  int get zikirHedefi => _zikirHedefi;
+  int get zikirXpKazanilan => _zikirXpKazanilan;
+  Map<String, int> get zikirGecmisi => _zikirGecmisi;
 
   // 🔥 İSTATİSTİK VE TAKVİM İÇİN YENİ EKLENENLER
   DateTime? ilkAcilisTarihi;
@@ -84,6 +99,7 @@ class NamazProvider extends ChangeNotifier {
 
   Future<void> _uygulamayiBaslat() async {
     await loadData();
+    await _gununAyetiniYukle();
 
     if (vakitler != null) {
       isLoading = false;
@@ -302,6 +318,17 @@ class NamazProvider extends ChangeNotifier {
     }
 
     bildirimlerAcik = prefs.getBool('bildirimler_acik') ?? true;
+
+    // 🔥 ZİKİRMATİK VERİLERİNİ YÜKLE
+    _zikirSayaci = prefs.getInt('zikirSayaci') ?? 0;
+    _zikirHedefi = prefs.getInt('zikirHedefi') ?? 33;
+    _zikirXpKazanilan = prefs.getInt('zikirXpKazanilan') ?? 0;
+    final zikirGecmisiStr = prefs.getString('zikirGecmisi') ?? '{}';
+    try {
+      _zikirGecmisi = Map<String, int>.from(json.decode(zikirGecmisiStr));
+    } catch (_) {
+      _zikirGecmisi = {};
+    }
 
     await istatistikleriYukle();
   }
@@ -648,11 +675,94 @@ Future<void> _bildirimleriGuncelle() async {
   }
 }
 
+  Future<void> _gununAyetiniYukle() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bugun = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final sonSecilenGun = prefs.getString('son_ayet_gunu') ?? "";
+
+    if (bugun == sonSecilenGun) {
+      gununAyetiMeali = prefs.getString('son_ayet_meal') ?? "";
+      gununAyetiReferans = prefs.getString('son_ayet_ref') ?? "";
+      
+      if (gununAyetiMeali.isNotEmpty) {
+        notifyListeners();
+        return;
+      }
+    }
+
+    try {
+      final random = Random();
+      // Rastgele sure (1-114)
+      final sureNo = random.nextInt(114) + 1;
+      // O surenin ayet sayısı
+      final ayetSayisi = quran.getVerseCount(sureNo);
+      // Rastgele ayet (1-ayetSayisi)
+      final ayetNo = random.nextInt(ayetSayisi) + 1;
+
+      gununAyetiMeali = quran.getVerseTranslation(
+        sureNo,
+        ayetNo,
+        translation: quran.Translation.trSaheeh,
+      );
+      
+      final sureIsmi = quran.getSurahNameTurkish(sureNo);
+      gununAyetiReferans = "$sureIsmi Suresi, $ayetNo. Ayet";
+
+      await prefs.setString('son_ayet_gunu', bugun);
+      await prefs.setString('son_ayet_meal', gununAyetiMeali);
+      await prefs.setString('son_ayet_ref', gununAyetiReferans);
+    } catch (e) {
+      // Hata durumunda varsayılan ayet
+      gununAyetiMeali = "Şüphesiz güçlükle beraber bir kolaylık vardır.";
+      gununAyetiReferans = "İnşirah Suresi, 5. Ayet";
+    }
+    notifyListeners();
+  }
+
   Future<void> bildirimAyariDegistir(bool acik) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('bildirimler_acik', acik);
     bildirimlerAcik = acik;
     await _bildirimleriGuncelle();
+    notifyListeners();
+  }
+
+  // --- ZİKİRMATİK METOTLARI ---
+  Future<void> zikirArtir() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    _zikirSayaci++;
+    await prefs.setInt('zikirSayaci', _zikirSayaci);
+
+    // Günlük geçmişi kaydet
+    final bugun = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _zikirGecmisi[bugun] = (_zikirGecmisi[bugun] ?? 0) + 1;
+    await prefs.setString('zikirGecmisi', json.encode(_zikirGecmisi));
+
+    // Her 10 zikirde +1 XP
+    if (_zikirSayaci % 10 == 0) {
+      _toplamXp += 1;
+      _zikirXpKazanilan += 1;
+      await prefs.setInt('toplam_xp', _toplamXp);
+      await prefs.setInt('zikirXpKazanilan', _zikirXpKazanilan);
+    }
+    
+    notifyListeners();
+  }
+
+  Future<void> zikirHedefBelirle(int hedef) async {
+    final prefs = await SharedPreferences.getInstance();
+    _zikirHedefi = hedef;
+    await prefs.setInt('zikirHedefi', _zikirHedefi);
+    notifyListeners();
+  }
+
+  Future<void> zikirSifirla() async {
+    final prefs = await SharedPreferences.getInstance();
+    _zikirSayaci = 0;
+    _zikirXpKazanilan = 0;
+    await prefs.setInt('zikirSayaci', _zikirSayaci);
+    await prefs.setInt('zikirXpKazanilan', _zikirXpKazanilan);
     notifyListeners();
   }
 }

@@ -23,6 +23,10 @@ class AyarlarSayfasi extends StatelessWidget {
     return Scaffold(
       backgroundColor: r.arkaPlanRengi,
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: r.yaziRengi),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(
           "Ayarlar",
           style: TextStyle(
@@ -34,7 +38,6 @@ class AyarlarSayfasi extends StatelessWidget {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false,
       ),
       body: ListView(
         padding: EdgeInsets.all(Responsive.w(16)),

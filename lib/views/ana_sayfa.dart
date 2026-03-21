@@ -4,10 +4,32 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import 'widgets/vakit_background.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/seviye_servisi.dart';
+import 'settings_screen.dart'; // Ayarlar ekranı eklendi
 
-class AnaSayfa extends StatelessWidget {
+class AnaSayfa extends StatefulWidget {
   const AnaSayfa({super.key});
+
+  @override
+  State<AnaSayfa> createState() => _AnaSayfaState();
+}
+
+class _AnaSayfaState extends State<AnaSayfa> {
+  late PageController _pageController;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +154,6 @@ class AnaSayfa extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Arkadaşının eklediği yeni Level Kartı (En üste eklendi)
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   Responsive.w(16),
@@ -140,8 +161,37 @@ class AnaSayfa extends StatelessWidget {
                   Responsive.w(16),
                   0,
                 ),
-                child: _buildLevelCard(context, provider),
+                child: Row(
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AyarlarSayfasi()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(Responsive.w(16)),
+                      child: Container(
+                        // Level kartı ile aynı padding/boyut uyumunu sağlamak için
+                        padding: EdgeInsets.all(Responsive.w(16)),
+                        decoration: BoxDecoration(
+                          color: context.renkler.kartRengi,
+                          borderRadius: BorderRadius.circular(Responsive.w(16)),
+                          border: Border.all(color: context.renkler.anaRenk.withOpacity(0.2), width: 1),
+                        ),
+                        child: Icon(
+                          Icons.settings_rounded,
+                          color: context.renkler.anaRenk,
+                          size: Responsive.w(26),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: Responsive.w(12)),
+                    Expanded(child: _buildLevelCard(context, provider)),
+                  ],
+                ),
               ),
+
 
               // Senin hazırladığın Header alanı
               Padding(
@@ -158,10 +208,10 @@ class AnaSayfa extends StatelessWidget {
 
               SizedBox(height: Responsive.h(16)),
 
-              // Senin hazırladığın Ana Saat alanı
+              // Senin hazırladığın Ana Saat alanı (Sayfalı yapıldı)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
-                child: _buildMainClock(context, provider),
+                child: _buildSwipeableHeader(context, provider),
               ),
 
               // Alt kısımdaki grid ve butonlar
@@ -181,6 +231,49 @@ class AnaSayfa extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSwipeableHeader(BuildContext context, NamazProvider provider) {
+    return Column(
+      children: [
+        SizedBox(
+          height: Responsive.h(220), // Sabit yükseklik PageView için gerekli
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() {
+                _currentPage = index;
+              });
+            },
+            children: [
+              _buildMainClock(context, provider),
+              if (provider.gununAyetiMeali.isNotEmpty)
+                _buildGununAyetiCard(context, provider),
+            ],
+          ),
+        ),
+        if (provider.gununAyetiMeali.isNotEmpty) ...[
+          SizedBox(height: Responsive.h(8)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(2, (index) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                height: 8,
+                width: _currentPage == index ? 24 : 8,
+                decoration: BoxDecoration(
+                  color: _currentPage == index
+                      ? context.renkler.anaRenk
+                      : context.renkler.pasifRenk.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              );
+            }),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -843,8 +936,6 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
     );
   }
 }
-// ... üstteki kodlar ...
-
 class _VakitIkonu extends StatefulWidget {
   final IconData ikon;
   final double size;
@@ -916,4 +1007,103 @@ class _VakitIkonuState extends State<_VakitIkonu>
       ),
     );
   }
+}
+
+Widget _buildGununAyetiCard(BuildContext context, NamazProvider provider) {
+  final r = context.renkler;
+
+  return Container(
+    padding: EdgeInsets.all(Responsive.w(20)),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          // Sol Üst: Daha koyu (Siyah karıştırılarak veya opacity düşürülerek)
+          Color.alphaBlend(Colors.black.withOpacity(0.3), r.anaRenk), 
+          // Orta: Tam ana renk
+          r.anaRenk, 
+          // Sağ Alt: Daha açık (Beyaz karıştırılarak veya opacity ile)
+          Color.alphaBlend(Colors.white.withOpacity(0.3), r.anaRenk),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        // Renklerin nerede duracağını belirleyelim (isteğe bağlı)
+        stops: const [0.0, 0.5, 1.0], 
+      ),
+      borderRadius: BorderRadius.circular(Responsive.w(20)),
+      boxShadow: [
+        BoxShadow(
+          color: r.anaRenk.withOpacity(0.3),
+          blurRadius: 15,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    ),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.auto_awesome, color: Colors.white, size: Responsive.w(16)),
+            SizedBox(width: Responsive.w(8)),
+            Text(
+              "GÜNÜN AYETİ",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: Responsive.sp(12),
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+        const Spacer(),
+        Text(
+          "\"${provider.gununAyetiMeali}\"",
+          textAlign: TextAlign.center,
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: Responsive.sp(15),
+            fontWeight: FontWeight.w600,
+            fontStyle: FontStyle.italic,
+            height: 1.4,
+            shadows: [Shadow(blurRadius: 8, color: Colors.black45)],
+          ),
+        ),
+        SizedBox(height: Responsive.h(12)),
+        Text(
+          provider.gununAyetiReferans,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.9),
+            fontSize: Responsive.sp(12),
+            fontWeight: FontWeight.bold,
+            shadows: [Shadow(blurRadius: 4, color: Colors.black26)],
+          ),
+        ),
+        const Spacer(),
+        ElevatedButton.icon(
+          onPressed: () {
+            Share.share(
+              "Günün Ayeti:\n\n\"${provider.gununAyetiMeali}\"\n\n(${provider.gununAyetiReferans})",
+            );
+          },
+          icon: Icon(Icons.share_rounded, size: Responsive.w(18), color: r.anaRenk),
+          label: Text("Paylaş", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(Responsive.w(15)),
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.w(24),
+              vertical: Responsive.h(10),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

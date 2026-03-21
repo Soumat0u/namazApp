@@ -361,7 +361,7 @@ class IstatistikSayfasi extends StatelessWidget {
                   ),
                   title: Text(vakit, style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w500)),
                 );
-              }).toList(),
+              }),
             SizedBox(height: Responsive.h(20)),
           ],
         ),
