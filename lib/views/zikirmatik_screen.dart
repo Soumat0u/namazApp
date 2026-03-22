@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:vibration/vibration.dart';
 import 'package:provider/provider.dart';
 
 import '../core/utils/responsive.dart';
@@ -16,6 +17,20 @@ class ZikirmatikScreen extends StatefulWidget {
 
 class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _canVibrate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkVibrationSupport();
+  }
+
+  Future<void> _checkVibrationSupport() async {
+    bool? hasVibrator = await Vibration.hasVibrator();
+    if (mounted) {
+      setState(() => _canVibrate = hasVibrator ?? false);
+    }
+  }
 
   @override
   void dispose() {
@@ -24,14 +39,18 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
   }
 
   void _zikirCek(NamazProvider provider) {
-    HapticFeedback.mediumImpact(); // lightImpact yerine daha güçlü
-    provider.zikirArtir();
-    
-    // Check if goal is reached
-    if (provider.zikirSayaci > 0 && provider.zikirSayaci == provider.zikirHedefi) {
-      // Hedef sesi çal (URL üzerinden örnek bir klik sesi)
-      _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'));
-      HapticFeedback.mediumImpact();
+    if (provider.zikirSayaci + 1 == provider.zikirHedefi) {
+      // Hedefe tam bu tıkta ulaşıyoruz
+      provider.zikirArtir();
+      
+      // Hedef sesi çal (Yerel Asset'ten)
+      _audioPlayer.play(AssetSource('sounds/success.mp3'));
+      
+      // Hedefe ulaşınca tekil ve uzun titreşim
+      if (_canVibrate) {
+        Vibration.vibrate(duration: 700); 
+      }
+      
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -40,6 +59,12 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
           duration: const Duration(seconds: 2),
         ),
       );
+    } else {
+      // Normal zikir dokunuşu
+      if (_canVibrate) {
+        Vibration.vibrate(duration: 50);
+      }
+      provider.zikirArtir();
     }
   }
 
@@ -125,7 +150,9 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
               );
             },
             onLongPress: () {
-              HapticFeedback.vibrate(); // Daha uzun bir titreşim
+              if (_canVibrate) {
+                Vibration.vibrate(duration: 300);
+              }
               provider.zikirSifirla();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

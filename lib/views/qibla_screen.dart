@@ -1,12 +1,13 @@
 import 'dart:async';
-import 'dart:math' show pi, atan2;
+import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter_qiblah/flutter_qiblah.dart';
-import 'package:sensors_plus/sensors_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-
+import 'package:video_player/video_player.dart';
+import 'package:flutter_compass_v2/flutter_compass_v2.dart';
+import 'package:vibration/vibration.dart';
 import '../core/utils/responsive.dart';
 import '../providers/theme_provider.dart';
 
@@ -21,26 +22,83 @@ class _QiblaScreenState extends State<QiblaScreen> {
   final _deviceSupport = FlutterQiblah.androidDeviceSensorSupport();
   bool _hasPermissions = false;
   bool _vibratedTarget = false;
+  bool _canVibrate = false;
   
   StreamSubscription? _qiblahSub;
-  double _smoothHeading = 0; // Yumuşatılmış (Lerp) cihaz açısı
-  double _qiblaFixedAngle = 0; // Kabe'nin cihaza / konuma göre sabit pusula açısı
+  StreamSubscription? _compassSub;
+  double _smoothHeading = 0;   // Yumuşatılmış cihaz açısı (Kuzeye göre)
+  double _qiblaFixedAngle = 0; // Kabe'nin Kuzeye göre sabit açısı
+  double _smoothOffset = 0;    // Kıble'nin cihaza göre anlık fark açısı (yumuşatılmış)
+  bool _isAccuracyLow = false; // Sensör doğruluğu düşük mü?
+  int? _lastAccuracy;          // En son gelen doğruluk verisi (Takip için)
 
   @override
   void initState() {
     super.initState();
+    _resetAndInit();
+  }
+
+  Future<void> _resetAndInit() async {
+    // Önce temizlik yap (baştan başlaması için)
+    try {
+      _qiblahSub?.cancel();
+      _compassSub?.cancel();
+      FlutterQiblah().dispose();
+    } catch (_) {}
+    
     _checkPermissions();
     _initSensors();
+    _checkVibrationSupport();
+  }
+
+  Future<void> _checkVibrationSupport() async {
+    bool? hasVibrator = await Vibration.hasVibrator();
+    if (mounted) {
+      setState(() => _canVibrate = hasVibrator ?? false);
+    }
   }
 
   void _initSensors() {
-    // Kusursuz ve eğime duyarlı pusula verisini dinleyip yumuşatma filtresinden geçiriyoruz
+    // 1. Kabe'nin Kuzeye olan mutlak açısını 1 kez al ve çivile (Böylece disk döndüğünde ok diskten asla kaymaz)
+    FlutterQiblah.qiblahStream.first.then((direction) {
+      if (mounted) setState(() => _qiblaFixedAngle = direction.qiblah);
+    });
+
+    // 2. Pusula doğruluğunu (accuracy) FlutterCompass üzerinden takip et
+    _compassSub = FlutterCompass.events?.listen((event) {
+      if (mounted) {
+        // Android'de sensör doğruluğu verisi (0: Unreliable, 1: Low, 2: Medium, 3: High)
+        int currentAccuracy = event.accuracy?.toInt() ?? 3;
+
+        setState(() {
+          // Doğruluk 3'ten (High) düşükse uyarı bandını aktif et
+          _isAccuracyLow = currentAccuracy < 3;
+
+          // Kalibrasyon düşükten (0,1,2) -> yüksek (3) seviyesine çıktıysa bildirim ver
+          if (_lastAccuracy != null && _lastAccuracy! < 3 && currentAccuracy == 3) {
+            if (_canVibrate) {
+              Vibration.vibrate(duration: 200);
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Pusula Kalibre Edildi'),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          _lastAccuracy = currentAccuracy;
+        });
+      }
+    });
+
+    // 3. Sadece cihazın pusula dönüşünü sürekli dinle
     _qiblahSub = FlutterQiblah.qiblahStream.listen((QiblahDirection direction) {
       if (mounted) {
         setState(() {
-          _qiblaFixedAngle = direction.qiblah;
-          // Pürüzsüzlük (FPS) hissini artıran Low-Pass Filtresi asıl pusula yönü üzerine uygulanır
           _smoothHeading = _lerpAngle(_smoothHeading, direction.direction, 0.15);
+          // offset: kıblenin cihaza göre farkı — doğrudan FlutterQiblah hesaplar
+          _smoothOffset = _lerpAngle(_smoothOffset, direction.offset, 0.15);
         });
       }
     });
@@ -53,6 +111,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
     return oldAngle + diff * t;
   }
 
+  // 5. Hata & İzin Yönetimi
   Future<void> _checkPermissions() async {
     final permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
@@ -70,8 +129,10 @@ class _QiblaScreenState extends State<QiblaScreen> {
     Responsive.init(context);
     final tema = context.watch<ThemeProvider>().aktifTema;
 
-    // Fark açısı: Kıble açısı ile cihazın pürüzsüz (smoothed) dönüş açısı arasındaki kısa fark (0-180)
-    double diff = (_qiblaFixedAngle - _smoothHeading) % 360;
+    // Hedefe olan fark açısının hesaplanması
+    // 81. satır civarındaki hesaplamayı şu hale getirin:
+double diff = (_qiblaFixedAngle - _smoothHeading - 45) % 360; 
+
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
     double kalanAci = diff.abs();
@@ -86,13 +147,16 @@ class _QiblaScreenState extends State<QiblaScreen> {
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: tema.yaziRengi),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.help_outline_rounded, color: tema.yaziRengi),
+            onPressed: () => _showCalibrationDialog(context, tema),
+          ),
+          SizedBox(width: Responsive.w(8)),
+        ],
         title: Text(
           "Kıble Pusulası",
-          style: TextStyle(
-            color: tema.yaziRengi,
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.sp(18),
-          ),
+          style: TextStyle(color: tema.yaziRengi, fontWeight: FontWeight.bold, fontSize: Responsive.sp(18)),
         ),
       ),
       body: FutureBuilder(
@@ -104,7 +168,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
           if (snapshot.data == true) {
             if (!_hasPermissions) return _buildPermissionError(tema);
             
-            // Veri varsa, Pusula UI çizimi
             return _buildCompassUI(tema, _smoothHeading, _qiblaFixedAngle, kalanAci);
           } else {
             return Center(
@@ -125,27 +188,90 @@ class _QiblaScreenState extends State<QiblaScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            if (_isAccuracyLow)
+              Padding(
+                padding: EdgeInsets.only(bottom: Responsive.h(16)),
+                child: GestureDetector(
+                  onTap: () => _showCalibrationDialog(context, tema),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(10)),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(Responsive.w(12)),
+                      border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Colors.amber, size: Responsive.w(20)),
+                        SizedBox(width: Responsive.w(8)),
+                        Text(
+                          'Pusula hassasiyeti düşük. Kalibre edin',
+                          style: TextStyle(
+                            color: tema.yaziRengi,
+                            fontSize: Responsive.sp(13),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             Text(
               "Kıbleye Kalan Açı: ${kalanAci.toStringAsFixed(1)}°",
-              style: TextStyle(
-                color: tema.yaziRengi.withOpacity(0.7),
-                fontSize: Responsive.sp(14),
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: tema.yaziRengi.withOpacity(0.7), fontSize: Responsive.sp(14), fontWeight: FontWeight.w600),
             ),
             SizedBox(height: Responsive.h(40)),
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. Pusula Diski: Cihazın yumuşatılmış yönüne (-smoothCompassHeading) göre dönerek N'yi Kuzeye sabitler
+                // 1. Fiziksel Pusula Mantığı (Tüm Gövde Tek Vektörde Döner)
                 Transform.rotate(
-                  angle: (smoothCompassHeading * (pi / 180) * -1),
-                  child: _buildCompassDisk(tema, qiblaFixedAngle),
+                  angle: (smoothCompassHeading * (pi / 180) * -1), // Cihazın açısının tersine tüm pusulayı salla (Kuzeyi sabitle)
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Arkadaki pusula kadranı (N,S,E,W)
+                      _buildCompassDiskBody(tema),
+                      
+                      // Diske 'çakılı' Kabe Oku
+                      Transform.rotate(
+                        // İkonun kendi default görselinden kaynaklı 45° kaymasını (-pi/4) siliyoruz.
+                        // Sonrasında doğrudan Kabe'nin Kuzeye olan sabit açısı (qiblaFixedAngle) oranında diske entegre ediyoruz.
+                        angle: (qiblaFixedAngle * (pi / 180)) - (pi / 4),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // 4. Görseller: navigation_rounded
+                            Icon(
+                              Icons.navigation_rounded,
+                              size: Responsive.w(150),
+                              color: tema.anaRenk,
+                            ),
+                            // Ortasındaki beyaz daire
+                            Positioned(
+                              bottom: Responsive.w(80),
+                              child: Container(
+                                width: Responsive.w(12),
+                                height: Responsive.w(12),
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
+            // Çizim üstüne değil ekranda sabit duran haptic mantığı
             _handleVibration(kalanAci),
-            SizedBox(height: Responsive.h(40)),
+            SizedBox(height: Responsive.h(60)),
             _buildStatusIndicator(tema, kalanAci),
           ],
         ),
@@ -153,15 +279,15 @@ class _QiblaScreenState extends State<QiblaScreen> {
     );
   }
 
-  // Diskin ta kendisi + İçindeki İğne
-  Widget _buildCompassDisk(tema, double qiblaFixedAngle) {
+  // Sadece diskin görsel çizimleri
+  Widget _buildCompassDiskBody(tema) {
     return SizedBox(
       width: Responsive.w(320),
       height: Responsive.w(320),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Derece Çizgileri
+          // Açılar/Çizgiler
           ...List.generate(36, (index) {
             return Transform.rotate(
               angle: (index * 10) * (pi / 180),
@@ -179,12 +305,12 @@ class _QiblaScreenState extends State<QiblaScreen> {
             );
           }),
           // Yön Harfleri
-          Positioned(top: 0, child: Text("N", style: TextStyle(color: tema.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(24)))),
-          Positioned(bottom: 0, child: Text("S", style: TextStyle(color: tema.yaziRengi, fontWeight: FontWeight.bold, fontSize: Responsive.sp(20)))),
-          Positioned(right: 0, child: Text("E", style: TextStyle(color: tema.yaziRengi, fontWeight: FontWeight.bold, fontSize: Responsive.sp(20)))),
-          Positioned(left: 0, child: Text("W", style: TextStyle(color: tema.yaziRengi, fontWeight: FontWeight.bold, fontSize: Responsive.sp(20)))),
+          Positioned(top: 0, child: _directionText("N", tema.anaRenk, 24)),
+          Positioned(bottom: 0, child: _directionText("S", tema.yaziRengi, 20)),
+          Positioned(right: 0, child: _directionText("E", tema.yaziRengi, 20)),
+          Positioned(left: 0, child: _directionText("W", tema.yaziRengi, 20)),
           
-          // İç Çerçeve (Diske sabitlenmiş)
+          // Sabit çerçeve çizgisi
           Container(
             width: Responsive.w(240),
             height: Responsive.w(240),
@@ -193,50 +319,27 @@ class _QiblaScreenState extends State<QiblaScreen> {
               border: Border.all(color: tema.anaRenk.withOpacity(0.2), width: 2),
             ),
           ),
-          
-          // 2. Kıble İğnesi (Diske Entegre Ok)
-          // İğne dışarıda değil, diskin üzerinde. Sabit 'qiblaFixedAngle' yönüne döndürüldüğünde, disk cihazla dışarıdan döndükçe, o da Kabe'ye şaşmaz şekilde kilitlenir!
-          Transform.rotate(
-            // İkon %45 derece eğik tasarımdadır (- pi/4 rotasyonu simgeyi tam 0 noktasına bakar hale getirir)
-            angle: (qiblaFixedAngle * (pi / 180)) - (pi / 4),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(
-                  Icons.navigation_rounded,
-                  size: Responsive.w(150),
-                  color: tema.anaRenk,
-                ),
-                Positioned(
-                  bottom: Responsive.w(80),
-                  child: Container(
-                    width: Responsive.w(12),
-                    height: Responsive.w(12),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
+  Widget _directionText(String label, Color color, double size) {
+    return Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: Responsive.sp(size)));
+  }
+
+  // 4. Görseller ve Titreşim (< 5 Derece Kuralı)
   Widget _handleVibration(double kalanAci) {
-    if (kalanAci < 3.0 && !_vibratedTarget) {
-      // Hedefe girildi
+    if (kalanAci < 5.0 && !_vibratedTarget) {
       Future.microtask(() {
         if (mounted) {
           setState(() => _vibratedTarget = true);
-          HapticFeedback.lightImpact();
+          if (_canVibrate) {
+            Vibration.vibrate(duration: 100);
+          }
         }
       });
-    } else if (kalanAci >= 3.0 && _vibratedTarget) {
-      // Hedef dışına çıkıldı
+    } else if (kalanAci >= 5.0 && _vibratedTarget) {
       Future.microtask(() {
         if (mounted) setState(() => _vibratedTarget = false);
       });
@@ -245,7 +348,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
   }
 
   Widget _buildStatusIndicator(tema, double kalanAci) {
-    bool onTarget = kalanAci < 3.0;
+    bool onTarget = kalanAci < 5.0; // 5 derece hedef marjı
     return Container(
       padding: EdgeInsets.symmetric(horizontal: Responsive.w(24), vertical: Responsive.h(12)),
       decoration: BoxDecoration(
@@ -260,11 +363,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
           SizedBox(width: Responsive.w(12)),
           Text(
             onTarget ? "Kıble Yönündesiniz!" : "Cihazı Döndürün",
-            style: TextStyle(
-              color: onTarget ? tema.anaRenk : tema.yaziRengi,
-              fontWeight: FontWeight.bold,
-              fontSize: Responsive.sp(16),
-            ),
+            style: TextStyle(color: onTarget ? tema.anaRenk : tema.yaziRengi, fontWeight: FontWeight.bold, fontSize: Responsive.sp(16)),
           ),
         ],
       ),
@@ -300,10 +399,127 @@ class _QiblaScreenState extends State<QiblaScreen> {
     );
   }
 
+  void _showCalibrationDialog(BuildContext context, dynamic tema) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // İçeriğin tam yükseklik almasına izin ver
+      backgroundColor: tema.arkaPlanRengi,
+      barrierColor: Colors.black.withOpacity(0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Responsive.w(25))),
+      ),
+      builder: (context) {
+        return SingleChildScrollView(
+          child: Container(
+            padding: EdgeInsets.fromLTRB(
+              Responsive.w(24),
+              Responsive.w(24),
+              Responsive.w(24),
+              MediaQuery.of(context).padding.bottom + Responsive.w(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(Responsive.w(20)),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: Responsive.h(240),
+                  child: _CalibrationVideoPlayer(),
+                ),
+              ),
+              SizedBox(height: Responsive.h(24)),
+              Text(
+                'Pusulayı kalibre etmek için telefonunuzu havada büyük bir 8 rakamı çizecek şekilde 5-10 saniye boyunca hareket ettirin.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: tema.yaziRengi,
+                  fontSize: Responsive.sp(16),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: Responsive.h(32)),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: tema.anaRenk,
+                    padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(Responsive.w(15)),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Anladım',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: Responsive.sp(16),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: Responsive.h(12)),
+            ],
+          ),
+        ),
+      );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _qiblahSub?.cancel();
+    _compassSub?.cancel();
     FlutterQiblah().dispose();
+    super.dispose();
+  }
+}
+
+class _CalibrationVideoPlayer extends StatefulWidget {
+  @override
+  _CalibrationVideoPlayerState createState() => _CalibrationVideoPlayerState();
+}
+
+class _CalibrationVideoPlayerState extends State<_CalibrationVideoPlayer> {
+  late VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.asset('assets/videos/calibration_video.mp4')
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() {});
+          _controller.setLooping(true);
+          _controller.setVolume(0); // Sesi kapat
+          _controller.play();
+        }
+      });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_controller.value.isInitialized) {
+      return FittedBox(
+        fit: BoxFit.cover,
+        alignment: const Alignment(0, -0.2), // Yazıları kırpmak için yukarı odaklan
+        child: SizedBox(
+          width: _controller.value.size.width,
+          height: _controller.value.size.height,
+          child: VideoPlayer(_controller),
+        ),
+      );
+    } else {
+      return const Center(child: CircularProgressIndicator());
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
     super.dispose();
   }
 }
