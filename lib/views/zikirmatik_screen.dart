@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
 import 'package:provider/provider.dart';
+import 'package:sound_mode/sound_mode.dart';
+import 'package:sound_mode/utils/ringer_mode_statuses.dart';
 
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
@@ -38,30 +40,40 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
     super.dispose();
   }
 
-  void _zikirCek(NamazProvider provider) {
+  void _zikirCek(NamazProvider provider) async {
+    RingerModeStatus ringerStatus = RingerModeStatus.normal;
+    try {
+      ringerStatus = await SoundMode.ringerModeStatus;
+    } catch (_) {
+      // Sessiz mod eklentisi hata verirse (plugin not found vb.) normal mod gibi devam et
+    }
+
     if (provider.zikirSayaci + 1 == provider.zikirHedefi) {
-      // Hedefe tam bu tıkta ulaşıyoruz
       provider.zikirArtir();
       
-      // Hedef sesi çal (Yerel Asset'ten)
-      _audioPlayer.play(AssetSource('sounds/success.mp3'));
+      // Hedef sesi: Yalnızca Normal modda çal
+      if (ringerStatus == RingerModeStatus.normal) {
+        _audioPlayer.play(AssetSource('sounds/success.mp3'));
+      }
       
-      // Hedefe ulaşınca tekil ve uzun titreşim
-      if (_canVibrate) {
+      // Hedef titreşimi: Normal ve Titreşim modunda çal
+      if (_canVibrate && (ringerStatus == RingerModeStatus.normal || ringerStatus == RingerModeStatus.vibrate)) {
         Vibration.vibrate(duration: 700); 
       }
       
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Hedefinize Ulaştınız: ${provider.zikirHedefi}"),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Hedefinize Ulaştınız: ${provider.zikirHedefi}"),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } else {
-      // Normal zikir dokunuşu
-      if (_canVibrate) {
+      // Normal zikir dokunuşu: Sessiz mod hariç titreşim ver
+      if (_canVibrate && ringerStatus != RingerModeStatus.silent) {
         Vibration.vibrate(duration: 50);
       }
       provider.zikirArtir();
