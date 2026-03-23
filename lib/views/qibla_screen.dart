@@ -54,62 +54,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
     _checkVibrationSupport();
   }
 
+
   void _initLocationListener() {
     if (mounted) setState(() => _qiblaFixedAngle = null); // Her açılışta sıfırla
-
-    // Önce mevcut konumu al ve ilk açıyı hesapla
-    Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high).then((position) {
-      if (mounted) {
-        setState(() {
-          _qiblaFixedAngle = _calculateQiblaBearing(position.latitude, position.longitude);
-        });
-      }
-    }).catchError((_) {
-      // Hata durumunda (GPS yoksa) kütüphane varsayılanını dene
-      FlutterQiblah.qiblahStream.first.then((direction) {
-        if (mounted) setState(() => _qiblaFixedAngle = direction.qiblah);
-      });
-    });
-
-    // Sonra konum değiştikçe dinlemeye devam et
-    _positionSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // 10 metrede bir güncelle
-      ),
-    ).listen((Position position) {
-      if (mounted) {
-        setState(() {
-          _qiblaFixedAngle = _calculateQiblaBearing(position.latitude, position.longitude);
-        });
-      }
-    });
-  }
-
-  double _calculateQiblaBearing(double lat, double lng) {
-    const double meccaLat = 21.4225241;
-    const double meccaLng = 39.8261818;
-
-    double phi1 = lat * (pi / 180);
-    double lambda1 = lng * (pi / 180);
-    double phi2 = meccaLat * (pi / 180);
-    double lambda2 = meccaLng * (pi / 180);
-
-    double y = sin(lambda2 - lambda1) * cos(phi2);
-    double x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(lambda2 - lambda1);
-    double bearing = atan2(y, x);
-    
-    return (bearing * (180 / pi) + 360) % 360;
-  }
-
-  Future<void> _checkVibrationSupport() async {
-    bool? hasVibrator = await Vibration.hasVibrator();
-    if (mounted) {
-      setState(() => _canVibrate = hasVibrator ?? false);
-    }
-  }
-
-  void _initLocationListener() {
     _positionSub?.cancel();
     _positionSub = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
@@ -122,6 +69,13 @@ class _QiblaScreenState extends State<QiblaScreen> {
         setState(() => _qiblaFixedAngle = bearing);
       }
     });
+  }
+
+  Future<void> _checkVibrationSupport() async {
+    bool? hasVibrator = await Vibration.hasVibrator();
+    if (mounted) {
+      setState(() => _canVibrate = hasVibrator ?? false);
+    }
   }
 
   void _initSensors() {

@@ -238,7 +238,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
     return Column(
       children: [
         SizedBox(
-          height: Responsive.h(250),
+          height: Responsive.h(220),
           child: PageView(
             controller: _pageController,
             onPageChanged: (index) {
@@ -1027,9 +1027,10 @@ class _GununAyetiCard extends StatelessWidget {
       barrierColor: Colors.black.withOpacity(0.8),
       transitionDuration: const Duration(milliseconds: 500),
       pageBuilder: (context, anim1, anim2) {
-        return Center(
+        return Align(
+          alignment: const Alignment(0, -0.2), // Hafif yukarı kaydırıldı (0, 0 tam ortadır)
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+            padding: EdgeInsets.symmetric(horizontal: Responsive.w(10)),
             child: SingleChildScrollView(
               child: Hero(
                 tag: 'gununAyetCard',
@@ -1061,7 +1062,12 @@ class _GununAyetiCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => _ayetOdakModuAc(context),
       child: Container(
-        padding: EdgeInsets.all(Responsive.w(20)),
+        padding: EdgeInsets.fromLTRB(
+          Responsive.w(20),
+          Responsive.w(20),
+          Responsive.w(20),
+          isFullText ? Responsive.w(10) : Responsive.w(0), // Alt boşluk küçültüldü
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -1156,7 +1162,7 @@ class _GununAyetiCard extends StatelessWidget {
                 );
               },
             ),
-            SizedBox(height: Responsive.h(12)),
+            SizedBox(height: Responsive.h(8)), // 12 -> 8
             Text(
               provider.gununAyetiReferans,
               style: TextStyle(
@@ -1166,7 +1172,7 @@ class _GununAyetiCard extends StatelessWidget {
                 shadows: [Shadow(blurRadius: 4, color: Colors.black26)],
               ),
             ),
-            if (!isFullText) SizedBox(height: Responsive.h(10)),
+            if (!isFullText) SizedBox(height: Responsive.h(5)),
             if (isFullText) SizedBox(height: Responsive.h(30)),
             ElevatedButton.icon(
               onPressed: () {
@@ -1174,10 +1180,6 @@ class _GununAyetiCard extends StatelessWidget {
                   "Günün Ayeti:\n\n\"${provider.gununAyetiMeali}\"\n\n(${provider.gununAyetiReferans})",
                 );
               },
-<<<<<<< HEAD
-              
-=======
->>>>>>> bazı-düzeltmeler-ve-geliştirmeler
               icon: Icon(Icons.share_rounded, size: Responsive.w(18), color: r.anaRenk),
               label: Text("Paylaş", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
