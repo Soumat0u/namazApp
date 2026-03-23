@@ -41,6 +41,7 @@ class NamazProvider extends ChangeNotifier {
   double get seviyeIlerleme => SeviyeServisi.ilerlemeHesapla(_toplamXp);
 
   String sonSifirlamaTarihi = "";
+  String _sonKontrolEdilenGun = ""; // 00:00 kontrolü için
 
   // 🔥 ZİKİRMATİK DEĞİŞKENLERİ
   int _zikirSayaci = 0;
@@ -281,6 +282,7 @@ class NamazProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final simdi = DateTime.now();
     ekranTarihi = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(simdi);
+    _sonKontrolEdilenGun = DateFormat('yyyy-MM-dd').format(simdi);
 
     // 🔥 İLK AÇILIŞ TARİHİNİ KONTROL ET VE KAYDET
     String? ilkTarihStr = prefs.getString('ilk_acilis_tarihi');
@@ -500,6 +502,12 @@ class NamazProvider extends ChangeNotifier {
       if (vakitler == null) return;
       final simdi = DateTime.now();
       final bugunStr = DateFormat('yyyy-MM-dd').format(simdi);
+
+      // --- 00:00 GÜN DEĞİŞİM KONTROLÜ (Günün Ayeti İçin) ---
+      if (_sonKontrolEdilenGun != bugunStr) {
+        _sonKontrolEdilenGun = bugunStr;
+        _gununAyetiniYukle(); // Ayeti yenile
+      }
 
       var sabahVakti = _parseTime(vakitler!["Sabah"]!);
       String bulunanVakit = "Yatsı";

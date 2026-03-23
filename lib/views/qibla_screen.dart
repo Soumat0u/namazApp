@@ -26,12 +26,12 @@ class _QiblaScreenState extends State<QiblaScreen> {
   
   StreamSubscription? _qiblahSub;
   StreamSubscription? _compassSub;
+  StreamSubscription<Position>? _positionSub;
   double _smoothHeading = 0;   // Yumuşatılmış cihaz açısı (Kuzeye göre)
-  double _qiblaFixedAngle = 0; // Kabe'nin Kuzeye göre sabit açısı
+  double? _qiblaFixedAngle;    // Kabe'nin Kuzeye göre sabit açısı (Hesaplanana kadar null)
   double _smoothOffset = 0;    // Kıble'nin cihaza göre anlık fark açısı (yumuşatılmış)
   bool _isAccuracyLow = false; // Sensör doğruluğu düşük mü?
   int? _lastAccuracy;          // En son gelen doğruluk verisi (Takip için)
-  StreamSubscription<Position>? _positionSub;
 
   @override
   void initState() {
@@ -44,6 +44,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
     try {
       _qiblahSub?.cancel();
       _compassSub?.cancel();
+      _positionSub?.cancel();
       FlutterQiblah().dispose();
     } catch (_) {}
     
@@ -51,6 +52,54 @@ class _QiblaScreenState extends State<QiblaScreen> {
     _initSensors();
     _initLocationListener();
     _checkVibrationSupport();
+  }
+
+  void _initLocationListener() {
+    if (mounted) setState(() => _qiblaFixedAngle = null); // Her açılışta sıfırla
+
+    // Önce mevcut konumu al ve ilk açıyı hesapla
+    Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high).then((position) {
+      if (mounted) {
+        setState(() {
+          _qiblaFixedAngle = _calculateQiblaBearing(position.latitude, position.longitude);
+        });
+      }
+    }).catchError((_) {
+      // Hata durumunda (GPS yoksa) kütüphane varsayılanını dene
+      FlutterQiblah.qiblahStream.first.then((direction) {
+        if (mounted) setState(() => _qiblaFixedAngle = direction.qiblah);
+      });
+    });
+
+    // Sonra konum değiştikçe dinlemeye devam et
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // 10 metrede bir güncelle
+      ),
+    ).listen((Position position) {
+      if (mounted) {
+        setState(() {
+          _qiblaFixedAngle = _calculateQiblaBearing(position.latitude, position.longitude);
+        });
+      }
+    });
+  }
+
+  double _calculateQiblaBearing(double lat, double lng) {
+    const double meccaLat = 21.4225241;
+    const double meccaLng = 39.8261818;
+
+    double phi1 = lat * (pi / 180);
+    double lambda1 = lng * (pi / 180);
+    double phi2 = meccaLat * (pi / 180);
+    double lambda2 = meccaLng * (pi / 180);
+
+    double y = sin(lambda2 - lambda1) * cos(phi2);
+    double x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(lambda2 - lambda1);
+    double bearing = atan2(y, x);
+    
+    return (bearing * (180 / pi) + 360) % 360;
   }
 
   Future<void> _checkVibrationSupport() async {
@@ -121,8 +170,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
     _qiblahSub = FlutterQiblah.qiblahStream.listen((QiblahDirection direction) {
       if (mounted) {
         setState(() {
+          // Sadece cihazın Kuzey'e olan açısını (heading) alıyoruz.
+          // Kıble açısı (_qiblaFixedAngle) GPS ile sabit hesaplandığı için diske çakılı kalır.
           _smoothHeading = _lerpAngle(_smoothHeading, direction.direction, 0.15);
-          // offset: kıblenin cihaza göre farkı — doğrudan FlutterQiblah hesaplar
           _smoothOffset = _lerpAngle(_smoothOffset, direction.offset, 0.15);
         });
       }
@@ -170,9 +220,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
     Responsive.init(context);
     final tema = context.watch<ThemeProvider>().aktifTema;
 
-    // Hedefe olan fark açısının hesaplanması
-    // 81. satır civarındaki hesaplamayı şu hale getirin:
-double diff = (_qiblaFixedAngle - _smoothHeading - 45) % 360; 
+    // Hedefe olan fark açısının hesaplanması: (Kıble Açısı - Cihaz Açısı)
+    double diff = ((_qiblaFixedAngle ?? 0) - _smoothHeading) % 360; 
 
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
@@ -209,7 +258,11 @@ double diff = (_qiblaFixedAngle - _smoothHeading - 45) % 360;
           if (snapshot.data == true) {
             if (!_hasPermissions) return _buildPermissionError(tema);
             
-            return _buildCompassUI(tema, _smoothHeading, _qiblaFixedAngle, kalanAci);
+            if (_qiblaFixedAngle == null) {
+              return Center(child: CircularProgressIndicator(color: tema.anaRenk));
+            }
+            
+            return _buildCompassUI(tema, _smoothHeading, _qiblaFixedAngle!, kalanAci);
           } else {
             return Center(
               child: Text(
@@ -278,13 +331,11 @@ double diff = (_qiblaFixedAngle - _smoothHeading - 45) % 360;
                       
                       // Diske 'çakılı' Kabe Oku
                       Transform.rotate(
-                        // İkonun kendi default görselinden kaynaklı 45° kaymasını (-pi/4) siliyoruz.
-                        // Sonrasında doğrudan Kabe'nin Kuzeye olan sabit açısı (qiblaFixedAngle) oranında diske entegre ediyoruz.
-                        angle: (qiblaFixedAngle * (pi / 180)) - (pi / 4),
+                        angle: ((qiblaFixedAngle ?? 0) * (pi / 180)),
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
-                            // 4. Görseller: navigation_rounded
+                            // 4. Görseller: navigation_rounded (45° eğik)
                             Icon(
                               Icons.navigation_rounded,
                               size: Responsive.w(150),
