@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' show pi;
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_qiblah/flutter_qiblah.dart';
 import 'package:geolocator/geolocator.dart';
@@ -26,6 +26,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
   
   StreamSubscription? _qiblahSub;
   StreamSubscription? _compassSub;
+  StreamSubscription? _positionSub;
   double _smoothHeading = 0;   // Yumuşatılmış cihaz açısı (Kuzeye göre)
   double _qiblaFixedAngle = 0; // Kabe'nin Kuzeye göre sabit açısı
   double _smoothOffset = 0;    // Kıble'nin cihaza göre anlık fark açısı (yumuşatılmış)
@@ -43,12 +44,55 @@ class _QiblaScreenState extends State<QiblaScreen> {
     try {
       _qiblahSub?.cancel();
       _compassSub?.cancel();
+      _positionSub?.cancel();
       FlutterQiblah().dispose();
     } catch (_) {}
     
     _checkPermissions();
     _initSensors();
+    _initLocationListener(); // Canlı konum dinleyicisi
     _checkVibrationSupport();
+  }
+
+  void _initLocationListener() {
+    // Önce mevcut konumu al ve ilk açıyı hesapla
+    Geolocator.getCurrentPosition().then((position) {
+      if (mounted) {
+        setState(() {
+          _qiblaFixedAngle = _calculateQiblaBearing(position.latitude, position.longitude);
+        });
+      }
+    });
+
+    // Sonra konum değiştikçe dinlemeye devam et
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // 10 metrede bir güncelle
+      ),
+    ).listen((Position position) {
+      if (mounted) {
+        setState(() {
+          _qiblaFixedAngle = _calculateQiblaBearing(position.latitude, position.longitude);
+        });
+      }
+    });
+  }
+
+  double _calculateQiblaBearing(double lat, double lng) {
+    const double meccaLat = 21.4225;
+    const double meccaLng = 39.8262;
+
+    double phi1 = lat * (pi / 180);
+    double lambda1 = lng * (pi / 180);
+    double phi2 = meccaLat * (pi / 180);
+    double lambda2 = meccaLng * (pi / 180);
+
+    double y = sin(lambda2 - lambda1);
+    double x = cos(phi1) * tan(phi2) - sin(phi1) * cos(lambda2 - lambda1);
+    double bearing = atan2(y, x) * (180 / pi);
+
+    return (bearing + 360) % 360;
   }
 
   Future<void> _checkVibrationSupport() async {
@@ -59,11 +103,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
   }
 
   void _initSensors() {
-    // 1. Kabe'nin Kuzeye olan mutlak açısını 1 kez al ve çivile (Böylece disk döndüğünde ok diskten asla kaymaz)
-    FlutterQiblah.qiblahStream.first.then((direction) {
-      if (mounted) setState(() => _qiblaFixedAngle = direction.qiblah);
-    });
-
     // 2. Pusula doğruluğunu (accuracy) FlutterCompass üzerinden takip et
     _compassSub = FlutterCompass.events?.listen((event) {
       if (mounted) {
@@ -96,8 +135,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
     _qiblahSub = FlutterQiblah.qiblahStream.listen((QiblahDirection direction) {
       if (mounted) {
         setState(() {
+          // Sadece cihazın Kuzey'e olan açısını (heading) alıyoruz.
+          // Kıble açısı (_qiblaFixedAngle) GPS ile sabit hesaplandığı için diske çakılı kalır.
           _smoothHeading = _lerpAngle(_smoothHeading, direction.direction, 0.15);
-          // offset: kıblenin cihaza göre farkı — doğrudan FlutterQiblah hesaplar
           _smoothOffset = _lerpAngle(_smoothOffset, direction.offset, 0.15);
         });
       }
@@ -129,9 +169,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
     Responsive.init(context);
     final tema = context.watch<ThemeProvider>().aktifTema;
 
-    // Hedefe olan fark açısının hesaplanması
-    // 81. satır civarındaki hesaplamayı şu hale getirin:
-double diff = (_qiblaFixedAngle - _smoothHeading - 45) % 360; 
+    // Hedefe olan fark açısının hesaplanması: (Kıble Açısı - Cihaz Açısı)
+    double diff = (_qiblaFixedAngle - _smoothHeading) % 360; 
 
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
@@ -237,13 +276,11 @@ double diff = (_qiblaFixedAngle - _smoothHeading - 45) % 360;
                       
                       // Diske 'çakılı' Kabe Oku
                       Transform.rotate(
-                        // İkonun kendi default görselinden kaynaklı 45° kaymasını (-pi/4) siliyoruz.
-                        // Sonrasında doğrudan Kabe'nin Kuzeye olan sabit açısı (qiblaFixedAngle) oranında diske entegre ediyoruz.
-                        angle: (qiblaFixedAngle * (pi / 180)) - (pi / 4),
+                        angle: (qiblaFixedAngle * (pi / 180)),
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
-                            // 4. Görseller: navigation_rounded
+                            // 4. Görseller: navigation_rounded (45° eğik)
                             Icon(
                               Icons.navigation_rounded,
                               size: Responsive.w(150),
@@ -473,6 +510,7 @@ double diff = (_qiblaFixedAngle - _smoothHeading - 45) % 360;
   void dispose() {
     _qiblahSub?.cancel();
     _compassSub?.cancel();
+    _positionSub?.cancel();
     FlutterQiblah().dispose();
     super.dispose();
   }
