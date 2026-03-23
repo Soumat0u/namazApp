@@ -1174,6 +1174,10 @@ class _GununAyetiCard extends StatelessWidget {
                   "Günün Ayeti:\n\n\"${provider.gununAyetiMeali}\"\n\n(${provider.gununAyetiReferans})",
                 );
               },
+<<<<<<< HEAD
+              
+=======
+>>>>>>> bazı-düzeltmeler-ve-geliştirmeler
               icon: Icon(Icons.share_rounded, size: Responsive.w(18), color: r.anaRenk),
               label: Text("Paylaş", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(

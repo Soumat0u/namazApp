@@ -5,7 +5,6 @@ import 'package:vibration/vibration.dart';
 import 'package:provider/provider.dart';
 import 'package:sound_mode/sound_mode.dart';
 import 'package:sound_mode/utils/ringer_mode_statuses.dart';
-
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
@@ -44,20 +43,19 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
     RingerModeStatus ringerStatus = RingerModeStatus.normal;
     try {
       ringerStatus = await SoundMode.ringerModeStatus;
-    } catch (_) {
-      // Sessiz mod eklentisi hata verirse (plugin not found vb.) normal mod gibi devam et
-    }
+    } catch (_) {}
 
+    // Hedefe ulaşıldı mı kontrolü
     if (provider.zikirSayaci + 1 == provider.zikirHedefi) {
       provider.zikirArtir();
       
-      // Hedef sesi: Yalnızca Normal modda çal
+      // Ses: Sadece normal modda çal
       if (ringerStatus == RingerModeStatus.normal) {
         _audioPlayer.play(AssetSource('sounds/success.mp3'));
       }
       
-      // Hedef titreşimi: Normal ve Titreşim modunda çal
-      if (_canVibrate && (ringerStatus == RingerModeStatus.normal || ringerStatus == RingerModeStatus.vibrate)) {
+      // Güçlü Titreşim: Sessiz mod hariç
+      if (_canVibrate && ringerStatus != RingerModeStatus.silent) {
         Vibration.vibrate(duration: 700); 
       }
       
@@ -72,7 +70,7 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
         );
       }
     } else {
-      // Normal zikir dokunuşu: Sessiz mod hariç titreşim ver
+      // Normal dokunuş titreşimi
       if (_canVibrate && ringerStatus != RingerModeStatus.silent) {
         Vibration.vibrate(duration: 50);
       }
