@@ -249,7 +249,10 @@ class _AnaSayfaState extends State<AnaSayfa> {
             children: [
               _buildMainClock(context, provider),
               if (provider.gununAyetiMeali.isNotEmpty)
-                _buildGununAyetiCard(context, provider),
+                Hero(
+                  tag: 'gununAyetCard',
+                  child: _GununAyetiCard(provider: provider),
+                ),
             ],
           ),
         ),
@@ -1009,101 +1012,201 @@ class _VakitIkonuState extends State<_VakitIkonu>
   }
 }
 
-Widget _buildGununAyetiCard(BuildContext context, NamazProvider provider) {
-  final r = context.renkler;
+class _GununAyetiCard extends StatelessWidget {
+  final NamazProvider provider;
+  final bool isFullText;
+  const _GununAyetiCard({required this.provider, this.isFullText = false});
 
-  return Container(
-    padding: EdgeInsets.all(Responsive.w(20)),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          // Sol Üst: Daha koyu (Siyah karıştırılarak veya opacity düşürülerek)
-          Color.alphaBlend(Colors.black.withOpacity(0.3), r.anaRenk), 
-          // Orta: Tam ana renk
-          r.anaRenk, 
-          // Sağ Alt: Daha açık (Beyaz karıştırılarak veya opacity ile)
-          Color.alphaBlend(Colors.white.withOpacity(0.3), r.anaRenk),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        // Renklerin nerede duracağını belirleyelim (isteğe bağlı)
-        stops: const [0.0, 0.5, 1.0], 
-      ),
-      borderRadius: BorderRadius.circular(Responsive.w(20)),
-      boxShadow: [
-        BoxShadow(
-          color: r.anaRenk.withOpacity(0.3),
-          blurRadius: 15,
-          offset: const Offset(0, 8),
-        ),
-      ],
-    ),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.auto_awesome, color: Colors.white, size: Responsive.w(16)),
-            SizedBox(width: Responsive.w(8)),
-            Text(
-              "GÜNÜN AYETİ",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: Responsive.sp(12),
-                letterSpacing: 2,
+  void _ayetOdakModuAc(BuildContext context) {
+    if (isFullText) return;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Ayet Detay",
+      barrierColor: Colors.black.withOpacity(0.8),
+      transitionDuration: const Duration(milliseconds: 500),
+      pageBuilder: (context, anim1, anim2) {
+        return Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: Responsive.w(10)),
+            child: SingleChildScrollView(
+              child: Hero(
+                tag: 'gununAyetCard',
+                child: Material(
+                  color: Colors.transparent,
+                  child: _GununAyetiCard(provider: provider, isFullText: true),
+                ),
               ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: CurvedAnimation(parent: anim1, curve: Curves.easeInOut),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.renkler;
+
+    return GestureDetector(
+      onTap: () => _ayetOdakModuAc(context),
+      child: Container(
+        padding: EdgeInsets.only(
+          top: Responsive.h(15),
+          left: Responsive.w(15),
+          right: Responsive.w(15),
+          bottom: Responsive.h(8),
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color.alphaBlend(Colors.black.withOpacity(0.3), r.anaRenk),
+              r.anaRenk,
+              Color.alphaBlend(Colors.white.withOpacity(0.3), r.anaRenk),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0.0, 0.5, 1.0],
+          ),
+          borderRadius: BorderRadius.circular(Responsive.w(20)),
+          boxShadow: [
+            BoxShadow(
+              color: r.anaRenk.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        const Spacer(),
-        Text(
-          "\"${provider.gununAyetiMeali}\"",
-          textAlign: TextAlign.center,
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: Responsive.sp(15),
-            fontWeight: FontWeight.w600,
-            fontStyle: FontStyle.italic,
-            height: 1.4,
-            shadows: [Shadow(blurRadius: 8, color: Colors.black45)],
-          ),
-        ),
-        SizedBox(height: Responsive.h(12)),
-        Text(
-          provider.gununAyetiReferans,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: Responsive.sp(12),
-            fontWeight: FontWeight.bold,
-            shadows: [Shadow(blurRadius: 4, color: Colors.black26)],
-          ),
-        ),
-        const Spacer(),
-        ElevatedButton.icon(
-          onPressed: () {
-            Share.share(
-              "Günün Ayeti:\n\n\"${provider.gununAyetiMeali}\"\n\n(${provider.gununAyetiReferans})",
-            );
-          },
-          icon: Icon(Icons.share_rounded, size: Responsive.w(18), color: r.anaRenk),
-          label: Text("Paylaş", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(Responsive.w(15)),
+        child: Column(
+          mainAxisSize: isFullText ? MainAxisSize.min : MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.auto_awesome, color: Colors.white, size: Responsive.w(16)),
+                SizedBox(width: Responsive.w(8)),
+                Text(
+                  "GÜNÜN AYETİ",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: Responsive.sp(12),
+                    letterSpacing: 2,
+                  ),
+                ),
+              ],
             ),
-            padding: EdgeInsets.symmetric(
-              horizontal: Responsive.w(24),
-              vertical: Responsive.h(10),
+            if (!isFullText) SizedBox(height: Responsive.h(5)),
+            if (isFullText) SizedBox(height: Responsive.h(20)),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final textStyle = TextStyle(
+                  color: Colors.white,
+                  fontSize: Responsive.sp(isFullText ? 18 : 15),
+                  fontWeight: FontWeight.w600,
+                  fontStyle: FontStyle.italic,
+                  height: 1.4,
+                  shadows: [Shadow(blurRadius: 8, color: Colors.black45)],
+                );
+
+                final text = "\"${provider.gununAyetiMeali}\"";
+
+                final span = TextSpan(text: text, style: textStyle);
+                final tp = TextPainter(
+                  text: span,
+                  maxLines: 3,
+                  textDirection: TextDirection.ltr,
+                );
+                tp.layout(maxWidth: constraints.maxWidth);
+                final isOverflowing = tp.didExceedMaxLines;
+
+                return Column(
+                  children: [
+                    Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      maxLines: isFullText ? null : 3,
+                      overflow: isFullText ? TextOverflow.visible : TextOverflow.ellipsis,
+                      style: textStyle,
+                    ),
+                    if (isOverflowing && !isFullText)
+                      TextButton(
+                        onPressed: () => _ayetOdakModuAc(context),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          "...devamını oku",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            fontSize: Responsive.sp(13),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
-          ),
+            SizedBox(height: Responsive.h(12)),
+            Text(
+              provider.gununAyetiReferans,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: Responsive.sp(isFullText ? 14 : 12),
+                fontWeight: FontWeight.bold,
+                shadows: [Shadow(blurRadius: 4, color: Colors.black26)],
+              ),
+            ),
+            if (!isFullText) SizedBox(height: Responsive.h(10)),
+            if (isFullText) SizedBox(height: Responsive.h(30)),
+            ElevatedButton.icon(
+              onPressed: () {
+                Share.share(
+                  "Günün Ayeti:\n\n\"${provider.gununAyetiMeali}\"\n\n(${provider.gununAyetiReferans})",
+                );
+              },
+              
+              icon: Icon(Icons.share_rounded, size: Responsive.w(18), color: r.anaRenk),
+              label: Text("Paylaş", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Responsive.w(15)),
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.w(24),
+                  vertical: Responsive.h(10),
+                ),
+              ),
+            ),
+            if (isFullText) ...[
+              SizedBox(height: Responsive.h(16)),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "KAPAT",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1),
+                ),
+              ),
+            ],
+          ],
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

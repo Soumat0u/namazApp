@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' show pi;
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_qiblah/flutter_qiblah.dart';
 import 'package:geolocator/geolocator.dart';
@@ -31,6 +31,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
   double _smoothOffset = 0;    // Kıble'nin cihaza göre anlık fark açısı (yumuşatılmış)
   bool _isAccuracyLow = false; // Sensör doğruluğu düşük mü?
   int? _lastAccuracy;          // En son gelen doğruluk verisi (Takip için)
+  StreamSubscription<Position>? _positionSub;
 
   @override
   void initState() {
@@ -48,6 +49,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
     
     _checkPermissions();
     _initSensors();
+    _initLocationListener();
     _checkVibrationSupport();
   }
 
@@ -58,10 +60,33 @@ class _QiblaScreenState extends State<QiblaScreen> {
     }
   }
 
+  void _initLocationListener() {
+    _positionSub?.cancel();
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen((Position position) {
+      if (mounted) {
+        double bearing = _calculateQiblaBearing(position.latitude, position.longitude);
+        setState(() => _qiblaFixedAngle = bearing);
+      }
+    });
+  }
+
   void _initSensors() {
-    // 1. Kabe'nin Kuzeye olan mutlak açısını 1 kez al ve çivile (Böylece disk döndüğünde ok diskten asla kaymaz)
-    FlutterQiblah.qiblahStream.first.then((direction) {
-      if (mounted) setState(() => _qiblaFixedAngle = direction.qiblah);
+    // 1. Kabe'nin Kuzeye olan mutlak açısını 1 kez al ve çivile
+    Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high).then((pos) {
+      if (mounted) {
+        double bearing = _calculateQiblaBearing(pos.latitude, pos.longitude);
+        setState(() => _qiblaFixedAngle = bearing);
+      }
+    }).catchError((_) {
+      // Hata durumunda (GPS yoksa) kütüphane varsayılanını dene
+      FlutterQiblah.qiblahStream.first.then((direction) {
+        if (mounted) setState(() => _qiblaFixedAngle = direction.qiblah);
+      });
     });
 
     // 2. Pusula doğruluğunu (accuracy) FlutterCompass üzerinden takip et
@@ -109,6 +134,22 @@ class _QiblaScreenState extends State<QiblaScreen> {
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
     return oldAngle + diff * t;
+  }
+
+  // Kıble Açısı Hesaplama (Great Circle Bearing)
+  double _calculateQiblaBearing(double lat1, double lon1) {
+    const double lat2 = 21.42252414371485; // Kabe Enlem
+    const double lon2 = 39.82618182245369; // Kabe Boylam
+
+    double phi1 = lat1 * pi / 180;
+    double phi2 = lat2 * pi / 180;
+    double lambda1 = lon1 * pi / 180;
+    double lambda2 = lon2 * pi / 180;
+
+    double y = sin(lambda2 - lambda1) * cos(phi2);
+    double x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(lambda2 - lambda1);
+    double bearing = atan2(y, x);
+    return (bearing * 180 / pi + 360) % 360;
   }
 
   // 5. Hata & İzin Yönetimi
@@ -473,6 +514,7 @@ double diff = (_qiblaFixedAngle - _smoothHeading - 45) % 360;
   void dispose() {
     _qiblahSub?.cancel();
     _compassSub?.cancel();
+    _positionSub?.cancel();
     FlutterQiblah().dispose();
     super.dispose();
   }

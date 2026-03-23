@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
 import 'package:provider/provider.dart';
+import 'package:sound_mode/sound_mode.dart';
+import 'package:sound_mode/utils/ringer_mode_statuses.dart';
 
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
@@ -38,30 +40,49 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
     super.dispose();
   }
 
-  void _zikirCek(NamazProvider provider) {
+  Future<void> _zikirCek(NamazProvider provider) async {
     if (provider.zikirSayaci + 1 == provider.zikirHedefi) {
       // Hedefe tam bu tıkta ulaşıyoruz
       provider.zikirArtir();
       
-      // Hedef sesi çal (Yerel Asset'ten)
-      _audioPlayer.play(AssetSource('sounds/success.mp3'));
+      // Ses modunu kontrol et
+      RingerModeStatus ringerStatus = RingerModeStatus.normal; // Varsayılan değer
+      try {
+        ringerStatus = await SoundMode.ringerModeStatus;
+      } catch (e) {
+        debugPrint("Ses modu alınamadı (Plugin hatası): $e");
+      }
       
-      // Hedefe ulaşınca tekil ve uzun titreşim
-      if (_canVibrate) {
+      // Sessiz değilse ve titreşimde değilse (yani Normalse) ses çal
+      if (ringerStatus == RingerModeStatus.normal) {
+        _audioPlayer.play(AssetSource('sounds/success.mp3'));
+      }
+      
+      // Titreşim veya Normal moddaysa titre (Sessiz hariç)
+      if (ringerStatus != RingerModeStatus.silent && _canVibrate) {
         Vibration.vibrate(duration: 700); 
       }
       
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Hedefinize Ulaştınız: ${provider.zikirHedefi}"),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Hedefinize Ulaştınız: ${provider.zikirHedefi}"),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } else {
       // Normal zikir dokunuşu
-      if (_canVibrate) {
+      RingerModeStatus ringerStatus = RingerModeStatus.normal;
+      try {
+        ringerStatus = await SoundMode.ringerModeStatus;
+      } catch (e) {
+        // Hata durumunda sessizliği engelleyip zikre odaklanıyoruz
+      }
+
+      if (ringerStatus != RingerModeStatus.silent && _canVibrate) {
         Vibration.vibrate(duration: 50);
       }
       provider.zikirArtir();
