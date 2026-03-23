@@ -28,7 +28,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
   StreamSubscription? _compassSub;
   StreamSubscription? _positionSub;
   double _smoothHeading = 0;   // Yumuşatılmış cihaz açısı (Kuzeye göre)
-  double _qiblaFixedAngle = 0; // Kabe'nin Kuzeye göre sabit açısı
+  double? _qiblaFixedAngle;    // Kabe'nin Kuzeye göre sabit açısı (Hesaplanana kadar null)
   double _smoothOffset = 0;    // Kıble'nin cihaza göre anlık fark açısı (yumuşatılmış)
   bool _isAccuracyLow = false; // Sensör doğruluğu düşük mü?
   int? _lastAccuracy;          // En son gelen doğruluk verisi (Takip için)
@@ -55,13 +55,20 @@ class _QiblaScreenState extends State<QiblaScreen> {
   }
 
   void _initLocationListener() {
+    if (mounted) setState(() => _qiblaFixedAngle = null); // Her açılışta sıfırla
+
     // Önce mevcut konumu al ve ilk açıyı hesapla
-    Geolocator.getCurrentPosition().then((position) {
+    Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high).then((position) {
       if (mounted) {
         setState(() {
           _qiblaFixedAngle = _calculateQiblaBearing(position.latitude, position.longitude);
         });
       }
+    }).catchError((_) {
+      // Hata durumunda (GPS yoksa) kütüphane varsayılanını dene
+      FlutterQiblah.qiblahStream.first.then((direction) {
+        if (mounted) setState(() => _qiblaFixedAngle = direction.qiblah);
+      });
     });
 
     // Sonra konum değiştikçe dinlemeye devam et
@@ -80,19 +87,19 @@ class _QiblaScreenState extends State<QiblaScreen> {
   }
 
   double _calculateQiblaBearing(double lat, double lng) {
-    const double meccaLat = 21.4225;
-    const double meccaLng = 39.8262;
+    const double meccaLat = 21.4225241;
+    const double meccaLng = 39.8261818;
 
     double phi1 = lat * (pi / 180);
     double lambda1 = lng * (pi / 180);
     double phi2 = meccaLat * (pi / 180);
     double lambda2 = meccaLng * (pi / 180);
 
-    double y = sin(lambda2 - lambda1);
-    double x = cos(phi1) * tan(phi2) - sin(phi1) * cos(lambda2 - lambda1);
-    double bearing = atan2(y, x) * (180 / pi);
-
-    return (bearing + 360) % 360;
+    double y = sin(lambda2 - lambda1) * cos(phi2);
+    double x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(lambda2 - lambda1);
+    double bearing = atan2(y, x);
+    
+    return (bearing * (180 / pi) + 360) % 360;
   }
 
   Future<void> _checkVibrationSupport() async {
@@ -170,7 +177,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
     final tema = context.watch<ThemeProvider>().aktifTema;
 
     // Hedefe olan fark açısının hesaplanması: (Kıble Açısı - Cihaz Açısı)
-    double diff = (_qiblaFixedAngle - _smoothHeading) % 360; 
+    double diff = ((_qiblaFixedAngle ?? 0) - _smoothHeading) % 360; 
 
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
@@ -207,7 +214,11 @@ class _QiblaScreenState extends State<QiblaScreen> {
           if (snapshot.data == true) {
             if (!_hasPermissions) return _buildPermissionError(tema);
             
-            return _buildCompassUI(tema, _smoothHeading, _qiblaFixedAngle, kalanAci);
+            if (_qiblaFixedAngle == null) {
+              return Center(child: CircularProgressIndicator(color: tema.anaRenk));
+            }
+            
+            return _buildCompassUI(tema, _smoothHeading, _qiblaFixedAngle!, kalanAci);
           } else {
             return Center(
               child: Text(
@@ -276,7 +287,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                       
                       // Diske 'çakılı' Kabe Oku
                       Transform.rotate(
-                        angle: (qiblaFixedAngle * (pi / 180)),
+                        angle: ((qiblaFixedAngle ?? 0) * (pi / 180)),
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
