@@ -42,3 +42,5 @@ flutter:
   assets:
     - assets/videos/
     - assets/sounds/
+    - assets/images/
+    - assets/images/streak_icon.png

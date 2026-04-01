@@ -76,6 +76,15 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
           deger: "${provider.streakCount}",
           ikon: Icons.local_fire_department,
           renk: r.anaRenk,
+          customIcon: ColorFiltered(
+            colorFilter: ColorFilter.mode(r.anaRenk, BlendMode.srcIn),
+            child: Image.asset(
+              'assets/images/streak_icon.png',
+              width: Responsive.w(25),
+              height: Responsive.w(25),
+              fit: BoxFit.contain,
+            ),
+          ),
         ),
         SizedBox(width: Responsive.w(12)),
         _kucukIstatistikKutusu(
@@ -95,6 +104,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
     required String deger,
     required IconData ikon,
     required Color renk,
+    Widget? customIcon,
   }) {
     final r = context.renkler;
     return Expanded(
@@ -113,27 +123,31 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
         ),
         child: Row(
           children: [
-            Icon(ikon, color: renk, size: Responsive.w(18)),
+            customIcon ?? Icon(ikon, color: renk, size: Responsive.w(18)),
             SizedBox(width: Responsive.w(8)),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  deger,
-                  style: TextStyle(
-                    fontSize: Responsive.sp(15),
-                    fontWeight: FontWeight.bold,
-                    color: r.yaziRengi,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    deger,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: Responsive.sp(15),
+                      fontWeight: FontWeight.bold,
+                      color: r.yaziRengi,
+                    ),
                   ),
-                ),
-                Text(
-                  baslik,
-                  style: TextStyle(
-                    fontSize: Responsive.sp(10),
-                    color: r.yaziRengi.withOpacity(0.5),
+                  Text(
+                    baslik,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: Responsive.sp(10),
+                      color: r.yaziRengi.withOpacity(0.5),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

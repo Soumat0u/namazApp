@@ -6,7 +6,8 @@ import '../providers/namaz_provider.dart';
 import 'widgets/vakit_background.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/seviye_servisi.dart';
-import 'social_screen.dart'; // Sosyal ekranı eklendi
+import 'social_screen.dart';
+import 'tools_screen.dart'; // Araçlar eklendi
 import '../models/religious_day.dart';
 import 'package:intl/intl.dart';
 
@@ -171,7 +172,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const SosyalSayfasi()),
+                          MaterialPageRoute(builder: (context) => const AraclarSayfasi()),
                         );
                       },
                       borderRadius: BorderRadius.circular(Responsive.w(16)),
@@ -184,7 +185,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
                           border: Border.all(color: context.renkler.anaRenk.withOpacity(0.2), width: 1),
                         ),
                         child: Icon(
-                          Icons.people_alt_rounded,
+                          Icons.grid_view_rounded, // Sosyal yerine Araçlar ikonu
                           color: context.renkler.anaRenk,
                           size: Responsive.w(26),
                         ),
@@ -351,7 +352,6 @@ class _AnaSayfaState extends State<AnaSayfa> {
       ),
     );
   }
-}
 
 // 🔥 XP BARI VE SEVİYE KARTI
 Widget _buildLevelCard(BuildContext context, NamazProvider provider) {
@@ -373,39 +373,44 @@ Widget _buildLevelCard(BuildContext context, NamazProvider provider) {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.military_tech_rounded,
-                    color: r.anaRenk,
-                    size: Responsive.w(22),
-                  ),
-                  SizedBox(width: Responsive.w(8)),
-                  Text(
-                    provider.mevcutUnvan,
-                    style: TextStyle(
-                      color: r.yaziRengi,
-                      fontWeight: FontWeight.bold,
-                      fontSize: Responsive.sp(15),
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.military_tech_rounded,
+                      color: r.anaRenk,
+                      size: Responsive.w(22),
                     ),
-                  ),
-                  SizedBox(width: Responsive.w(8)),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(6), vertical: Responsive.h(2)),
-                    decoration: BoxDecoration(
-                      color: r.anaRenk.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(Responsive.w(6)),
-                    ),
-                    child: Text(
-                      "${provider.toplamXp} XP",
-                      style: TextStyle(
-                        color: r.anaRenk,
-                        fontWeight: FontWeight.bold,
-                        fontSize: Responsive.sp(11),
+                    SizedBox(width: Responsive.w(8)),
+                    Flexible(
+                      child: Text(
+                        provider.mevcutUnvan,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: r.yaziRengi,
+                          fontWeight: FontWeight.bold,
+                          fontSize: Responsive.sp(15),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(width: Responsive.w(8)),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(6), vertical: Responsive.h(2)),
+                      decoration: BoxDecoration(
+                        color: r.anaRenk.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(Responsive.w(6)),
+                      ),
+                      child: Text(
+                        "${provider.toplamXp} XP",
+                        style: TextStyle(
+                          color: r.anaRenk,
+                          fontWeight: FontWeight.bold,
+                          fontSize: Responsive.sp(11),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               TweenAnimationBuilder<double>(
                 duration: const Duration(milliseconds: 800),
@@ -481,7 +486,7 @@ void _unvanlariGoster(
                 ),
               ),
               Text(
-                "VAKİT SAVAŞÇISI RÜTBELERİ",
+                "HAKK YOLU",
                 style: TextStyle(
                   color: r.anaRenk,
                   fontWeight: FontWeight.bold,
@@ -586,7 +591,7 @@ void _unvanlariGoster(
   );
 }
 
-// --- DİĞER WIDGET METODLARI (HEADER, CLOCK VB.) AYNEN DEVAM EDİYOR ---
+// --- DİĞER WIDGET METODLARI (HEADER, CLOCK VB.) ---
 Widget _buildHeader(BuildContext context, NamazProvider provider) {
   final r = context.renkler;
   return Container(
@@ -622,33 +627,33 @@ Widget _buildHeader(BuildContext context, NamazProvider provider) {
           ),
         ),
         Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.w(12),
-            vertical: Responsive.h(8),
-          ),
-          decoration: BoxDecoration(
-            color: r.anaRenk.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(Responsive.w(20)),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.local_fire_department,
-                color: r.anaRenk,
-                size: Responsive.w(24),
-              ),
-              SizedBox(width: Responsive.w(4)),
-              Text(
-                "${provider.streakCount}",
-                style: TextStyle(
-                  fontSize: Responsive.sp(20),
-                  fontWeight: FontWeight.bold,
-                  color: r.yaziRengi,
-                ),
-              ),
-            ],
-          ),
+  padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
+  decoration: BoxDecoration(
+    color: r.anaRenk.withOpacity(0.15),
+    borderRadius: BorderRadius.circular(Responsive.w(20)),
+  ),
+  child: Row(
+    children: [
+      // Eski streak_icon.png yerine yeni yıldız webp
+      Image.asset(
+                  'assets/images/streak_icon.png',
+                  width: Responsive.w(30),
+        height: Responsive.w(30),
+        color: r.anaRenk, // Yıldızı temanın ana rengine boyar
+        colorBlendMode: BlendMode.srcIn,
+      ),
+      SizedBox(width: Responsive.w(6)),
+      Text(
+        "${provider.streakCount}",
+        style: TextStyle(
+          fontSize: Responsive.sp(20),
+          fontWeight: FontWeight.bold,
+          color: r.yaziRengi,
         ),
+      ),
+    ],
+  ),
+)
       ],
     ),
   );
@@ -923,6 +928,7 @@ Widget _vakitKutusu(
       ],
     ),
   );
+}
 }
 
 class _AnimatedPrayerButton extends StatefulWidget {

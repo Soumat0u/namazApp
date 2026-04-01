@@ -10,8 +10,9 @@ import 'providers/namaz_provider.dart';
 import 'providers/theme_provider.dart';
 import 'views/ana_sayfa.dart';
 import 'views/statistics_screen.dart';
-import 'views/tools_screen.dart'; // Yeni araçlar sayfası eklendi
-import 'views/settings_screen.dart'; // (İleride gerekirse kullanılabilir, ama main'de Navigation'da çıkmayacak)
+import 'views/tools_screen.dart';
+import 'views/social_screen.dart'; // Sosyal ekran eklendi
+import 'views/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,7 +64,7 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
   final List<Widget> _sayfalar = [
     const AnaSayfa(),
     const IstatistikSayfasi(),
-    const AraclarSayfasi(), // Ayarlar yerine Araçlar geldi
+    const SosyalSayfasi(), // Araçlar yerine Sosyal geldi
   ];
 
   @override
@@ -107,8 +108,8 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
               label: 'İstatistik',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_rounded),
-              label: 'Araçlar',
+              icon: Icon(Icons.people_alt_rounded),
+              label: 'Sosyal',
             ),
           ],
         ),
