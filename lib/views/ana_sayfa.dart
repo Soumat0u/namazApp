@@ -6,7 +6,9 @@ import '../providers/namaz_provider.dart';
 import 'widgets/vakit_background.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/seviye_servisi.dart';
-import 'settings_screen.dart'; // Ayarlar ekranı eklendi
+import 'social_screen.dart'; // Sosyal ekranı eklendi
+import '../models/religious_day.dart';
+import 'package:intl/intl.dart';
 
 class AnaSayfa extends StatefulWidget {
   const AnaSayfa({super.key});
@@ -163,11 +165,13 @@ class _AnaSayfaState extends State<AnaSayfa> {
                 ),
                 child: Row(
                   children: [
+                    Expanded(child: _buildLevelCard(context, provider)),
+                    SizedBox(width: Responsive.w(12)),
                     InkWell(
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const AyarlarSayfasi()),
+                          MaterialPageRoute(builder: (context) => const SosyalSayfasi()),
                         );
                       },
                       borderRadius: BorderRadius.circular(Responsive.w(16)),
@@ -180,14 +184,12 @@ class _AnaSayfaState extends State<AnaSayfa> {
                           border: Border.all(color: context.renkler.anaRenk.withOpacity(0.2), width: 1),
                         ),
                         child: Icon(
-                          Icons.settings_rounded,
+                          Icons.people_alt_rounded,
                           color: context.renkler.anaRenk,
                           size: Responsive.w(26),
                         ),
                       ),
                     ),
-                    SizedBox(width: Responsive.w(12)),
-                    Expanded(child: _buildLevelCard(context, provider)),
                   ],
                 ),
               ),
@@ -207,6 +209,8 @@ class _AnaSayfaState extends State<AnaSayfa> {
               ),
 
               SizedBox(height: Responsive.h(16)),
+
+              _buildDiniGunBanner(context, provider),
 
               // Senin hazırladığın Ana Saat alanı (Sayfalı yapıldı)
               Padding(
@@ -279,6 +283,74 @@ class _AnaSayfaState extends State<AnaSayfa> {
       ],
     );
   }
+
+  Widget _buildDiniGunBanner(BuildContext context, NamazProvider provider) {
+    if (provider.isDiniGunlerLoading && provider.tumDiniGunler.isEmpty) {
+      return const SizedBox.shrink(); // Yüklenirken gösterme
+    }
+  
+    final simdi = DateTime.now();
+    final yarin = simdi.add(const Duration(days: 1));
+    
+    final bugunStr = DateFormat('yyyy-MM-dd').format(simdi);
+    final yarinStr = DateFormat('yyyy-MM-dd').format(yarin);
+
+    ReligiousDay? hDay = provider.tumDiniGunler[bugunStr];
+    bool isBugun = true;
+
+    if (hDay == null) {
+      hDay = provider.tumDiniGunler[yarinStr];
+      isBugun = false;
+    }
+
+    if (hDay == null) return const SizedBox.shrink();
+
+    final r = context.renkler;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(16)),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(Responsive.w(12)),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFD700).withOpacity(0.15),
+          border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.5)),
+          borderRadius: BorderRadius.circular(Responsive.w(12)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.star, color: const Color(0xFFD4AF37), size: Responsive.w(24)),
+            SizedBox(width: Responsive.w(12)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isBugun ? "Bugün: ${hDay.turkishName}" : "Yarın: ${hDay.turkishName}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: Responsive.sp(14),
+                      color: r.yaziRengi,
+                    ),
+                  ),
+                  if (hDay.description != null)
+                    Text(
+                      hDay.description!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: Responsive.sp(11),
+                        color: r.yaziRengi.withOpacity(0.8),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // 🔥 XP BARI VE SEVİYE KARTI
@@ -315,6 +387,22 @@ Widget _buildLevelCard(BuildContext context, NamazProvider provider) {
                       color: r.yaziRengi,
                       fontWeight: FontWeight.bold,
                       fontSize: Responsive.sp(15),
+                    ),
+                  ),
+                  SizedBox(width: Responsive.w(8)),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(6), vertical: Responsive.h(2)),
+                    decoration: BoxDecoration(
+                      color: r.anaRenk.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(Responsive.w(6)),
+                    ),
+                    child: Text(
+                      "${provider.toplamXp} XP",
+                      style: TextStyle(
+                        color: r.anaRenk,
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.sp(11),
+                      ),
                     ),
                   ),
                 ],
@@ -1127,7 +1215,7 @@ class _GununAyetiCard extends StatelessWidget {
                 final tp = TextPainter(
                   text: span,
                   maxLines: 4,
-                  textDirection: TextDirection.ltr,
+                  textDirection: Directionality.of(context),
                 );
                 tp.layout(maxWidth: constraints.maxWidth);
                 final isOverflowing = tp.didExceedMaxLines;

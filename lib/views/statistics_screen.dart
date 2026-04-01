@@ -4,9 +4,18 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import 'package:intl/intl.dart';
+import '../core/utils/dini_gunler_util.dart';
+import '../models/religious_day.dart';
 
-class IstatistikSayfasi extends StatelessWidget {
+class IstatistikSayfasi extends StatefulWidget {
   const IstatistikSayfasi({super.key});
+
+  @override
+  State<IstatistikSayfasi> createState() => _IstatistikSayfasiState();
+}
+
+class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
+  DateTime? _goruntulenenTarih;
 
   @override
   Widget build(BuildContext context) {
@@ -135,11 +144,12 @@ class IstatistikSayfasi extends StatelessWidget {
   // Ana Takvim Widget'ı
   Widget _buildAylikTakvim(BuildContext context, NamazProvider provider) {
     final r = context.renkler;
-    final sanalBugun = provider.getSanalSimdi();
-    final ayAdi = DateFormat('MMMM yyyy', 'tr_TR').format(sanalBugun);
+    _goruntulenenTarih ??= provider.getSanalSimdi();
+    final goruntulenen = _goruntulenenTarih!;
+    final ayAdi = DateFormat('MMMM yyyy', 'tr_TR').format(goruntulenen);
 
-    final ayinIlkGunu = DateTime(sanalBugun.year, sanalBugun.month, 1);
-    final ayinSonGunu = DateTime(sanalBugun.year, sanalBugun.month + 1, 0).day;
+    final ayinIlkGunu = DateTime(goruntulenen.year, goruntulenen.month, 1);
+    final ayinSonGunu = DateTime(goruntulenen.year, goruntulenen.month + 1, 0).day;
     final baslangicBoslugu = ayinIlkGunu.weekday - 1;
 
     return Container(
@@ -149,22 +159,45 @@ class IstatistikSayfasi extends StatelessWidget {
         borderRadius: BorderRadius.circular(Responsive.w(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+             color: Colors.black.withOpacity(0.05),
+             blurRadius: 15,
+             offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
         children: [
-          Text(
-            ayAdi.toUpperCase(),
-            style: TextStyle(
-              fontSize: Responsive.sp(16),
-              fontWeight: FontWeight.w900,
-              color: r.anaRenk,
-              letterSpacing: 1.2,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: Icon(Icons.chevron_left, color: r.anaRenk),
+                onPressed: () {
+                  setState(() {
+                    _goruntulenenTarih = DateTime(goruntulenen.year, goruntulenen.month - 1, 1);
+                    provider.seciliAyDiniGunleriGetir(_goruntulenenTarih!.year, _goruntulenenTarih!.month);
+                  });
+                },
+              ),
+              Text(
+                ayAdi.toUpperCase(),
+                style: TextStyle(
+                  fontSize: Responsive.sp(16),
+                  fontWeight: FontWeight.w900,
+                  color: r.anaRenk,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.chevron_right, color: r.anaRenk),
+                onPressed: () {
+                  setState(() {
+                    _goruntulenenTarih = DateTime(goruntulenen.year, goruntulenen.month + 1, 1);
+                    provider.seciliAyDiniGunleriGetir(_goruntulenenTarih!.year, _goruntulenenTarih!.month);
+                  });
+                },
+              ),
+            ],
           ),
           SizedBox(height: Responsive.h(4)),
           Divider(color: r.anaRenk.withOpacity(0.1), thickness: 1),
@@ -204,7 +237,7 @@ class IstatistikSayfasi extends StatelessWidget {
               if (index < baslangicBoslugu) return const SizedBox();
 
               final gun = index - baslangicBoslugu + 1;
-              final hucreTarihi = DateTime(sanalBugun.year, sanalBugun.month, gun);
+              final hucreTarihi = DateTime(_goruntulenenTarih!.year, _goruntulenenTarih!.month, gun);
 
               final sanalBugunStr = provider.getSanalGun();
               final sanalBugunObj = DateFormat('yyyy-MM-dd').parse(sanalBugunStr);
@@ -247,6 +280,10 @@ class IstatistikSayfasi extends StatelessWidget {
   bool isSanalBugun = false,
 }) {
   final r = context.renkler;
+  final String dateKey = DateFormat('yyyy-MM-dd').format(hucreTarihi);
+  final ReligiousDay? religiousDay = provider.tumDiniGunler[dateKey];
+  final String? diniGun = religiousDay?.turkishName;
+  final bool isDiniGun = diniGun != null;
 
   final Map<int, Color> renkSkalasi = {
     -1: r.pasifRenk.withOpacity(0.15),
@@ -260,38 +297,68 @@ class IstatistikSayfasi extends StatelessWidget {
 
   Color hucreRengi;
   if (isSanalBugun) {
-    // Bugün renksiz (pasif kutucuklarla aynı) ama çerçeveli
     hucreRengi = r.pasifRenk.withOpacity(0.15);
   } else {
     hucreRengi = renkSkalasi[vakitSayisi] ?? r.pasifRenk.withOpacity(0.15);
   }
 
-  // Sadece kesinleşmiş geçmiş günler (vakitSayisi != -1) ve bugün olmayan günler tıklanabilir.
-  bool tiklanabilir = vakitSayisi != -1 && !isSanalBugun;
+  bool tiklanabilir = (vakitSayisi != -1 && !isSanalBugun) || isDiniGun;
+
+  BoxBorder? hucreCercevesi;
+  List<BoxShadow>? hucreGolgeleri;
+
+  if (isSanalBugun) {
+    hucreCercevesi = Border.all(color: r.anaRenk, width: 2);
+  } else if (isDiniGun) {
+    hucreCercevesi = Border.all(color: const Color(0xFFFFD700), width: 2); // Altın sarısı çerçeve
+    hucreGolgeleri = [
+      BoxShadow(
+        color: const Color(0xFFFFD700).withOpacity(0.4),
+        blurRadius: 8,
+        spreadRadius: 1,
+      )
+    ];
+  } else if (tiklanabilir) {
+    hucreCercevesi = Border.all(color: Colors.black.withOpacity(0.05));
+  }
 
   return GestureDetector(
     onTap: tiklanabilir 
         ? () => _gunDetayiGoster(context, hucreTarihi, provider, vakitSayisi)
         : null,
-    child: AnimatedContainer( // Görsel geri bildirim için AnimatedContainer
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        color: hucreRengi,
-        borderRadius: BorderRadius.circular(Responsive.w(8)),
-        border: isSanalBugun
-            ? Border.all(color: r.anaRenk, width: 2)
-            : (tiklanabilir ? Border.all(color: Colors.black.withOpacity(0.05)) : null),
-      ),
-      child: Center(
-        child: Text(
-          "$gun",
-          style: TextStyle(
-            color: isSanalBugun 
-                ? r.yaziRengi 
-                : (tiklanabilir ? Colors.white : r.yaziRengi.withOpacity(0.4)),
-            fontWeight: FontWeight.bold,
-            fontSize: Responsive.sp(12),
-          ),
+    child: Tooltip(
+      message: isDiniGun ? diniGun! : "",
+      child: AnimatedContainer( 
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: hucreRengi,
+          borderRadius: BorderRadius.circular(Responsive.w(8)),
+          border: hucreCercevesi,
+          boxShadow: hucreGolgeleri,
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (isDiniGun) ...[
+              Positioned(
+                top: 2,
+                right: 2,
+                child: Icon(Icons.star, color: const Color(0xFFFFD700), size: Responsive.w(8)),
+              ),
+            ],
+            Center(
+              child: Text(
+                "$gun",
+                style: TextStyle(
+                  color: isSanalBugun 
+                      ? r.yaziRengi 
+                      : (tiklanabilir ? Colors.white : r.yaziRengi.withOpacity(0.4)),
+                  fontWeight: FontWeight.bold,
+                  fontSize: Responsive.sp(12),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     ),
@@ -310,6 +377,10 @@ class IstatistikSayfasi extends StatelessWidget {
   String dateKey = DateFormat('yyyy-MM-dd').format(tarih);
   String displayDate = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(tarih);
   String bugunKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+  final ReligiousDay? religiousDay = provider.tumDiniGunler[dateKey];
+  final String? diniGun = religiousDay?.turkishName;
+  final String? diniGunAciklama = religiousDay?.description;
 
   // Veriyi güvenli çekme
   Map<String, dynamic> detaylar;
@@ -343,10 +414,57 @@ class IstatistikSayfasi extends StatelessWidget {
             ),
             SizedBox(height: 20),
             Text(displayDate, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: r.yaziRengi)),
-            Text("$toplamVakit / 5 Vakit Kılındı", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+            if (toplamVakit != -1)
+              Text("$toplamVakit / 5 Vakit Kılındı", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             
-            if (detaylar.isEmpty && toplamVakit > 0)
+            if (diniGun != null) ...[
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(Responsive.w(15)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD700).withOpacity(0.1),
+                  border: Border.all(color: const Color(0xFFFFD700)),
+                  borderRadius: BorderRadius.circular(Responsive.w(12)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.star, color: const Color(0xFFFFD700), size: Responsive.w(20)),
+                        SizedBox(width: Responsive.w(8)),
+                        Text(
+                          diniGun,
+                          style: TextStyle(
+                            fontSize: Responsive.sp(16),
+                            fontWeight: FontWeight.bold,
+                            color: r.yaziRengi,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (diniGunAciklama != null) ...[
+                      SizedBox(height: Responsive.h(8)),
+                      Text(
+                        diniGunAciklama,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: Responsive.sp(13),
+                          color: r.yaziRengi.withOpacity(0.8),
+                          height: 1.4,
+                        ),
+                      ),
+                    ]
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            
+            if (toplamVakit == -1)
+              const SizedBox.shrink()
+            else if (detaylar.isEmpty && toplamVakit > 0)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 child: Text("Bu güne ait detaylı veri bulunamadı.", textAlign: TextAlign.center),

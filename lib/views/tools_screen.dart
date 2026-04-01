@@ -4,6 +4,7 @@ import '../core/utils/responsive.dart';
 import '../providers/theme_provider.dart';
 import 'qibla_screen.dart';
 import 'zikirmatik_screen.dart'; // Eklendi
+import 'settings_screen.dart'; // Ayarlar Eklendi
 
 
 class AraclarSayfasi extends StatelessWidget {
@@ -68,6 +69,18 @@ class AraclarSayfasi extends StatelessWidget {
               color: Colors.orange,
               isSoon: true,
               onTap: () => _showYakinda(context),
+            ),
+            _buildAracCard(
+              context: context,
+              icon: Icons.settings_rounded,
+              title: "Ayarlar",
+              color: Colors.blueGrey,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AyarlarSayfasi()),
+                );
+              },
             ),
           ],
         ),

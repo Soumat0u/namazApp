@@ -1,23 +1,22 @@
 class SeviyeServisi {
   static const int namazXp = 20; // Her vaktin ödülü
+  static const int tamGunBonusu = 25; // 5 vakit tamamlanınca gelen ekstra
 
-  // Beğendiğin o efsane liste
   static final Map<int, String> unvanlar = {
-    0: "Seccade Kaşifi",
-    100: "Seccade Yolcusu",
-    300: "Abdest Pro Max",
-    600: "Abdest Bükücü",
-    1000: "Tespih Silahşörü",
-    2000: "Seccade Pilotu",
-    4000: "Namaz Gurmesi",
-    7000: "Cami Kuşu",
-    11000: "Seccade Üstadı",
-    16000: "Final Boss (Hacı Abi)",
+    0: "Talip",
+    1000: "Salik",
+    3000: "Muhip",
+    6500: "Sakin",
+    11500: "Arif",
+    18000: "Fecr",
+    26000: "Züha",
+    35000: "Zuhur",
+    45000: "Kamer",
+    50000: "Süreyya",
   };
 
-  // XP'ye göre ünvanı bulan fonksiyon
   static String unvanGetir(int xp) {
-    String sonUnvan = unvanlar.values.first;
+    String sonUnvan = "Talip";
     var anahtarlar = unvanlar.keys.toList()..sort();
     for (var limit in anahtarlar) {
       if (xp >= limit) {
@@ -29,14 +28,20 @@ class SeviyeServisi {
     return sonUnvan;
   }
 
-  // Barın doluluk oranını hesaplayan fonksiyon (0.0 - 1.0 arası)
   static double ilerlemeHesapla(int xp) {
     var anahtarlar = unvanlar.keys.toList()..sort();
+    
+    // Eğer en üst seviyeye ulaşıldıysa barı dolu göster
+    if (xp >= anahtarlar.last) return 1.0;
+
     for (int i = 0; i < anahtarlar.length - 1; i++) {
-      if (xp >= anahtarlar[i] && xp < anahtarlar[i + 1]) {
-        return (xp - anahtarlar[i]) / (anahtarlar[i + 1] - anahtarlar[i]);
+      int altLimit = anahtarlar[i];
+      int ustLimit = anahtarlar[i + 1];
+      
+      if (xp >= altLimit && xp < ustLimit) {
+        return (xp - altLimit) / (ustLimit - altLimit);
       }
     }
-    return 1.0; // Max seviyeyse bar hep dolu kalsın
+    return 0.0;
   }
 }

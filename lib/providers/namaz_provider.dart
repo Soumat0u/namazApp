@@ -11,6 +11,7 @@ import '../services/seviye_servisi.dart';
 import '../services/notification_service.dart';
 import 'package:quran/quran.dart' as quran;
 import 'dart:math';
+import '../models/religious_day.dart';
 
 class NamazProvider extends ChangeNotifier {
   final NamazServisi _namazServisi;
@@ -57,8 +58,12 @@ class NamazProvider extends ChangeNotifier {
   // 🔥 İSTATİSTİK VE TAKVİM İÇİN YENİ EKLENENLER
   DateTime? ilkAcilisTarihi;
   Map<String, int> aylikGecmis = {};
-  Map<String, dynamic> gunlukDetaylar =
-      {}; // Hangi gün hangi vakit kılındı detayını tutar
+  Map<String, dynamic> gunlukDetaylar = {}; // Hangi gün hangi vakit kılındı detayını tutar
+  
+  // 🔥 DİNİ GÜNLER API STATE
+  Map<String, ReligiousDay> tumDiniGunler = {}; // Format: "yyyy-MM-dd"
+  Set<String> _aylikDiniGunlerCache = {};
+  bool isDiniGunlerLoading = false;
 
   Map<String, bool> kildiMi = {
     "Sabah": false,
@@ -111,6 +116,15 @@ class NamazProvider extends ChangeNotifier {
     }
 
     await konumVeApiIstegi(kullaniciTetikledi: false);
+    
+    // Açılışta bu ayın dini günlerini getir
+    final simdi = DateTime.now();
+    await seciliAyDiniGunleriGetir(simdi.year, simdi.month);
+    // Eğer bugün ayın son günüyse, yarın için uyarı göstermek adına sonraki ayı da çek
+    final yarin = simdi.add(const Duration(days: 1));
+    if (simdi.month != yarin.month) {
+      await seciliAyDiniGunleriGetir(yarin.year, yarin.month);
+    }
   }
 
   Future<void> konumVeApiIstegi({bool kullaniciTetikledi = false}) async {
@@ -344,16 +358,10 @@ class NamazProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🔥 XP KAZANMA FONKSİYONU
-  Future<void> xpKazandir() async {
-    final prefs = await SharedPreferences.getInstance();
-    _toplamXp += SeviyeServisi.namazXp; // Servisten 10 XP çekiyoruz
-    await prefs.setInt('toplam_xp', _toplamXp);
-    notifyListeners();
-  }
-
   Future<void> vaktiKildimIsaretle(String vakitIsmi, bool yeniDurum) async {
     // 🔥 XP SUİSTİMALİNİ ÖNLEME: Zaten aynı durumdaysa işlem yapma
+    if (kildiMi[vakitIsmi] == yeniDurum) return;
+
     // 🔥 DURUMU HEMEN GÜNCELLE (Race condition önlemek için await öncesinde)
     kildiMi[vakitIsmi] = yeniDurum;
 
@@ -363,17 +371,35 @@ class NamazProvider extends ChangeNotifier {
     if (yeniDurum) {
       streakCount++;
       toplamTamamlanan++;
-      await xpKazandir(); // 🔥 NAMAZ KILINCA XP VERİYORUZ
+      
+      _toplamXp += SeviyeServisi.namazXp;
+      int kilinanSayisi = kildiMi.values.where((v) => v == true).length;
+      if (kilinanSayisi == 5) {
+        _toplamXp += SeviyeServisi.tamGunBonusu;
+      }
+      await prefs.setInt('toplam_xp', _toplamXp);
+      
     } else {
       if (streakCount > 0) streakCount--;
       if (toplamTamamlanan > 0) toplamTamamlanan--;
 
-      // Geri alınan namazda XP'yi de geri alıyoruz
-      if (_toplamXp >= SeviyeServisi.namazXp) {
-        _toplamXp -= SeviyeServisi.namazXp;
-        await prefs.setInt('toplam_xp', _toplamXp);
+      // Kaç adet işaretli kaldığına bak (Eğer 4 kaldıysa, demek ki az önce 5'ti ve bonus alınmıştı)
+      int kilinanSayisi = kildiMi.values.where((v) => v == true).length;
+      int geriAlinacakXp = SeviyeServisi.namazXp;
+      
+      // Eğer az önce 5'i bozup 4'e düşürdüyse haksız kazancı engellemek için Bonus'u da geri al
+      if (kilinanSayisi == 4) {
+        geriAlinacakXp += SeviyeServisi.tamGunBonusu;
       }
+
+      if (_toplamXp >= geriAlinacakXp) {
+        _toplamXp -= geriAlinacakXp;
+      } else {
+        _toplamXp = 0;
+      }
+      await prefs.setInt('toplam_xp', _toplamXp);
     }
+    
     await prefs.setInt('streakCount', streakCount);
     await prefs.setInt('toplamKilinan', toplamTamamlanan);
 
@@ -771,6 +797,40 @@ Future<void> _bildirimleriGuncelle() async {
     _zikirXpKazanilan = 0;
     await prefs.setInt('zikirSayaci', _zikirSayaci);
     await prefs.setInt('zikirXpKazanilan', _zikirXpKazanilan);
+    notifyListeners();
+  }
+  
+  // --- DİNİ GÜNLER (ALADHAN API) ---
+  Future<void> seciliAyDiniGunleriGetir(int year, int month) async {
+    String cacheKey = "$year-$month";
+    if (_aylikDiniGunlerCache.contains(cacheKey)) return;
+
+    isDiniGunlerLoading = true;
+    notifyListeners();
+
+    try {
+      List<ReligiousDay> liste;
+      if (seciliSehir.isNotEmpty) {
+        liste = await _namazServisi.diniGunleriGetir(year, month, sehir: seciliSehir);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        double lat = prefs.getDouble('last_lat') ?? 38.6748; // Elazığ Fallback
+        double lng = prefs.getDouble('last_lng') ?? 39.2225;
+        Position pos = Position(
+          latitude: lat, longitude: lng, timestamp: DateTime.now(),
+          accuracy: 0, altitude: 0, heading: 0, speed: 0, speedAccuracy: 0,
+          altitudeAccuracy: 0, headingAccuracy: 0,
+        );
+        liste = await _namazServisi.diniGunleriGetir(year, month, position: pos);
+      }
+
+      for (var d in liste) {
+        tumDiniGunler[d.dateStr] = d;
+      }
+      _aylikDiniGunlerCache.add(cacheKey);
+    } catch (_) {}
+
+    isDiniGunlerLoading = false;
     notifyListeners();
   }
 }

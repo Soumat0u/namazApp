@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import '../models/religious_day.dart';
+import '../core/utils/dini_gunler_util.dart';
 
 class NamazServisi {
   // izinIste parametresi: Sadece kullanıcı butona bastığında true olur.
@@ -75,5 +77,32 @@ class NamazServisi {
       "Yatsı": data['Isha'],
       "GünBatımı": data['Sunset'],
     };
+  }
+
+  Future<List<ReligiousDay>> diniGunleriGetir(int year, int month, {Position? position, String? sehir}) async {
+    Uri url;
+    if (position != null) {
+      url = Uri.parse('https://api.aladhan.com/v1/calendar/$year/$month?latitude=${position.latitude}&longitude=${position.longitude}&method=13');
+    } else if (sehir != null && sehir.isNotEmpty) {
+      url = Uri.parse('https://api.aladhan.com/v1/calendarByCity/$year/$month?city=$sehir&country=Turkey&method=13');
+    } else {
+      return [];
+    }
+
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final List<dynamic> days = json.decode(response.body)['data'];
+        List<ReligiousDay> diniGunler = [];
+        for (var dayData in days) {
+          final dayResults = DiniGunlerUtil.parseAladhanDay(dayData);
+          diniGunler.addAll(dayResults);
+        }
+        return diniGunler;
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
   }
 }

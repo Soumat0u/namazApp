@@ -60,7 +60,6 @@ class AnaUygulamaEkrani extends StatefulWidget {
 class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
   int _seciliSayfaIndex = 0;
 
-  // Sayfalar views klasöründeki dosyalardan geliyor
   final List<Widget> _sayfalar = [
     const AnaSayfa(),
     const IstatistikSayfasi(),
