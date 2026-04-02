@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "976857623627",
+    "project_id": "namaz-app-d0e52",
+    "storage_bucket": "namaz-app-d0e52.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:976857623627:android:d1ef0f819c95eae207b1ce",
+        "android_client_info": {
+          "package_name": "com.example.namaz_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDR5N9gXfw-M4dS-MWwpn8uD7moug3DK0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

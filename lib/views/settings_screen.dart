@@ -103,6 +103,46 @@ class AyarlarSayfasi extends StatelessWidget {
             ),
           ]),
           SizedBox(height: Responsive.h(16)),
+          _buildSectionHeader(r, "Hesap"),
+          _buildSettingsCard(r, [
+            _buildActionTile(
+              r,
+              title: "Çıkış Yap",
+              icon: Icons.logout_rounded,
+              color: Colors.orange.shade700,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: r.kartRengi,
+                    title: Text("Çıkış Yap", style: TextStyle(color: r.yaziRengi, fontSize: Responsive.sp(16))),
+                    content: Text(
+                      "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
+                      style: TextStyle(color: r.yaziRengi.withOpacity(0.7), fontSize: Responsive.sp(14)),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: Text("İptal", style: TextStyle(color: r.pasifRenk))),
+                      TextButton(
+                        onPressed: () {
+                          final provider = context.read<NamazProvider>();
+                          
+                          // Tüm pencereleri ve sayfaları kapatıp en ana Safyaya dön
+                          Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+
+                          // Geçiş animasyonunun tamamlanmasını bekle, ardından oturumu kapat.
+                          Future.delayed(const Duration(milliseconds: 400), () {
+                            provider.cikisYap();
+                          });
+                        },
+                        child: Text("Çıkış Yap", style: TextStyle(color: Colors.orange.shade700, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ]),
+          SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Uygulama"),
           _buildSettingsCard(r, [
             _buildActionTile(

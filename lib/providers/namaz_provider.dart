@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/namaz_servis.dart';
 import '../services/seviye_servisi.dart';
 import '../services/notification_service.dart';
+import '../services/firebase_service.dart';
 import 'package:quran/quran.dart' as quran;
 import 'dart:math';
 import '../models/religious_day.dart';
@@ -16,6 +17,15 @@ import '../models/religious_day.dart';
 class NamazProvider extends ChangeNotifier {
   final NamazServisi _namazServisi;
   final NotificationService _notificationService;
+  final FirebaseService _firebaseService;
+
+  // --- FIREBASE / AUTH DURUMLARI ---
+  bool _needsProfile = false;
+  bool get needsProfile => _needsProfile;
+  String? _currentUid;
+  String? get currentUid => _currentUid;
+  String _currentUsername = '';
+  String get currentUsername => _currentUsername;
 
   // --- STATE DEĞİŞKENLERİ ---
   bool isLoading = true;
@@ -99,13 +109,16 @@ class NamazProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  NamazProvider(this._namazServisi, this._notificationService) {
+  NamazProvider(this._namazServisi, this._notificationService, this._firebaseService) {
     _uygulamayiBaslat();
   }
 
   Future<void> _uygulamayiBaslat() async {
     await loadData();
     await _gununAyetiniYukle();
+
+    // 🔥 FIREBASE AUTH KONTROLÜ
+    await _firebaseAuthKontrol();
 
     if (vakitler != null) {
       isLoading = false;
@@ -125,6 +138,208 @@ class NamazProvider extends ChangeNotifier {
     if (simdi.month != yarin.month) {
       await seciliAyDiniGunleriGetir(yarin.year, yarin.month);
     }
+  }
+
+  /// Firebase auth kontrolü — giriş yapmış mı kontrol et
+  Future<void> _firebaseAuthKontrol() async {
+    try {
+      final user = _firebaseService.currentUser;
+      if (user != null) {
+        _currentUid = user.uid;
+        final hasProfile = await _firebaseService.hasUserProfile(user.uid);
+        if (hasProfile) {
+          _needsProfile = false;
+          final prefs = await SharedPreferences.getInstance();
+          _currentUsername = prefs.getString('firebase_username') ?? user.displayName ?? '';
+          _firebaseCloudSync();
+          _firebaseService.initMessaging(user.uid);
+        } else {
+          _needsProfile = true;
+        }
+      } else {
+        // Giriş yapılmamış — Auth ekranı gösterilecek
+        _needsProfile = true;
+      }
+    } catch (e) {
+      debugPrint('🔐 Firebase auth kontrol hatası: $e');
+      _needsProfile = true;
+    }
+    notifyListeners();
+  }
+
+  /// Email/Şifre ile kayıt ol
+  Future<String?> emailIleKayitOl({
+    required String email,
+    required String password,
+    required String displayName,
+    required String username,
+  }) async {
+    // 1. Kullanıcı adının müsaitliğini kontrol et
+    final isAvailable = await _firebaseService.isUsernameAvailable(username);
+    if (!isAvailable) return 'Bu kullanıcı adı daha önce alınmış.';
+
+    final result = await _firebaseService.registerWithEmail(
+      email: email,
+      password: password,
+    );
+
+    if (result.error != null) return result.error;
+    if (result.user == null) return 'Hesap oluşturulamadı.';
+
+    _currentUid = result.user!.uid;
+    final prefs = await SharedPreferences.getInstance();
+
+    await _firebaseService.createUserProfile(
+      uid: _currentUid!,
+      username: username,
+      displayName: displayName,
+      initialXp: _toplamXp,
+      initialStreak: streakCount,
+    );
+
+    _currentUsername = displayName;
+    _needsProfile = false;
+    await prefs.setString('firebase_username', displayName);
+    _firebaseService.initMessaging(_currentUid!);
+    notifyListeners();
+    return null; // Hata yok
+  }
+
+  /// Email/Şifre ile giriş yap (mevcut hesap)
+  Future<String?> emailIleGirisYap({
+    required String email,
+    required String password,
+  }) async {
+    final result = await _firebaseService.signInWithEmail(
+      email: email,
+      password: password,
+    );
+
+    if (result.error != null) return result.error;
+    if (result.user == null) return 'Giriş yapılamadı.';
+
+    _currentUid = result.user!.uid;
+    final prefs = await SharedPreferences.getInstance();
+
+    final hasProfile = await _firebaseService.hasUserProfile(_currentUid!);
+    if (hasProfile) {
+      _needsProfile = false;
+      _currentUsername = prefs.getString('firebase_username') ?? result.user!.displayName ?? '';
+      _firebaseCloudSync();
+    } else {
+      // Email ile giriş yaptı ama profili yoksa (olağandışı durum) oluştur
+      final displayName = result.user!.displayName ?? email.split('@')[0];
+      final baseUsername = displayName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
+      
+      await _firebaseService.createUserProfile(
+        uid: _currentUid!,
+        username: baseUsername.isEmpty ? 'user_${_currentUid!.substring(0,5)}' : baseUsername,
+        displayName: displayName,
+        initialXp: _toplamXp,
+        initialStreak: streakCount,
+      );
+      _currentUsername = displayName;
+      _needsProfile = false;
+      await prefs.setString('firebase_username', displayName);
+    }
+
+    _firebaseService.initMessaging(_currentUid!);
+    notifyListeners();
+    return null; // Hata yok
+  }
+
+  /// Google ile giriş yapar (alternatif yöntem)
+  Future<String?> googleIleGirisYap() async {
+    try {
+      final user = await _firebaseService.signInWithGoogle();
+      if (user == null) return 'Google girişi iptal edildi.';
+
+      _currentUid = user.uid;
+      final prefs = await SharedPreferences.getInstance();
+
+      final hasProfile = await _firebaseService.hasUserProfile(user.uid);
+      if (hasProfile) {
+        _needsProfile = false;
+        _currentUsername = prefs.getString('firebase_username') ?? user.displayName ?? '';
+        _firebaseCloudSync();
+      } else {
+        final googleName = user.displayName ?? 'Google Kullanıcı';
+        String base = googleName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
+        if (base.isEmpty) base = 'kullanici';
+
+        final isAvailable = await _firebaseService.isUsernameAvailable(base);
+        
+        if (isAvailable) {
+          await _firebaseService.createUserProfile(
+            uid: user.uid,
+            username: base,
+            displayName: googleName,
+            initialXp: _toplamXp,
+            initialStreak: streakCount,
+          );
+          _currentUsername = googleName;
+          _needsProfile = false;
+          await prefs.setString('firebase_username', googleName);
+        } else {
+          // İsim doluysa UI'a sinyal gönder (UI modal açacak ve completeGoogleRegistration çağıracak)
+          return 'google_username_taken';
+        }
+      }
+
+      _firebaseService.initMessaging(user.uid);
+      notifyListeners();
+      return null; // Hata yok
+    } catch (e) {
+      debugPrint('🔐 Google giriş hatası (Provider): $e');
+      return 'Google ile giriş yapılamadı.';
+    }
+  }
+
+  /// Google kaydını username seçimi ile tamamlar (Çakışma varsa UI'dan çağrılır)
+  Future<String?> completeGoogleRegistration({required String username, required String displayName}) async {
+    if (_currentUid == null) return 'Oturum bulunamadı.';
+    
+    final isAvailable = await _firebaseService.isUsernameAvailable(username);
+    if (!isAvailable) return 'Bu kullanıcı adı daha önce alınmış.';
+
+    final prefs = await SharedPreferences.getInstance();
+    
+    await _firebaseService.createUserProfile(
+      uid: _currentUid!,
+      username: username,
+      displayName: displayName,
+      initialXp: _toplamXp,
+      initialStreak: streakCount,
+    );
+    
+    _currentUsername = displayName;
+    _needsProfile = false;
+    await prefs.setString('firebase_username', displayName);
+    _firebaseService.initMessaging(_currentUid!);
+    notifyListeners();
+    
+    return null;
+  }
+
+  /// Hesaptan çıkış yapar
+  Future<void> cikisYap() async {
+    await _firebaseService.signOut();
+    _currentUid = null;
+    _needsProfile = true;
+    _currentUsername = '';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('firebase_username');
+    notifyListeners();
+  }
+
+  /// Yerel XP/streak'i Firebase'e arka planda senkronize eder
+  void _firebaseCloudSync() {
+    if (_currentUid == null) return;
+    _firebaseService.updateUserStats(
+      uid: _currentUid!,
+      totalXp: _toplamXp,
+      streak: streakCount,
+    );
   }
 
   Future<void> konumVeApiIstegi({bool kullaniciTetikledi = false}) async {
@@ -402,6 +617,9 @@ class NamazProvider extends ChangeNotifier {
     
     await prefs.setInt('streakCount', streakCount);
     await prefs.setInt('toplamKilinan', toplamTamamlanan);
+
+    // 🔥 FIREBASE CLOUD SYNC (fire-and-forget)
+    _firebaseCloudSync();
 
     await istatistikleriYukle();
     notifyListeners();
@@ -779,6 +997,9 @@ Future<void> _bildirimleriGuncelle() async {
       _zikirXpKazanilan += 1;
       await prefs.setInt('toplam_xp', _toplamXp);
       await prefs.setInt('zikirXpKazanilan', _zikirXpKazanilan);
+      
+      // 🔥 FIREBASE CLOUD SYNC
+      _firebaseCloudSync();
     }
     
     notifyListeners();
