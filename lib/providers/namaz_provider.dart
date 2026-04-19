@@ -393,15 +393,19 @@ class NamazProvider extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     } catch (e) {
+      String errStr = e.toString();
       if (seciliSehir.isNotEmpty) {
         await sehirVakitleriniGetir(seciliSehir);
       } else if (vakitler == null) {
-        _varsayilanKonumKullan(e.toString());
+        _varsayilanKonumKullan(errStr);
       } else {
         isLoading = false;
         if (kullaniciTetikledi) {
-          hataMesaji =
-              "İnternet bağlantısı yok, çevrimdışı veriler kullanılıyor.";
+          if (errStr.toLowerCase().contains("konum")) {
+            hataMesaji = "Konum servisi ulaşılamadığı için çevrimdışı veriler kullanılıyor.\nDetay: $errStr";
+          } else {
+            hataMesaji = "Bir bağlantı hatası oluştu.\nDetay: $errStr";
+          }
         }
         notifyListeners();
       }
@@ -437,7 +441,7 @@ class NamazProvider extends ChangeNotifier {
     } catch (e) {
       isLoading = false;
       hataMesaji =
-          "Şehir verileri alınamadı. Lütfen internet bağlantınızı kontrol edin.";
+          "Şehir verileri alınamadı. Lütfen bağlantınızı kontrol edin.\nDetay: ${e.toString()}";
       if (vakitler == null) {
         konumBilgisi = "Şehir Seçilmeli";
       }

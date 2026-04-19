@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
@@ -16,8 +18,17 @@ import 'views/statistics_screen.dart';
 import 'views/social_screen.dart';
 import 'views/auth_screen.dart';
 
+class DevHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = DevHttpOverrides(); // HTTPS/SSL hatalarını yoksaymak için
   await initializeDateFormatting('tr_TR', null);
 
   // 🔥 Firebase'i başlat

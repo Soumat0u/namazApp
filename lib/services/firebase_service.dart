@@ -370,6 +370,32 @@ class FirebaseService {
     }
   }
 
+  /// Arkadaş Önerileri: Kendisi ve halihazırda arkadaşı olmayan popüler kullanıcılar
+  Future<List<UserProfile>> getSuggestedFriends(String currentUid, List<String> currentFriends) async {
+    try {
+      final snap = await _firestore
+          .collection('users')
+          .orderBy('totalXp', descending: true) // En aktif kişileri öne çıkar
+          .limit(20)
+          .get();
+          
+      final users = snap.docs.map((doc) => UserProfile.fromFirestore(doc)).toList();
+      
+      // Filtreleme: Kendisini ve arkadaşlarını çıkar
+      var suggestions = users.where((u) {
+        if (u.uid == currentUid) return false;
+        if (currentFriends.contains(u.uid)) return false;
+        return true;
+      }).toList();
+      
+      // Çeşitlilik veya karma isterseniz users.shuffle() burada yapılabilir
+      return suggestions.take(10).toList();
+    } catch (e) {
+      debugPrint('Önerilen arkadaş getirme hatası: $e');
+      return [];
+    }
+  }
+
   /// Liderlik tablosu: XP'ye göre azalan sırada kullanıcıları getirir
   Stream<List<UserProfile>> getLeaderboard({int limit = 50}) {
     return _firestore
@@ -425,6 +451,50 @@ class FirebaseService {
       return snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
           .toList();
+    });
+  }
+
+  /// Sadece arkadaşların yayınladığı dualar (Gönül Kardeşliği)
+  Stream<List<PrayerPost>> getFriendsPrayers(List<String> friendUids, {int limit = 30}) {
+    if (friendUids.isEmpty) {
+      return Stream.value([]);
+    }
+    
+    // Firestore 'whereIn' sorgusu maksimim 10 eleman destekler
+    final targetUids = friendUids.take(10).toList();
+
+    return _firestore
+        .collection('prayers')
+        .where('isApproved', isEqualTo: true)
+        .where('senderUid', whereIn: targetUids)
+        .orderBy('timestamp', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => PrayerPost.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  /// Trendler / Keşfet: Son 24 saatte en çok Amîn alan dualar (Global)
+  Stream<List<PrayerPost>> getDiscoverPrayers({int limit = 30}) {
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    return _firestore
+        .collection('prayers')
+        .where('isApproved', isEqualTo: true)
+        .where('timestamp', isGreaterThan: yesterday)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      var list = snapshot.docs
+          .map((doc) => PrayerPost.fromFirestore(doc))
+          .toList();
+          
+      // Dart (Istemci) uzerinde amîn sayısına göre sırala ki Firestore'da 
+      // timestamp + aminCount composite (bileşik) dizin yaratma çilesinden veya hatasından kaçınalım.
+      list.sort((a, b) => b.aminCount.compareTo(a.aminCount));
+      return list.take(limit).toList();
     });
   }
 
