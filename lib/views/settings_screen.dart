@@ -272,69 +272,35 @@ class AyarlarSayfasi extends StatelessWidget {
           SizedBox(height: Responsive.h(14)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: themeProvider.tumTemalar.map((tema) {
-              bool secili = themeProvider.aktifTema.id == tema.id;
-
-              // 🔥 circleSize hatası burada çözüldü 🔥
-              final double circleSize = Responsive.w(42);
-
-              return GestureDetector(
-                onTap: () => themeProvider.temaDegistir(tema.id),
-                child: Column(
-                  children: [
-                    Container(
-                      width: circleSize,
-                      height: circleSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: secili
-                            ? Border.all(color: tema.anaRenk, width: 2.5)
-                            : Border.all(color: Colors.transparent, width: 2.5),
-                      ),
-                      child: Container(
-                        width: circleSize,
-                        height: circleSize,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [tema.arkaPlanRengi, tema.anaRenk],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: secili
-                              ? [
-                                  BoxShadow(
-                                    color: tema.anaRenk.withOpacity(0.4),
-                                    blurRadius: 8,
-                                    spreadRadius: 1,
-                                  ),
-                                ]
-                              : [],
-                        ),
-                        child: secili
-                            ? const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 20,
-                              )
-                            : null,
-                      ),
-                    ),
-                    SizedBox(height: Responsive.h(6)),
-                    Text(
-                      tema.isim,
-                      style: TextStyle(
-                        fontSize: Responsive.sp(10),
-                        fontWeight: secili ? FontWeight.bold : FontWeight.w500,
-                        color: secili
-                            ? tema.anaRenk
-                            : r.yaziRengi.withOpacity(0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+            children: [
+              _ThemeGroupWidget(
+                isim: 'Varsayılan',
+                lightId: 'varsayilan',
+                darkId: 'karanlik',
+                baseLightColor: const Color(0xFFE67E22),
+                baseDarkColor: const Color(0xFFFFB74D),
+                themeProvider: themeProvider,
+                r: r,
+              ),
+              _ThemeGroupWidget(
+                isim: 'Zümrüt',
+                lightId: 'zumrut',
+                darkId: 'zumrut_karanlik',
+                baseLightColor: const Color(0xFF2E7D32),
+                baseDarkColor: const Color(0xFF4CAF50),
+                themeProvider: themeProvider,
+                r: r,
+              ),
+              _ThemeGroupWidget(
+                isim: 'Okyanus',
+                lightId: 'okyanus',
+                darkId: 'okyanus_karanlik',
+                baseLightColor: const Color(0xFF1565C0),
+                baseDarkColor: const Color(0xFF42A5F5),
+                themeProvider: themeProvider,
+                r: r,
+              ),
+            ],
           ),
         ],
       ),
@@ -464,3 +430,150 @@ class AyarlarSayfasi extends StatelessWidget {
     );
   }
 }
+
+class _ThemeGroupWidget extends StatelessWidget {
+  final String isim;
+  final String lightId;
+  final String darkId;
+  final Color baseLightColor;
+  final Color baseDarkColor;
+  final ThemeProvider themeProvider;
+  final AppThemeColors r;
+
+  const _ThemeGroupWidget({
+    Key? key,
+    required this.isim,
+    required this.lightId,
+    required this.darkId,
+    required this.baseLightColor,
+    required this.baseDarkColor,
+    required this.themeProvider,
+    required this.r,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final activeId = themeProvider.aktifTema.id;
+    final bool isSelected = activeId == lightId || activeId == darkId;
+    final bool isDark = activeId == darkId;
+    
+    final Color currentColor = isDark ? baseDarkColor : baseLightColor;
+
+    final double circleSize = Responsive.w(44);
+    final double expandedHeight = circleSize * 2.3;
+
+    return GestureDetector(
+      onTap: () {
+        if (!isSelected) {
+          // Eğer şu anki tema karanlık moddaysa, yeni seçilen de karanlık mod başlasın
+          final isCurrentlyDark = themeProvider.aktifTema.brightness == Brightness.dark;
+          themeProvider.temaDegistir(isCurrentlyDark ? darkId : lightId);
+        } else {
+          // Zaten seçiliyse moda geçiş yap
+          themeProvider.temaDegistir(isDark ? lightId : darkId);
+        }
+      },
+      onVerticalDragEnd: (details) {
+        if (!isSelected) return;
+        if (details.primaryVelocity != null) {
+          if (details.primaryVelocity! > 0 && !isDark) {
+            // Aşağı kaydırıldı, karanlık moda geç
+            themeProvider.temaDegistir(darkId);
+          } else if (details.primaryVelocity! < 0 && isDark) {
+            // Yukarı kaydırıldı, aydınlık moda geç
+            themeProvider.temaDegistir(lightId);
+          }
+        }
+      },
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            width: circleSize,
+            height: isSelected ? expandedHeight : circleSize,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(circleSize / 2),
+              border: isSelected
+                  ? Border.all(color: currentColor, width: 2.5)
+                  : Border.all(color: Colors.transparent, width: 2.5),
+              color: isSelected 
+                     ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
+                     : Colors.transparent,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: currentColor.withOpacity(0.4),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Arkaplanda ikonlar
+                if (isSelected) ...[
+                  Positioned(
+                    top: Responsive.w(8),
+                    left: 0,
+                    right: 0,
+                    child: Icon(Icons.wb_sunny_rounded, color: Colors.blueGrey.shade300, size: Responsive.w(18)),
+                  ),
+                  Positioned(
+                    bottom: Responsive.w(8),
+                    left: 0,
+                    right: 0,
+                    child: Icon(Icons.nightlight_round, color: Colors.blueGrey.shade300, size: Responsive.w(18)),
+                  ),
+                ],
+                // Hareketli buton / Normal buton
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  alignment: isSelected 
+                             ? (isDark ? Alignment.bottomCenter : Alignment.topCenter)
+                             : Alignment.center,
+                  child: Container(
+                    width: circleSize - (isSelected ? 5 : 0),
+                    height: circleSize - (isSelected ? 5 : 0),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: isDark 
+                            ? [const Color(0xFF1E1E1E), baseDarkColor] 
+                            : [const Color(0xFFFFFFFF), baseLightColor],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: isSelected
+                        ? const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 20,
+                          )
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: Responsive.h(8)),
+          Text(
+            isim,
+            style: TextStyle(
+              fontSize: Responsive.sp(11),
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected
+                  ? currentColor
+                  : r.yaziRengi.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

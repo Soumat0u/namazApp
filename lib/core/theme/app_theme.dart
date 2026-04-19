@@ -68,7 +68,35 @@ class AppThemeData {
     brightness: Brightness.light,
   );
 
-  // ─── KARANLIK ───
+  // ─── ZÜMRÜT KARANLIK ───
+  factory AppThemeData.zumrutKaranlik() => const AppThemeData(
+    id: 'zumrut_karanlik',
+    isim: 'Zümrüt Karanlık',
+    arkaPlanRengi: Color(0xFF121212),
+    kartRengi: Color(0xFF1E1E1E),
+    anaRenk: Color(0xFF4CAF50),
+    yaziRengi: Color(0xFFE0E0E0),
+    pasifRenk: Color(0xFF757575),
+    aktifRenk: Color(0xFF81C784),
+    kirmizi: Color(0xFFEF5350),
+    brightness: Brightness.dark,
+  );
+
+  // ─── OKYANUS KARANLIK ───
+  factory AppThemeData.okyanusKaranlik() => const AppThemeData(
+    id: 'okyanus_karanlik',
+    isim: 'Okyanus Karanlık',
+    arkaPlanRengi: Color(0xFF121212),
+    kartRengi: Color(0xFF1E1E1E),
+    anaRenk: Color(0xFF42A5F5),
+    yaziRengi: Color(0xFFE0E0E0),
+    pasifRenk: Color(0xFF757575),
+    aktifRenk: Color(0xFF90CAF9),
+    kirmizi: Color(0xFFEF5350),
+    brightness: Brightness.dark,
+  );
+
+  // ─── KARANLIK (VARSAYILAN KARANLIK) ───
   factory AppThemeData.karanlik() => const AppThemeData(
     id: 'karanlik',
     isim: 'Karanlık',
@@ -85,9 +113,11 @@ class AppThemeData {
   /// Tüm mevcut temalar
   static List<AppThemeData> tumTemalar = [
     AppThemeData.varsayilan(),
-    AppThemeData.zumrut(),
-    AppThemeData.okyanus(),
     AppThemeData.karanlik(),
+    AppThemeData.zumrut(),
+    AppThemeData.zumrutKaranlik(),
+    AppThemeData.okyanus(),
+    AppThemeData.okyanusKaranlik(),
   ];
 
   /// ID'ye göre tema bul
