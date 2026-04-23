@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 
 import 'core/utils/responsive.dart';
@@ -17,6 +18,7 @@ import 'views/ana_sayfa.dart';
 import 'views/statistics_screen.dart';
 import 'views/social_screen.dart';
 import 'views/auth_screen.dart';
+import 'views/onboarding_screen.dart';
 
 class DevHttpOverrides extends HttpOverrides {
   @override
@@ -64,26 +66,63 @@ class NamazTakipApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Namaz Vakti',
+      title: 'Takva Yolu',
       theme: themeProvider.buildThemeData(),
       home: const _AuthGate(),
     );
   }
 }
 
-/// Auth durumuna göre AuthScreen veya AnaUygulamaEkrani gösterir
-class _AuthGate extends StatelessWidget {
+/// Auth durumuna göre Onboarding -> AuthScreen veya AnaUygulamaEkrani gösterir
+class _AuthGate extends StatefulWidget {
   const _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  bool? _onboardingCompleted;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+    });
+  }
+
+  void _onOnboardingComplete() {
+    setState(() => _onboardingCompleted = true);
+    // Onboarding bittiğinde konum ve vakitleri tazele
+    context.read<NamazProvider>().konumVeApiIstegi(kullaniciTetikledi: true);
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<NamazProvider>();
 
-    // Profil oluşturulmamışsa auth ekranını göster
+    // Yükleniyor (Sadece initial shared prefs yüklemesi için)
+    if (_onboardingCompleted == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // 1. Profil oluşturulmamışsa ÖNCE auth ekranını göster
     if (provider.needsProfile) {
       return const AuthScreen();
     }
 
+    // 2. Giriş yapıldıktan sonra, onboarding tamamlanmamışsa göster
+    if (!_onboardingCompleted!) {
+      return OnboardingScreen(onComplete: _onOnboardingComplete);
+    }
+
+    // 3. Her şey tamamsa ana ekran
     return const AnaUygulamaEkrani();
   }
 }
@@ -94,8 +133,39 @@ class AnaUygulamaEkrani extends StatefulWidget {
   State<AnaUygulamaEkrani> createState() => _AnaUygulamaEkraniState();
 }
 
-class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> {
+class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindingObserver {
   int _seciliSayfaIndex = 0;
+  final FirebaseService _firebaseService = FirebaseService();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _updateStatus(true);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _updateStatus(false);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _updateStatus(true);
+    } else {
+      _updateStatus(false);
+    }
+  }
+
+  void _updateStatus(bool isOnline) {
+    final provider = context.read<NamazProvider>();
+    if (provider.currentUid != null) {
+      _firebaseService.setUserStatus(provider.currentUid!, isOnline);
+    }
+  }
 
   final List<Widget> _sayfalar = [
     const AnaSayfa(),

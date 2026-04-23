@@ -13,11 +13,16 @@ import '../services/firebase_service.dart';
 import 'package:quran/quran.dart' as quran;
 import 'dart:math';
 import '../models/religious_day.dart';
+import '../models/prayer_post.dart';
+import '../models/story.dart';
+import '../services/local_db_service.dart';
+import 'dart:typed_data';
 
 class NamazProvider extends ChangeNotifier {
   final NamazServisi _namazServisi;
   final NotificationService _notificationService;
   final FirebaseService _firebaseService;
+  final LocalDbService _localDbService = LocalDbService();
 
   // --- FIREBASE / AUTH DURUMLARI ---
   bool _needsProfile = false;
@@ -26,6 +31,8 @@ class NamazProvider extends ChangeNotifier {
   String? get currentUid => _currentUid;
   String _currentUsername = '';
   String get currentUsername => _currentUsername;
+  String _currentHandle = '';
+  String get currentHandle => _currentHandle;
 
   // --- STATE DEĞİŞKENLERİ ---
   bool isLoading = true;
@@ -74,6 +81,10 @@ class NamazProvider extends ChangeNotifier {
   Map<String, ReligiousDay> tumDiniGunler = {}; // Format: "yyyy-MM-dd"
   Set<String> _aylikDiniGunlerCache = {};
   bool isDiniGunlerLoading = false;
+
+  // 🔥 SOSYAL ÖNBELLEK
+  List<PrayerPost> _cachedPrayers = [];
+  List<PrayerPost> get cachedPrayers => _cachedPrayers;
 
   Map<String, bool> kildiMi = {
     "Sabah": false,
@@ -151,6 +162,17 @@ class NamazProvider extends ChangeNotifier {
           _needsProfile = false;
           final prefs = await SharedPreferences.getInstance();
           _currentUsername = prefs.getString('firebase_username') ?? user.displayName ?? '';
+          _currentHandle = prefs.getString('firebase_handle') ?? '';
+          
+          // Eğer handle yoksa Firestore'dan çek (Geriye dönük uyumluluk)
+          if (_currentHandle.isEmpty) {
+            final doc = await _firebaseService.getUserProfile(user.uid).first;
+            if (doc != null) {
+              _currentHandle = doc.username;
+              await prefs.setString('firebase_handle', _currentHandle);
+            }
+          }
+          
           _firebaseCloudSync();
           _firebaseService.initMessaging(user.uid);
         } else {
@@ -198,8 +220,10 @@ class NamazProvider extends ChangeNotifier {
     );
 
     _currentUsername = displayName;
+    _currentHandle = username;
     _needsProfile = false;
     await prefs.setString('firebase_username', displayName);
+    await prefs.setString('firebase_handle', username);
     _firebaseService.initMessaging(_currentUid!);
     notifyListeners();
     return null; // Hata yok
@@ -225,6 +249,15 @@ class NamazProvider extends ChangeNotifier {
     if (hasProfile) {
       _needsProfile = false;
       _currentUsername = prefs.getString('firebase_username') ?? result.user!.displayName ?? '';
+      _currentHandle = prefs.getString('firebase_handle') ?? '';
+      
+      if (_currentHandle.isEmpty) {
+        final doc = await _firebaseService.getUserProfile(_currentUid!).first;
+        if (doc != null) {
+          _currentHandle = doc.username;
+          await prefs.setString('firebase_handle', _currentHandle);
+        }
+      }
       _firebaseCloudSync();
     } else {
       // Email ile giriş yaptı ama profili yoksa (olağandışı durum) oluştur
@@ -239,8 +272,10 @@ class NamazProvider extends ChangeNotifier {
         initialStreak: streakCount,
       );
       _currentUsername = displayName;
+      _currentHandle = baseUsername.isEmpty ? 'user_${_currentUid!.substring(0,5)}' : baseUsername;
       _needsProfile = false;
       await prefs.setString('firebase_username', displayName);
+      await prefs.setString('firebase_handle', _currentHandle);
     }
 
     _firebaseService.initMessaging(_currentUid!);
@@ -261,6 +296,14 @@ class NamazProvider extends ChangeNotifier {
       if (hasProfile) {
         _needsProfile = false;
         _currentUsername = prefs.getString('firebase_username') ?? user.displayName ?? '';
+        _currentHandle = prefs.getString('firebase_handle') ?? '';
+        if (_currentHandle.isEmpty) {
+          final doc = await _firebaseService.getUserProfile(user.uid).first;
+          if (doc != null) {
+            _currentHandle = doc.username;
+            await prefs.setString('firebase_handle', _currentHandle);
+          }
+        }
         _firebaseCloudSync();
       } else {
         final googleName = user.displayName ?? 'Google Kullanıcı';
@@ -278,8 +321,10 @@ class NamazProvider extends ChangeNotifier {
             initialStreak: streakCount,
           );
           _currentUsername = googleName;
+          _currentHandle = base;
           _needsProfile = false;
           await prefs.setString('firebase_username', googleName);
+          await prefs.setString('firebase_handle', base);
         } else {
           // İsim doluysa UI'a sinyal gönder (UI modal açacak ve completeGoogleRegistration çağıracak)
           return 'google_username_taken';
@@ -327,9 +372,21 @@ class NamazProvider extends ChangeNotifier {
     _currentUid = null;
     _needsProfile = true;
     _currentUsername = '';
+    _currentHandle = '';
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('firebase_username');
+    await prefs.remove('firebase_handle');
     notifyListeners();
+  }
+
+  /// Arkadaşı siler
+  Future<void> arkadasiSil(String targetUid) async {
+    if (_currentUid == null) return;
+    await _firebaseService.removeFriend(
+      currentUid: _currentUid!,
+      targetUid: targetUid,
+    );
+    // UI StreamBuilder kullandığı için otomatik güncellenecektir.
   }
 
   /// Yerel XP/streak'i Firebase'e arka planda senkronize eder
@@ -340,6 +397,12 @@ class NamazProvider extends ChangeNotifier {
       totalXp: _toplamXp,
       streak: streakCount,
     );
+  }
+
+  /// Sosyal akış önbelleğini günceller
+  Future<void> updatePrayerCache(List<PrayerPost> prayers) async {
+    _cachedPrayers = prayers.take(20).toList();
+    await _localDbService.cachePrayers(prayers);
   }
 
   Future<void> konumVeApiIstegi({bool kullaniciTetikledi = false}) async {
@@ -359,18 +422,10 @@ class NamazProvider extends ChangeNotifier {
           return;
         }
 
-        if (vakitler == null) {
-          konumBilgisi = "Konum İzni Gerekli";
-          hataMesaji =
-              "Konum izni verilmediği için vakitler hesaplanamıyor. Lütfen bir şehir seçin.";
-          isLoading = false;
-          notifyListeners();
-        } else {
-          if (konumBilgisi == "Yükleniyor...") {
-            konumBilgisi = "Konum İzni Bekleniyor (Önbellek)";
-          }
-          notifyListeners();
-        }
+        konumBilgisi = "Konum İzni Gerekli";
+        hataMesaji = "Konum izni verilmediği için vakitler belirlenemedi.";
+        isLoading = false;
+        notifyListeners();
         return;
       }
 
@@ -566,6 +621,10 @@ class NamazProvider extends ChangeNotifier {
     }
 
     await istatistikleriYukle();
+
+    // 🔥 SOSYAL AKIŞ ÖNBELLEĞİNİ YÜKLE
+    _cachedPrayers = await _localDbService.getCachedPrayers();
+    notifyListeners();
   }
 
   Future<void> kazaGuncelle(String vakit, int miktar) async {
@@ -897,39 +956,46 @@ class NamazProvider extends ChangeNotifier {
     await _uygulamayiBaslat();
   }
 
-  // lib/providers/namaz_provider.dart içindeki ilgili kısmı güncelliyorum
-Future<void> _bildirimleriGuncelle() async {
-  // 1. Tüm eski bildirimleri temizle
-  await _notificationService.cancelAll();
-  // 2. Eğer bildirimler kapalıysa veya vakitler yüklenmemişse çık
-  if (!bildirimlerAcik || vakitler == null) return;
-  final simdi = DateTime.now();
-  final bugunStr = DateFormat('yyyy-MM-dd').format(simdi);
-  for (int i = 0; i < vakitIsimleri.length; i++) {
-    final vakitAdi = vakitIsimleri[i];
-    String? vakitSaati = vakitler![vakitAdi];
+  Future<void> _bildirimleriGuncelle() async {
+    // 1. Tüm eski bildirimleri temizle
+    await _notificationService.cancelAll();
     
-    if (vakitSaati != null) {
-      // 3. KRİTİK: Saati temizle (Örn: "05:30 (EEST)" -> "05:30")
-      vakitSaati = vakitSaati.split(" ")[0]; 
+    // 2. Eğer bildirimler kapalıysa çık
+    if (!bildirimlerAcik) return;
+
+    // Manevi Rehber bildirimlerini planla (her 5 saatte bir)
+    await _notificationService.scheduleManeviRehberNotifications();
+
+    // 3. Vakitler yüklenmemişse vakit bildirimlerini planlayamaz
+    if (vakitler == null) return;
+
+    final simdi = DateTime.now();
+    final bugunStr = DateFormat('yyyy-MM-dd').format(simdi);
+    for (int i = 0; i < vakitIsimleri.length; i++) {
+      final vakitAdi = vakitIsimleri[i];
+      String? vakitSaati = vakitler![vakitAdi];
       
-      try {
-        final vakitDateTime = DateFormat('yyyy-MM-dd HH:mm').parse('$bugunStr $vakitSaati');
+      if (vakitSaati != null) {
+        // Saati temizle (Örn: "05:30 (EEST)" -> "05:30")
+        vakitSaati = vakitSaati.split(" ")[0]; 
         
-        if (vakitDateTime.isAfter(simdi)) {
-          await _notificationService.scheduleNotification(
-            id: i,
-            title: 'Namaz Vakti: $vakitAdi',
-            body: '$vakitAdi vakti girdi. Namazını kılmayı unutma.',
-            scheduledDate: vakitDateTime,
-          );
+        try {
+          final vakitDateTime = DateFormat('yyyy-MM-dd HH:mm').parse('$bugunStr $vakitSaati');
+          
+          if (vakitDateTime.isAfter(simdi)) {
+            await _notificationService.scheduleNotification(
+              id: i,
+              title: 'Namaz Vakti: $vakitAdi',
+              body: '$vakitAdi vakti girdi. Namazını kılmayı unutma.',
+              scheduledDate: vakitDateTime,
+            );
+          }
+        } catch (e) {
+          debugPrint("Hata: $vakitAdi vakti formatlanamadı -> $e");
         }
-      } catch (e) {
-        debugPrint("Hata: $vakitAdi vakti formatlanamadı -> $e");
       }
     }
   }
-}
 
   Future<void> _gununAyetiniYukle() async {
     final prefs = await SharedPreferences.getInstance();
@@ -1058,4 +1124,48 @@ Future<void> _bildirimleriGuncelle() async {
     isDiniGunlerLoading = false;
     notifyListeners();
   }
+  // ════════════════════════════════════════
+  // 📸 HİKAYE (STORY) İŞLEMLERİ
+  // ════════════════════════════════════════
+
+  /// Haftalık özeti story olarak paylaşır
+  Future<void> paylasHaftalikStory(Uint8List imageBytes) async {
+    if (currentUid == null) return;
+
+    try {
+      // Future sürümünü kullanarak profil verisini al
+      final user = await _firebaseService.getUserProfileFuture(currentUid!);
+      if (user == null) return;
+
+      final base64Image = base64Encode(imageBytes);
+      
+      await _firebaseService.uploadStory(
+        uid: currentUid!,
+        username: user.username,
+        displayName: user.displayName,
+        photoUrl: user.photoUrl,
+        base64Image: base64Image,
+      );
+      
+      debugPrint('📸 Hikaye paylaşıldı');
+    } catch (e) {
+      debugPrint('📸 Hikaye paylaşma hatası: $e');
+      rethrow;
+    }
+  }
+
+  /// Arkadaşların hikayelerini dinler
+  Stream<List<UserStory>> arkadasHikayeleriniDinle() {
+    if (currentUid == null) return Stream.value([]);
+    
+    // Arkadaş listesini al ve hikayeleri getir
+    // getUserProfile bir Stream döner
+    return _firebaseService.getUserProfile(currentUid!).asyncExpand((user) {
+      if (user == null || user.friends.isEmpty) return Stream.value([]);
+      return _firebaseService.getFriendStories(user.friends);
+    });
+  }
+
+  /// Belirli bir kullanıcının hikayesini getirir
+  Future<UserStory?> hikayeGetir(String uid) => _firebaseService.getUserStory(uid);
 }

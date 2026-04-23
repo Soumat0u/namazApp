@@ -11,6 +11,9 @@ class UserProfile {
   final String? fcmToken;
   final DateTime createdAt;
   final List<String> friends;
+  final bool isOnline;
+  final DateTime? lastActive;
+  final DateTime? lastStoryAt;
 
   UserProfile({
     required this.uid,
@@ -23,6 +26,9 @@ class UserProfile {
     this.fcmToken,
     required this.createdAt,
     this.friends = const [],
+    this.isOnline = false,
+    this.lastActive,
+    this.lastStoryAt,
   });
 
   /// Firestore belgesinden model oluşturur
@@ -39,6 +45,9 @@ class UserProfile {
       fcmToken: data['fcmToken'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       friends: List<String>.from(data['friends'] ?? []),
+      isOnline: data['isOnline'] ?? false,
+      lastActive: (data['lastActive'] as Timestamp?)?.toDate(),
+      lastStoryAt: (data['lastStoryAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -54,6 +63,9 @@ class UserProfile {
       'fcmToken': fcmToken,
       'createdAt': Timestamp.fromDate(createdAt),
       'friends': friends,
+      'isOnline': isOnline,
+      'lastActive': lastActive != null ? Timestamp.fromDate(lastActive!) : FieldValue.serverTimestamp(),
+      'lastStoryAt': lastStoryAt != null ? Timestamp.fromDate(lastStoryAt!) : null,
     };
   }
 }

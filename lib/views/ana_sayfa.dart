@@ -55,92 +55,9 @@ class _AnaSayfaState extends State<AnaSayfa> {
       });
     }
 
-    if (provider.vakitler == null && provider.hataMesaji.isNotEmpty) {
-      return Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-                child: Text(
-                  provider.hataMesaji,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: context.renkler.yaziRengi,
-                    fontSize: Responsive.sp(16),
-                  ),
-                ),
-              ),
-              SizedBox(height: Responsive.h(20)),
-              ElevatedButton(
-                onPressed: () => context.read<NamazProvider>().konumVeApiIstegi(
-                  kullaniciTetikledi: true,
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: context.renkler.anaRenk,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text("Konum İzni Ver / Tekrar Dene"),
-              ),
-              SizedBox(height: Responsive.h(30)),
-              Text(
-                "veya Manuel Şehir Seçin:",
-                style: TextStyle(
-                  color: context.renkler.yaziRengi,
-                  fontSize: Responsive.sp(14),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: Responsive.h(10)),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: Responsive.w(40)),
-                child: DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: context.renkler.kartRengi,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  hint: const Text("Şehir Seç"),
-                  items:
-                      [
-                        "Adana",
-                        "Ankara",
-                        "Antalya",
-                        "Bursa",
-                        "Diyarbakır",
-                        "Erzurum",
-                        "Eskişehir",
-                        "Gaziantep",
-                        "İstanbul",
-                        "İzmir",
-                        "Kayseri",
-                        "Konya",
-                        "Mersin",
-                        "Samsun",
-                        "Trabzon",
-                        "Van",
-                      ].map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                  onChanged: (String? newValue) {
-                    if (newValue != null) {
-                      context.read<NamazProvider>().sehirVakitleriniGetir(
-                        newValue,
-                      );
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+    // Vakitler yoksa bile ana iskeleti göster
+    if (provider.vakitler == null && !provider.isLoading) {
+      // Hata mesajı varsa SnackBar ile gösterilebilir veya sessizce beklenebilir
     }
 
     return SafeArea(
@@ -486,7 +403,7 @@ void _unvanlariGoster(
                 ),
               ),
               Text(
-                "HAKK YOLU",
+                "Takva Yolun",
                 style: TextStyle(
                   color: r.anaRenk,
                   fontWeight: FontWeight.bold,
@@ -811,35 +728,35 @@ Widget _buildVakitGrid(BuildContext context, NamazProvider provider) {
           context,
           "Sabah",
           Icons.wb_twilight,
-          provider.vakitler?["Sabah"] ?? "05:00",
+          provider.vakitler?["Sabah"] ?? "--:--",
           provider,
         ),
         _vakitKutusu(
           context,
           "Öğle",
           Icons.wb_sunny,
-          provider.vakitler?["Öğle"] ?? "13:00",
+          provider.vakitler?["Öğle"] ?? "--:--",
           provider,
         ),
         _vakitKutusu(
           context,
           "İkindi",
-          Icons.wb_twighlight,
-          provider.vakitler?["İkindi"] ?? "16:00",
+          Icons.wb_twilight,
+          provider.vakitler?["İkindi"] ?? "--:--",
           provider,
         ),
         _vakitKutusu(
           context,
           "Akşam",
           Icons.nights_stay,
-          provider.vakitler?["Akşam"] ?? "19:00",
+          provider.vakitler?["Akşam"] ?? "--:--",
           provider,
         ),
         _vakitKutusu(
           context,
           "Yatsı",
           Icons.bedtime,
-          provider.vakitler?["Yatsı"] ?? "20:30",
+          provider.vakitler?["Yatsı"] ?? "--:--",
           provider,
         ),
       ],

@@ -9,8 +9,11 @@ import '../services/seviye_servisi.dart';
 import '../models/user_profile.dart';
 import '../models/prayer_post.dart';
 import '../models/app_notification.dart';
+import '../models/story.dart';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../core/utils/extensions.dart';
 class SosyalSayfasi extends StatefulWidget {
   const SosyalSayfasi({super.key});
 
@@ -47,6 +50,13 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     _fullLeaderboardStream = _firebaseService.getLeaderboard(limit: 50);
     _fullPrayersStream = _firebaseService.getPrayers(limit: 50);
     _cachedDiscoverStream = _firebaseService.getDiscoverPrayers(limit: 5);
+
+    // 🔥 Sosyal akış önbelleğini Firestore'dan veri geldikçe güncelle
+    _fullPrayersStream.listen((prayers) {
+      if (mounted) {
+        context.read<NamazProvider>().updatePrayerCache(prayers);
+      }
+    });
   }
 
   @override
@@ -104,17 +114,17 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           children: [
             // 1. ÜST GİRİŞ PANELİ (ÖZET BAR)
             _buildOzetBar(context, provider, r, toplamBugunXp),
-            // 1.5 ARKADAŞLARIM (Yeni Sekme)
             _buildSectionHeader(
               title: "Arkadaşlarım", 
               icon: Icons.people_alt_rounded,
               buttonText: "Tümünü Gör",
               onSeeAll: () { FocusScope.of(context).unfocus(); _showFriendsModal(context, r, provider); }
             ),
+            _buildFriendsPreview(context, r, provider),
             
             // 2. LİDERLİK TABLOSU ÖN İZLEME
             _buildSectionHeader(
-              title: "İstikamet Rehberi", 
+              title: "Liderlik Tablosu", 
               icon: Icons.emoji_events_rounded,
               buttonText: "Tümünü Gör",
               onSeeAll: () { FocusScope.of(context).unfocus(); _showFullLeaderboard(context, r, provider); }
@@ -334,6 +344,11 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                       style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w800, fontSize: Responsive.sp(18)),
                       overflow: TextOverflow.ellipsis,
                     ),
+                    Text(
+                      "@${provider.currentHandle}",
+                      style: TextStyle(color: r.pasifRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     SizedBox(height: Responsive.h(4)),
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(2)),
@@ -433,6 +448,153 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           ),
         ],
       ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // 👥 0. ARKADAŞLARIM ÖN İZLEME (ÇEVRİMİÇİ)
+  // ═══════════════════════════════════════════════
+
+  Widget _buildFriendsPreview(BuildContext context, AppThemeColors r, NamazProvider provider) {
+    if (provider.currentUid == null) return const SizedBox();
+
+    return StreamBuilder<UserProfile?>(
+      stream: _firebaseService.getUserProfile(provider.currentUid!),
+      builder: (context, userSnap) {
+        if (!userSnap.hasData || userSnap.data == null) return const SizedBox();
+        final friends = userSnap.data!.friends;
+        if (friends.isEmpty) return const SizedBox();
+
+        return StreamBuilder<List<UserProfile>>(
+          stream: _firebaseService.getFriendsProfilesStream(friends),
+          builder: (context, profilesSnap) {
+            if (!profilesSnap.hasData) return const SizedBox();
+            
+            // Arkadaşları sırala: Önce çevrimiçi olanlar, sonra son aktiflik zamanına göre
+            final displayFriends = profilesSnap.data!;
+            displayFriends.sort((a, b) {
+              if (a.isOnline != b.isOnline) return a.isOnline ? -1 : 1;
+              final aTime = a.lastActive ?? DateTime(0);
+              final bTime = b.lastActive ?? DateTime(0);
+              return bTime.compareTo(aTime);
+            });
+            
+            final limitedFriends = displayFriends.take(10).toList();
+            if (limitedFriends.isEmpty) return const SizedBox();
+
+            return Container(
+              height: Responsive.h(100),
+              margin: EdgeInsets.only(bottom: Responsive.h(10)),
+              child: ListView.builder(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+                scrollDirection: Axis.horizontal,
+                itemCount: limitedFriends.length,
+                itemBuilder: (context, index) {
+                  final friend = limitedFriends[index];
+                  final bool isOnline = friend.isOnline;
+                  
+                  // Aktif hikaye kontrolü (son 24 saat)
+                  final bool hasActiveStory = friend.lastStoryAt != null && 
+                      DateTime.now().difference(friend.lastStoryAt!).inHours < 24;
+
+                  return GestureDetector(
+                    onTap: () async {
+                      if (hasActiveStory) {
+                        final story = await provider.hikayeGetir(friend.uid);
+                        if (story != null && mounted) {
+                          _showStoryViewer(context, r, story);
+                        }
+                      }
+                    },
+                    child: Container(
+                      width: Responsive.w(65),
+                      margin: EdgeInsets.only(right: Responsive.w(12)),
+                      child: Column(
+                        children: [
+                          Stack(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(2.5),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: hasActiveStory ? LinearGradient(
+                                    colors: [r.anaRenk, Colors.purple, Colors.orange],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ) : null,
+                                  border: !hasActiveStory ? Border.all(
+                                    color: isOnline ? r.anaRenk.withOpacity(0.3) : r.pasifRenk.withOpacity(0.4), 
+                                    width: 2
+                                  ) : null,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: r.arkaPlanRengi,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: Responsive.w(22),
+                                    backgroundColor: isOnline ? r.anaRenk.withOpacity(0.1) : r.pasifRenk.withOpacity(0.1),
+                                    child: Text(
+                                      friend.displayName[0].toUpperCase(),
+                                      style: TextStyle(
+                                        color: isOnline ? r.anaRenk : r.pasifRenk, 
+                                        fontWeight: FontWeight.bold
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (isOnline)
+                                Positioned(
+                                  right: 2,
+                                  bottom: 2,
+                                  child: Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: r.arkaPlanRengi, width: 2),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            friend.displayName,
+                            style: TextStyle(
+                              color: isOnline ? r.yaziRengi : r.yaziRengi.withOpacity(0.6), 
+                              fontSize: Responsive.sp(10), 
+                              fontWeight: FontWeight.w800
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            "@${friend.username}",
+                            style: TextStyle(
+                              color: r.pasifRenk, 
+                              fontSize: Responsive.sp(8), 
+                              fontWeight: FontWeight.bold
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      }
     );
   }
 
@@ -696,14 +858,17 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         return StreamBuilder<List<PrayerPost>>(
           stream: prayerStream,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+            // 🔥 FLUID UX: Eğer stream henüz yüklenmediyse veya internet yoksa önbellekteki duaları göster (Kardeşlik tabanı için)
+            final currentPrayers = snapshot.data ?? ( !_isDiscoverTab ? provider.cachedPrayers.take(5).toList() : [] );
+
+            if (snapshot.connectionState == ConnectionState.waiting && currentPrayers.isEmpty) {
                return Padding(
                  padding: EdgeInsets.all(Responsive.w(30)),
                  child: Center(child: CircularProgressIndicator(color: r.anaRenk, strokeWidth: 2)),
                );
             }
 
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            if (currentPrayers.isEmpty) {
               return _buildEmptyState(
                 r, 
                 "Dua Meclisi", 
@@ -711,7 +876,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               );
             }
 
-            final prayers = snapshot.data!;
+            final prayers = currentPrayers;
             return Column(
               children: [
                 ...prayers.map((prayer) => _buildDuaItem(context, r, prayer, provider)).toList(),
@@ -754,13 +919,20 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                 child: StreamBuilder<List<PrayerPost>>(
                   stream: _fullPrayersStream,
                   builder: (context, snapshot) {
-                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    final provider = context.read<NamazProvider>();
+                    // 🔥 Önbellekten veriyi al (Stream gelene kadar veya internet yoksa)
+                    final currentPrayers = snapshot.data ?? provider.cachedPrayers;
+
+                    if (snapshot.connectionState == ConnectionState.waiting && currentPrayers.isEmpty) {
+                       return Center(child: CircularProgressIndicator(color: r.anaRenk));
+                    }
+
+                    if (currentPrayers.isEmpty) {
                       return Center(
                         child: Text("Dua duvarı boş", style: TextStyle(color: r.pasifRenk)),
                       );
                     }
-                    final prayers = snapshot.data!;
-                    final provider = context.read<NamazProvider>();
+                    final prayers = currentPrayers;
                     return GridView.builder(
                       controller: scrollController,
                       padding: EdgeInsets.all(Responsive.w(12)),
@@ -793,8 +965,9 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   }
 
   Widget _buildDuaItem(BuildContext context, AppThemeColors r, PrayerPost prayer, NamazProvider provider) {
-    final zamanFarki = _zamanFarkiHesapla(prayer.timestamp);
-    final benAminDedimMi = provider.currentUid != null && prayer.aminBy.contains(provider.currentUid);
+    final benAminDedimMi = provider.currentUid != null && 
+                           provider.currentUid!.isNotEmpty && 
+                           prayer.aminBy.contains(provider.currentUid);
 
     return Card(
       margin: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(8)),
@@ -817,9 +990,16 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(prayer.senderName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(13), color: r.yaziRengi)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(prayer.senderName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(13), color: r.yaziRengi)),
+                    if (prayer.senderUsername.isNotEmpty)
+                      Text("@${prayer.senderUsername}", style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10), fontWeight: FontWeight.bold)),
+                  ],
+                ),
                 const Spacer(),
-                Text(zamanFarki, style: TextStyle(color: r.yaziRengi.withOpacity(0.4), fontSize: Responsive.sp(10))),
+                Text(prayer.zamanFarki, style: TextStyle(color: r.yaziRengi.withOpacity(0.4), fontSize: Responsive.sp(10))),
               ],
             ),
             SizedBox(height: Responsive.h(12)),
@@ -957,6 +1137,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   text: text,
                   senderUid: provider.currentUid!,
                   senderName: provider.currentUsername,
+                  senderUsername: provider.currentHandle,
                 );
 
                 _duaController.clear();
@@ -1314,6 +1495,44 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     );
   }
 
+  void _showDeleteFriendDialog(BuildContext context, AppThemeColors r, UserProfile user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: r.arkaPlanRengi,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Arkadaşlıktan Çıkar", style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.bold)),
+        content: Text(
+          "${user.displayName} (@${user.username}) isimli kardeşimizi arkadaşlarınızdan çıkarmak istediğinize emin misiniz?",
+          style: TextStyle(color: r.yaziRengi.withOpacity(0.7)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text("Vazgeç", style: TextStyle(color: r.pasifRenk, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.read<NamazProvider>().arkadasiSil(user.uid);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("${user.displayName} arkadaşlıktan çıkarıldı."),
+                  backgroundColor: r.anaRenk,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: r.kirmizi,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text("Çıkar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showFriendsModal(BuildContext context, AppThemeColors r, NamazProvider provider) {
     if (provider.currentUid == null) return;
     
@@ -1335,28 +1554,54 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               _buildBottomSheetHandle(r),
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text("Mumin Kardeşlerim", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(18), color: r.yaziRengi)),
+                child: Text("Mümin Kardeşlerim", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(18), color: r.yaziRengi)),
               ),
               Expanded(
                 child: StreamBuilder<UserProfile?>(
-                  stream: FirebaseService().getUserProfile(provider.currentUid!),
+                  stream: _firebaseService.getUserProfile(provider.currentUid!),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData || snapshot.data == null) return const Center(child: CircularProgressIndicator());
                     
                     final friendsList = snapshot.data!.friends;
                     if (friendsList.isEmpty) return Center(child: Text("Henüz bir kardeşiniz ekli değil.\nDua halkasına arkadaşlarınızı davet edin!", textAlign: TextAlign.center, style: TextStyle(color: r.pasifRenk)));
 
-                    return FutureBuilder<List<UserProfile>>(
-                      future: FirebaseService().getFriendsProfiles(friendsList),
-                      builder: (context, futureSnap) {
-                        if (!futureSnap.hasData) return const Center(child: CircularProgressIndicator());
+                    return StreamBuilder<List<UserProfile>>(
+                      stream: _firebaseService.getFriendsProfilesStream(friendsList),
+                      builder: (context, streamSnap) {
+                        if (!streamSnap.hasData) return const Center(child: CircularProgressIndicator());
                         
-                        final friendProfiles = futureSnap.data!;
-                        return ListView.builder(
+                        // Tüm arkadaşları sırala: Önce çevrimiçi olanlar, sonra son aktiflik zamanına göre
+                        final allFriendsSorted = streamSnap.data!;
+                        allFriendsSorted.sort((a, b) {
+                          if (a.isOnline != b.isOnline) {
+                            return a.isOnline ? -1 : 1;
+                          }
+                          final aTime = a.lastActive ?? DateTime(0);
+                          final bTime = b.lastActive ?? DateTime(0);
+                          return bTime.compareTo(aTime);
+                        });
+
+                        // Sadece ilk 10 arkadaşı al
+                        final limitedFriends = allFriendsSorted.take(10).toList();
+                        
+                        final onlineOnes = limitedFriends.where((f) => f.isOnline).toList();
+                        final offlineOnes = limitedFriends.where((f) => !f.isOnline).toList();
+
+                        return ListView(
                           controller: scrollController,
-                          padding: EdgeInsets.symmetric(horizontal: Responsive.w(4)),
-                          itemCount: friendProfiles.length,
-                          itemBuilder: (context, index) => _buildLeaderboardItem(r, index, friendProfiles[index], provider.currentUid),
+                          padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+                          children: [
+                            if (onlineOnes.isNotEmpty) ...[
+                              _buildSubHeader(r, "Çevrimiçi", onlineOnes.length),
+                              ...onlineOnes.map((f) => _buildFriendItem(r, f, provider.currentUid)),
+                            ],
+                            if (offlineOnes.isNotEmpty) ...[
+                              SizedBox(height: Responsive.h(16)),
+                              _buildSubHeader(r, "Çevrimdışı", offlineOnes.length),
+                              ...offlineOnes.map((f) => _buildFriendItem(r, f, provider.currentUid)),
+                            ],
+                            SizedBox(height: Responsive.h(40)),
+                          ],
                         );
                       },
                     );
@@ -1370,14 +1615,190 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     );
   }
 
-  /// Zaman farkını okunabilir formata çevirir
-  String _zamanFarkiHesapla(DateTime zaman) {
-    final fark = DateTime.now().difference(zaman);
-    if (fark.inMinutes < 1) return 'Az önce';
-    if (fark.inMinutes < 60) return '${fark.inMinutes} dk önce';
-    if (fark.inHours < 24) return '${fark.inHours} saat önce';
-    if (fark.inDays < 7) return '${fark.inDays} gün önce';
-    return DateFormat('dd MMM', 'tr_TR').format(zaman);
+  Widget _buildSubHeader(AppThemeColors r, String title, int count) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: Responsive.h(10)),
+      child: Row(
+        children: [
+          Text(title, style: TextStyle(color: r.pasifRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(14))),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: r.pasifRenk.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+            child: Text("$count", style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFriendItem(AppThemeColors r, UserProfile user, String? currentUid) {
+    final lastSeen = user.lastActive != null ? user.lastActive!.zamanFarki : "Belirsiz";
+    return Container(
+      margin: EdgeInsets.only(bottom: Responsive.h(10)),
+      padding: EdgeInsets.all(Responsive.w(12)),
+      decoration: BoxDecoration(
+        color: r.kartRengi,
+        borderRadius: BorderRadius.circular(Responsive.w(15)),
+        border: Border.all(color: r.pasifRenk.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: Responsive.w(20),
+                backgroundColor: r.anaRenk.withOpacity(0.1),
+                child: Text(user.displayName[0].toUpperCase(), style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+              ),
+              if (user.isOnline)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: r.arkaPlanRengi, width: 2)),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(width: Responsive.w(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(user.displayName, style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
+                Text("@${user.username}", style: TextStyle(color: r.anaRenk.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: Responsive.sp(11))),
+                Text(user.isOnline ? "Çevrimiçi" : "Son görülme: $lastSeen", style: TextStyle(color: r.pasifRenk.withOpacity(0.6), fontSize: Responsive.sp(10))),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text("${user.totalXp} XP", style: TextStyle(fontWeight: FontWeight.bold, color: r.anaRenk, fontSize: Responsive.sp(12))),
+              Text(user.unvan, style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10))),
+            ],
+          ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert_rounded, color: r.pasifRenk, size: 20),
+            padding: EdgeInsets.zero,
+            onSelected: (value) {
+              if (value == 'delete') {
+                _showDeleteFriendDialog(context, r, user);
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.person_remove_rounded, color: r.kirmizi, size: 18),
+                    const SizedBox(width: 8),
+                    Text("Kardeşlikten Çıkar", style: TextStyle(color: r.kirmizi, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // 📸 HİKAYE (STORY) GÖRÜNTÜLEYİCİ
+  // ═══════════════════════════════════════════════
+
+  void _showStoryViewer(BuildContext context, AppThemeColors r, UserStory story) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Story",
+      barrierColor: Colors.black.withOpacity(0.9),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            children: [
+              // 1. Hikaye Görseli
+              Center(
+                child: Hero(
+                  tag: 'story_${story.uid}',
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(20), vertical: Responsive.h(100)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.memory(
+                        base64Decode(story.imageUrl),
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              
+              // 2. Üst Bar (Kullanıcı Bilgisi)
+              SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.all(Responsive.w(16)),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: r.anaRenk.withOpacity(0.2),
+                        child: Text(story.displayName[0].toUpperCase(), style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+                      ),
+                      SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(story.displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(
+                            "@${story.username} • ${DateFormat('HH:mm').format(story.createdAt)}", 
+                            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // 3. Alt Bilgi
+              Positioned(
+                bottom: Responsive.h(40),
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Text(
+                      "Kapatmak için geri gel veya çarpıya bas", 
+                      style: TextStyle(color: Colors.white70, fontSize: 12)
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -1436,7 +1857,9 @@ class _DuaGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final benAminDedimMi = currentUid != null && prayer.aminBy.contains(currentUid);
+    final benAminDedimMi = currentUid != null && 
+                           currentUid!.isNotEmpty && 
+                           prayer.aminBy.contains(currentUid);
 
     return GestureDetector(
       onTap: () => _showDuaOdakModu(context),
@@ -1463,9 +1886,20 @@ class _DuaGridCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Expanded(child: Text(prayer.senderName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(isFullView ? 14 : 10), color: r.yaziRengi), overflow: TextOverflow.ellipsis)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(prayer.senderName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(isFullView ? 14 : 10), color: r.yaziRengi), overflow: TextOverflow.ellipsis),
+                      if (prayer.senderUsername.isNotEmpty)
+                        Text("@${prayer.senderUsername}", style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(isFullView ? 11 : 8)), overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
                 if (isFullView) 
-                  IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close_rounded, size: 20, color: r.yaziRengi.withOpacity(0.4))),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close_rounded, size: 20, color: r.yaziRengi.withOpacity(0.4)))
+                else
+                  Text(prayer.zamanFarki, style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(8))),
               ],
             ),
             const SizedBox(height: 4),

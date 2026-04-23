@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 import '../models/prayer_post.dart';
 import '../models/app_notification.dart';
+import '../models/story.dart';
 import '../services/seviye_servisi.dart';
 
 /// Tüm Firebase operasyonlarını kapsülleyen abstraction layer.
@@ -263,6 +264,18 @@ class FirebaseService {
     }
   }
 
+  /// Kullanıcının çevrimiçi durumunu günceller
+  Future<void> setUserStatus(String uid, bool isOnline) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'isOnline': isOnline,
+        'lastActive': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('👤 Durum güncelleme hatası: $e');
+    }
+  }
+
   /// Tek bir kullanıcı profilini dinler (stream)
   Stream<UserProfile?> getUserProfile(String uid) {
     return _firestore
@@ -270,6 +283,17 @@ class FirebaseService {
         .doc(uid)
         .snapshots()
         .map((doc) => doc.exists ? UserProfile.fromFirestore(doc) : null);
+  }
+
+  /// Tek bir kullanıcı profilini bir kez getirir (Future)
+  Future<UserProfile?> getUserProfileFuture(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      return doc.exists ? UserProfile.fromFirestore(doc) : null;
+    } catch (e) {
+      debugPrint('👤 Profil getirme hatası: $e');
+      return null;
+    }
   }
 
   // ════════════════════════════════════════
@@ -355,6 +379,37 @@ class FirebaseService {
     }
   }
 
+  /// Arkadaşlıktan çıkarır
+  Future<void> removeFriend({
+    required String currentUid,
+    required String targetUid,
+  }) async {
+    try {
+      final batch = _firestore.batch();
+      
+      final currentUserRef = _firestore.collection('users').doc(currentUid);
+      batch.update(currentUserRef, {
+        'friends': FieldValue.arrayRemove([targetUid])
+      });
+      
+      final targetUserRef = _firestore.collection('users').doc(targetUid);
+      batch.update(targetUserRef, {
+        'friends': FieldValue.arrayRemove([currentUid])
+      });
+      
+      // Arkadaşlık isteği bildirimini de temizleyelim (opsiyonel ama temiz olur)
+      final notifRef1 = _firestore.collection('users').doc(currentUid).collection('notifications').doc(targetUid);
+      batch.delete(notifRef1);
+      final notifRef2 = _firestore.collection('users').doc(targetUid).collection('notifications').doc(currentUid);
+      batch.delete(notifRef2);
+
+      await batch.commit();
+      debugPrint('🤝 Arkadaşlıktan çıkarıldı: $targetUid');
+    } catch (e) {
+      debugPrint('🤝 Arkadaşlıktan çıkarma hatası: $e');
+    }
+  }
+
   Future<List<UserProfile>> getFriendsProfiles(List<String> friendUids) async {
     if (friendUids.isEmpty) return [];
     try {
@@ -368,6 +423,20 @@ class FirebaseService {
       debugPrint('Arkadaşları getirme hatası: $e');
       return [];
     }
+  }
+
+  /// Arkadaşların profil bilgilerini anlık (stream) olarak dinler
+  Stream<List<UserProfile>> getFriendsProfilesStream(List<String> friendUids) {
+    if (friendUids.isEmpty) return Stream.value([]);
+    
+    // Firestore 'whereIn' sınırı nedeniyle max 30 arkadaş (güncel Firestore limiti 30)
+    final targetUids = friendUids.take(30).toList();
+
+    return _firestore
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: targetUids)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => UserProfile.fromFirestore(doc)).toList());
   }
 
   /// Arkadaş Önerileri: Kendisi ve halihazırda arkadaşı olmayan popüler kullanıcılar
@@ -419,6 +488,7 @@ class FirebaseService {
     required String text,
     required String senderUid,
     required String senderName,
+    required String senderUsername,
     bool isApproved = true,
   }) async {
     try {
@@ -427,6 +497,7 @@ class FirebaseService {
         text: text,
         senderUid: senderUid,
         senderName: senderName,
+        senderUsername: senderUsername,
         aminCount: 0,
         aminBy: [],
         timestamp: DateTime.now(),
@@ -503,6 +574,7 @@ class FirebaseService {
     required String prayerId,
     required String userUid,
   }) async {
+    if (userUid.isEmpty) return null;
     try {
       final docRef = _firestore.collection('prayers').doc(prayerId);
 
@@ -553,7 +625,22 @@ class FirebaseService {
   }
 
   /// FCM izinlerini ister ve token'ı Firestore'a kaydeder
+  /// Mevcut bildirim izinlerini kontrol eder ve yetki varsa token'ı günceller (Sessiz işlem)
   Future<void> initMessaging(String uid) async {
+    try {
+      final settings = await _messaging.getNotificationSettings();
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        await _updateFcmToken(uid);
+      }
+      debugPrint('🔔 FCM Kontrol: ${settings.authorizationStatus}');
+    } catch (e) {
+      debugPrint('🔔 FCM init hatası: $e');
+    }
+  }
+
+  /// Kullanıcıdan bildirim izni ister ve yetki verilirse token'ı kaydeder
+  Future<void> requestMessagingPermission(String uid) async {
     try {
       final settings = await _messaging.requestPermission(
         alert: true,
@@ -562,23 +649,99 @@ class FirebaseService {
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        final token = await _getMessagingToken();
-        if (token != null) {
-          await _firestore.collection('users').doc(uid).update({
-            'fcmToken': token,
-          });
-        }
-
-        // Token yenilenirse güncelle
-        _messaging.onTokenRefresh.listen((newToken) {
-          _firestore.collection('users').doc(uid).update({
-            'fcmToken': newToken,
-          });
-        });
+        await _updateFcmToken(uid);
       }
-      debugPrint('🔔 FCM başlatıldı: ${settings.authorizationStatus}');
+      debugPrint('🔔 FCM İzin Talebi: ${settings.authorizationStatus}');
     } catch (e) {
-      debugPrint('🔔 FCM init hatası: $e');
+      debugPrint('🔔 FCM izin hatası: $e');
+    }
+  }
+
+  /// Token'ı alır ve Firestore'a kaydeder
+  Future<void> _updateFcmToken(String uid) async {
+    final token = await _getMessagingToken();
+    if (token != null) {
+      await _firestore.collection('users').doc(uid).update({
+        'fcmToken': token,
+      });
+    }
+
+    // Token yenilenirse güncelle
+    _messaging.onTokenRefresh.listen((newToken) {
+      _firestore.collection('users').doc(uid).update({
+        'fcmToken': newToken,
+      });
+    });
+  }
+
+  // ════════════════════════════════════════
+  // 📸 HİKAYE (STORY) İŞLEMLERİ
+  // ════════════════════════════════════════
+
+  /// Yeni bir hikaye yükler
+  Future<void> uploadStory({
+    required String uid,
+    required String username,
+    required String displayName,
+    String? photoUrl,
+    required String base64Image,
+  }) async {
+    try {
+      final now = DateTime.now();
+      
+      // 1. Hikaye koleksiyonuna ekle
+      await _firestore.collection('stories').doc(uid).set({
+        'uid': uid,
+        'username': username,
+        'displayName': displayName,
+        'photoUrl': photoUrl,
+        'imageUrl': base64Image,
+        'createdAt': Timestamp.fromDate(now),
+      });
+
+      // 2. Kullanıcı profilindeki lastStoryAt alanını güncelle
+      await _firestore.collection('users').doc(uid).update({
+        'lastStoryAt': Timestamp.fromDate(now),
+      });
+
+      debugPrint('📸 Hikaye başarıyla yüklendi: $uid');
+    } catch (e) {
+      debugPrint('📸 Hikaye yükleme hatası: $e');
+      rethrow;
+    }
+  }
+
+  /// Arkadaşların aktif hikayelerini getirir (son 24 saat)
+  Stream<List<UserStory>> getFriendStories(List<String> friendUids) {
+    if (friendUids.isEmpty) return Stream.value([]);
+
+    final yesterday = DateTime.now().subtract(const Duration(hours: 24));
+
+    return _firestore
+        .collection('stories')
+        .where('uid', whereIn: friendUids.take(10).toList())
+        .where('createdAt', isGreaterThan: Timestamp.fromDate(yesterday))
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) => UserStory.fromFirestore(doc)).toList();
+        });
+  }
+
+  /// Belirli bir kullanıcının aktif hikayesini getirir
+  Future<UserStory?> getUserStory(String uid) async {
+    try {
+      final yesterday = DateTime.now().subtract(const Duration(hours: 24));
+      final doc = await _firestore.collection('stories').doc(uid).get();
+      
+      if (!doc.exists) return null;
+      
+      final story = UserStory.fromFirestore(doc);
+      if (story.createdAt.isBefore(yesterday)) return null;
+      
+      return story;
+    } catch (e) {
+      debugPrint('📸 Hikaye getirme hatası: $e');
+      return null;
     }
   }
 }

@@ -258,7 +258,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
                     // Başlık
                     Text(
-                      _isLogin ? "Tekrar Hoş Geldin" : "Manevi Meclise\nKatıl",
+                      _isLogin ? "Hoş Geldin" : "Manevi Meclise\nKatıl",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: r.yaziRengi,
@@ -272,7 +272,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
                     Text(
                       _isLogin 
-                          ? "Hesabına giriş yap ve meclise devam et." 
+                          ? "Hesabına giriş yap veya bir hesap oluştur." 
                           : "Bir hesap oluştur, manevi yolculuğuna başla.",
                       textAlign: TextAlign.center,
                       style: TextStyle(color: r.yaziRengi.withOpacity(0.5), fontSize: Responsive.sp(13), height: 1.4),
