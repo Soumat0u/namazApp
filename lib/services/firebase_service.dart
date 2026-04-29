@@ -325,6 +325,7 @@ class FirebaseService {
       
       final targetUid = snap.data()?['uid'] as String?;
       if (targetUid == null) return 'Kullanıcı hesabı hatalı.';
+      if (targetUid == senderUid) return 'Kendinize istek gönderemezsiniz.';
       
       final targetProfile = await _firestore.collection('users').doc(targetUid).get();
       final targetFriends = List<String>.from(targetProfile.data()?['friends'] ?? []);
@@ -522,13 +523,29 @@ class FirebaseService {
       return snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
           .toList();
+    }).asBroadcastStream();
+  }
+
+  /// Belirli bir kullanıcının yayınladığı dualar
+  Stream<List<PrayerPost>> getMyPrayers(String uid, {int limit = 30}) {
+    return _firestore
+        .collection('prayers')
+        .where('senderUid', isEqualTo: uid)
+        .snapshots()
+        .map((snapshot) {
+      var list = snapshot.docs
+          .map((doc) => PrayerPost.fromFirestore(doc))
+          .toList();
+      // Firestore composite index hatası almamak için Dart tarafında sıralıyoruz
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return list.take(limit).toList();
     });
   }
 
   /// Sadece arkadaşların yayınladığı dualar (Gönül Kardeşliği)
   Stream<List<PrayerPost>> getFriendsPrayers(List<String> friendUids, {int limit = 30}) {
     if (friendUids.isEmpty) {
-      return Stream.value([]);
+      return Stream.value(<PrayerPost>[]);
     }
     
     // Firestore 'whereIn' sorgusu maksimim 10 eleman destekler
@@ -536,15 +553,16 @@ class FirebaseService {
 
     return _firestore
         .collection('prayers')
-        .where('isApproved', isEqualTo: true)
         .where('senderUid', whereIn: targetUids)
-        .orderBy('timestamp', descending: true)
-        .limit(limit)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      var list = snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
+          .where((prayer) => prayer.isApproved)
           .toList();
+      // Firestore composite index hatası almamak için orderBy ve limit'i Dart'ta yapıyoruz
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return list.take(limit).toList();
     });
   }
 
@@ -697,6 +715,8 @@ class FirebaseService {
         'photoUrl': photoUrl,
         'imageUrl': base64Image,
         'createdAt': Timestamp.fromDate(now),
+        'viewers': [],
+        'viewerProfiles': [],
       });
 
       // 2. Kullanıcı profilindeki lastStoryAt alanını güncelle
@@ -736,12 +756,78 @@ class FirebaseService {
       if (!doc.exists) return null;
       
       final story = UserStory.fromFirestore(doc);
-      if (story.createdAt.isBefore(yesterday)) return null;
+      
+      // Eğer hikaye 24 saatten eskiyse fiziksel olarak sil (Lazy Delete)
+      if (story.createdAt.isBefore(yesterday)) {
+        await doc.reference.delete();
+        debugPrint('📸 Süresi dolan hikaye silindi: $uid');
+        return null;
+      }
       
       return story;
     } catch (e) {
       debugPrint('📸 Hikaye getirme hatası: $e');
       return null;
+    }
+  }
+
+  /// Hikaye izlenme kaydı yapar
+  Future<void> recordStoryView({
+    required String storyUid,
+    required String viewerUid,
+    required String viewerDisplayName,
+    String? viewerPhotoUrl,
+  }) async {
+    try {
+      final docRef = _firestore.collection('stories').doc(storyUid);
+      
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
+        if (!snapshot.exists) return;
+
+        final data = snapshot.data() as Map<String, dynamic>;
+        final List<String> viewers = List<String>.from(data['viewers'] ?? []);
+        
+        // Eğer zaten izlemişse veya hikaye kendisininkiyse kaydetme
+        if (viewers.contains(viewerUid) || storyUid == viewerUid) return;
+
+        viewers.add(viewerUid);
+        
+        final List<Map<String, dynamic>> viewerProfiles = List<Map<String, dynamic>>.from(data['viewerProfiles'] ?? []);
+        
+        // Yeni izleyen profilini en başa ekle
+        viewerProfiles.insert(0, {
+          'uid': viewerUid,
+          'displayName': viewerDisplayName,
+          'photoUrl': viewerPhotoUrl,
+          'viewedAt': Timestamp.now(),
+        });
+
+        // Sadece son 20 profili tutalım
+        if (viewerProfiles.length > 20) {
+          viewerProfiles.removeRange(20, viewerProfiles.length);
+        }
+
+        transaction.update(docRef, {
+          'viewers': viewers,
+          'viewerProfiles': viewerProfiles,
+        });
+      });
+    } catch (e) {
+      debugPrint('📸 Hikaye izlenme kaydı hatası: $e');
+    }
+  }
+
+  /// Hikayeyi fiziksel olarak siler
+  Future<void> deleteStory(String uid) async {
+    try {
+      await _firestore.collection('stories').doc(uid).delete();
+      await _firestore.collection('users').doc(uid).update({
+        'lastStoryAt': null,
+      });
+      debugPrint('📸 Hikaye kullanıcı tarafından silindi: $uid');
+    } catch (e) {
+      debugPrint('📸 Hikaye silme hatası: $e');
     }
   }
 }

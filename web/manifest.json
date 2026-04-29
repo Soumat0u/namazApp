@@ -1,6 +1,6 @@
 {
-    "name": "namaz_app",
-    "short_name": "namaz_app",
+    "name": "Takva Yolum",
+    "short_name": "Takva Yolum",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

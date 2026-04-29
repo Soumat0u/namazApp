@@ -51,12 +51,27 @@ class NamazProvider extends ChangeNotifier {
   int toplamTamamlanan = 0;
   String gununAyetiMeali = "";
   String gununAyetiReferans = "";
+  int gununAyetiSureNo = 1;
+  int gununAyetiNo = 1;
 
   // 🔥 SEVİYE SİSTEMİ DEĞİŞKENLERİ
   int _toplamXp = 0;
   int get toplamXp => _toplamXp;
   String get mevcutUnvan => SeviyeServisi.unvanGetir(_toplamXp);
   double get seviyeIlerleme => SeviyeServisi.ilerlemeHesapla(_toplamXp);
+  
+  /// Dışarıdan XP eklemek için kullanılır (Örn: Dua beğenme)
+  Future<void> xpEkle(int miktar) async {
+    final prefs = await SharedPreferences.getInstance();
+    _toplamXp += miktar;
+    if (_toplamXp < 0) _toplamXp = 0; // Negatif XP olmasın
+    await prefs.setInt('toplam_xp', _toplamXp);
+    
+    // 🔥 FIREBASE CLOUD SYNC
+    _firebaseCloudSync();
+    
+    notifyListeners();
+  }
 
   String sonSifirlamaTarihi = "";
   String _sonKontrolEdilenGun = ""; // 00:00 kontrolü için
@@ -684,6 +699,9 @@ class NamazProvider extends ChangeNotifier {
     // 🔥 FIREBASE CLOUD SYNC (fire-and-forget)
     _firebaseCloudSync();
 
+    // 🔥 BİLDİRİMLERİ GÜNCELLE (Hatırlatıcıları iptal etmek veya yeniden planlamak için)
+    await _bildirimleriGuncelle();
+
     await istatistikleriYukle();
     notifyListeners();
   }
@@ -976,12 +994,12 @@ class NamazProvider extends ChangeNotifier {
       String? vakitSaati = vakitler![vakitAdi];
       
       if (vakitSaati != null) {
-        // Saati temizle (Örn: "05:30 (EEST)" -> "05:30")
         vakitSaati = vakitSaati.split(" ")[0]; 
         
         try {
           final vakitDateTime = DateFormat('yyyy-MM-dd HH:mm').parse('$bugunStr $vakitSaati');
           
+          // 1. Vakit Bildirimi (Vakit girdiğinde)
           if (vakitDateTime.isAfter(simdi)) {
             await _notificationService.scheduleNotification(
               id: i,
@@ -989,6 +1007,23 @@ class NamazProvider extends ChangeNotifier {
               body: '$vakitAdi vakti girdi. Namazını kılmayı unutma.',
               scheduledDate: vakitDateTime,
             );
+          }
+
+          // 2. Hatırlatma Bildirimi (Sonraki vakte 20 dk kala, önceki kılanmamışsa)
+          // Örn: İkindiye 20 dk kala "Öğle namazını kıldın mı?"
+          final reminderTime = vakitDateTime.subtract(const Duration(minutes: 20));
+          if (reminderTime.isAfter(simdi)) {
+            final oncekiVakit = i == 0 ? "Yatsı" : vakitIsimleri[i - 1];
+            
+            // Eğer önceki vakit kılındı olarak işaretlenmişse, hatırlatıcıyı kurma
+            if (!(kildiMi[oncekiVakit] ?? false)) {
+              await _notificationService.scheduleNotification(
+                id: 100 + i,
+                title: 'Namaz Hatırlatması',
+                body: '$vakitAdi vaktine 20 dakika kaldı. $oncekiVakit namazını kılmış mıydın?',
+                scheduledDate: reminderTime,
+              );
+            }
           }
         } catch (e) {
           debugPrint("Hata: $vakitAdi vakti formatlanamadı -> $e");
@@ -1002,9 +1037,11 @@ class NamazProvider extends ChangeNotifier {
     final bugun = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final sonSecilenGun = prefs.getString('son_ayet_gunu') ?? "";
 
-    if (bugun == sonSecilenGun) {
+    if (bugun == sonSecilenGun && prefs.containsKey('son_ayet_sure_no')) {
       gununAyetiMeali = prefs.getString('son_ayet_meal') ?? "";
       gununAyetiReferans = prefs.getString('son_ayet_ref') ?? "";
+      gununAyetiSureNo = prefs.getInt('son_ayet_sure_no') ?? 1;
+      gununAyetiNo = prefs.getInt('son_ayet_no') ?? 1;
       
       if (gununAyetiMeali.isNotEmpty) {
         notifyListeners();
@@ -1029,14 +1066,20 @@ class NamazProvider extends ChangeNotifier {
       
       final sureIsmi = quran.getSurahNameTurkish(sureNo);
       gununAyetiReferans = "$sureIsmi Suresi, $ayetNo. Ayet";
+      gununAyetiSureNo = sureNo;
+      gununAyetiNo = ayetNo;
 
       await prefs.setString('son_ayet_gunu', bugun);
       await prefs.setString('son_ayet_meal', gununAyetiMeali);
       await prefs.setString('son_ayet_ref', gununAyetiReferans);
+      await prefs.setInt('son_ayet_sure_no', sureNo);
+      await prefs.setInt('son_ayet_no', ayetNo);
     } catch (e) {
       // Hata durumunda varsayılan ayet
       gununAyetiMeali = "Şüphesiz güçlükle beraber bir kolaylık vardır.";
       gununAyetiReferans = "İnşirah Suresi, 5. Ayet";
+      gununAyetiSureNo = 94;
+      gununAyetiNo = 5;
     }
     notifyListeners();
   }

@@ -10,6 +10,8 @@ import 'social_screen.dart';
 import 'tools_screen.dart'; // Araçlar eklendi
 import '../models/religious_day.dart';
 import 'package:intl/intl.dart';
+import 'package:quran/quran.dart' as quran;
+import 'dart:ui' as ui;
 
 class AnaSayfa extends StatefulWidget {
   const AnaSayfa({super.key});
@@ -169,11 +171,17 @@ class _AnaSayfaState extends State<AnaSayfa> {
               });
             },
             children: [
-              _buildMainClock(context, provider),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: _buildMainClock(context, provider),
+              ),
               if (provider.gununAyetiMeali.isNotEmpty)
-                Hero(
-                  tag: 'gununAyetCard',
-                  child: _GununAyetiCard(provider: provider),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Hero(
+                    tag: 'gununAyetCard',
+                    child: _GununAyetiCard(provider: provider),
+                  ),
                 ),
             ],
           ),
@@ -1066,6 +1074,244 @@ class _GununAyetiCard extends StatelessWidget {
     );
   }
 
+  void _sureyiGoster(BuildContext context, int sureNo, int targetAyet, AppThemeColors r) {
+  final sureAdi = quran.getSurahNameTurkish(sureNo);
+  final ayetSayisi = quran.getVerseCount(sureNo);
+
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: "Sure Detay",
+    barrierColor: Colors.black.withOpacity(0.85), // Arka planı biraz daha koyulaştırdım
+    transitionDuration: const Duration(milliseconds: 500),
+    pageBuilder: (context, anim1, anim2) {
+      final scrollController = ScrollController();
+      
+      // Build tamamlandıktan sonra hedef ayete kaydır
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (targetAyet > 1 && scrollController.hasClients) {
+          // Tahmini bir offset hesabı yerine daha stabil bir değer
+          final offset = (targetAyet - 1) * 210.0; 
+          scrollController.animateTo(
+            offset.clamp(0, scrollController.position.maxScrollExtent),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOutExpo,
+          );
+        }
+      });
+
+      return Align(
+        alignment: Alignment.center,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: Responsive.w(15), vertical: Responsive.h(40)),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.92,
+              height: MediaQuery.of(context).size.height * 0.80,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color.alphaBlend(Colors.black.withOpacity(0.4), r.anaRenk),
+                    r.anaRenk,
+                    Color.alphaBlend(Colors.white.withOpacity(0.2), r.anaRenk),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(Responsive.w(28)),
+                boxShadow: [
+                  BoxShadow(
+                    color: r.anaRenk.withOpacity(0.4),
+                    blurRadius: 25,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(Responsive.w(28)),
+                child: Column(
+                  children: [
+                    // --- BAŞLIK ALANI ---
+                    _buildModalHeader(context, sureAdi, ayetSayisi, r),
+
+                    // --- AYETLER LİSTESİ ---
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(Responsive.w(20), Responsive.h(10), Responsive.w(20), Responsive.h(30)),
+                        itemCount: ayetSayisi,
+                        itemBuilder: (context, index) {
+                          // KRİTİK: index her zaman 0'dan başlar, ayetNo 1'den.
+                          final int currentAyetNo = index + 1;
+                          final bool isTarget = currentAyetNo == targetAyet;
+
+                          return Container(
+                            key: ValueKey('ayet_card_$sureNo\_$currentAyetNo'),
+                            margin: EdgeInsets.only(bottom: Responsive.h(16)),
+                            padding: EdgeInsets.all(Responsive.w(16)),
+                            decoration: BoxDecoration(
+                              color: isTarget ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(Responsive.w(20)),
+                              border: Border.all(
+                                color: isTarget ? Colors.white.withOpacity(0.5) : Colors.white.withOpacity(0.1),
+                                width: isTarget ? 1.5 : 0.5,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Ayet Numarası ve Arapça Metin
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildAyetNoBadge(currentAyetNo, isTarget, r),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        quran.getVerse(sureNo, currentAyetNo, verseEndSymbol: true),
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          fontSize: Responsive.sp(22),
+                                          fontFamily: 'Amiri', // Arapça fontu yüklü olmalı
+                                          color: Colors.white,
+                                          height: 1.8,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                // Türkçe Meal (Tekrarlı çevirileri önleme mantığı)
+                                Builder(
+                                  builder: (context) {
+                                    final currentTranslation = quran.getVerseTranslation(
+                                      sureNo, 
+                                      currentAyetNo, 
+                                      translation: quran.Translation.trSaheeh
+                                    );
+                                    
+                                    bool isDuplicate = false;
+                                    if (currentAyetNo > 1) {
+                                      final previousTranslation = quran.getVerseTranslation(
+                                        sureNo, 
+                                        currentAyetNo - 1, 
+                                        translation: quran.Translation.trSaheeh
+                                      );
+                                      isDuplicate = currentTranslation == previousTranslation;
+                                    }
+
+                                    if (isDuplicate) {
+                                      return Text(
+                                        "(Önceki ayetin mealine dâhildir)",
+                                        style: TextStyle(
+                                          fontSize: Responsive.sp(12),
+                                          color: Colors.white.withOpacity(0.5),
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      );
+                                    }
+
+                                    return Text(
+                                      currentTranslation,
+                                      style: TextStyle(
+                                        fontSize: Responsive.sp(isTarget ? 15 : 14),
+                                        color: Colors.white.withOpacity(isTarget ? 1.0 : 0.85),
+                                        fontWeight: isTarget ? FontWeight.bold : FontWeight.normal,
+                                        fontStyle: FontStyle.italic,
+                                        height: 1.5,
+                                      ),
+                                    );
+                                  }
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (context, anim1, anim2, child) {
+      return FadeTransition(
+        opacity: anim1,
+        child: ScaleTransition(
+          scale: CurvedAnimation(parent: anim1, curve: Curves.easeInOut),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+// Başlık için yardımcı widget
+Widget _buildModalHeader(BuildContext context, String name, int count, AppThemeColors r) {
+  return Container(
+    padding: EdgeInsets.all(Responsive.w(20)),
+    decoration: BoxDecoration(
+      color: Colors.black.withOpacity(0.1),
+      border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
+    ),
+    child: Row(
+      children: [
+        IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          style: IconButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.1)),
+        ),
+        const Spacer(),
+        Column(
+          children: [
+            Text(
+              name.toUpperCase(),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: Responsive.sp(14),
+                letterSpacing: 2,
+              ),
+            ),
+            Text(
+              "$count Ayet-i Kerime",
+              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: Responsive.sp(11)),
+            ),
+          ],
+        ),
+        const Spacer(),
+        const SizedBox(width: 48), // Simetri dengelemesi
+      ],
+    ),
+  );
+}
+
+// Ayet numarası rozeti
+Widget _buildAyetNoBadge(int no, bool isTarget, AppThemeColors r) {
+  return Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: isTarget ? Colors.white : Colors.white.withOpacity(0.1),
+      shape: BoxShape.circle,
+      boxShadow: isTarget ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
+    ),
+    child: Text(
+      "$no",
+      style: TextStyle(
+        color: isTarget ? r.anaRenk : Colors.white,
+        fontWeight: FontWeight.bold,
+        fontSize: 12,
+      ),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final r = context.renkler;
@@ -1183,27 +1429,38 @@ class _GununAyetiCard extends StatelessWidget {
                 shadows: [Shadow(blurRadius: 4, color: Colors.black26)],
               ),
             ),
-            if (!isFullText) SizedBox(height: Responsive.h(5)),
-            if (isFullText) SizedBox(height: Responsive.h(30)),
-            ElevatedButton.icon(
-              onPressed: () {
-                Share.share(
-                  "Günün Ayeti:\n\n\"${provider.gununAyetiMeali}\"\n\n(${provider.gununAyetiReferans})",
-                );
-              },
-              icon: Icon(Icons.share_rounded, size: Responsive.w(18), color: r.anaRenk),
-              label: Text("Paylaş", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Responsive.w(15)),
+            if (isFullText) SizedBox(height: Responsive.h(20)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Share.share(
+                      "Günün Ayeti:\n\n\"${provider.gununAyetiMeali}\"\n\n(${provider.gununAyetiReferans})",
+                    );
+                  },
+                  icon: Icon(Icons.share_rounded, size: Responsive.w(16), color: r.anaRenk),
+                  label: Text("Paylaş", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12))),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(12)),
+                  ),
                 ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.w(24),
-                  vertical: Responsive.h(10),
+                SizedBox(width: Responsive.w(8)),
+                ElevatedButton.icon(
+                  onPressed: () => _sureyiGoster(context, provider.gununAyetiSureNo, provider.gununAyetiNo, r),
+                  icon: Icon(Icons.menu_book_rounded, size: Responsive.w(16), color: Colors.white),
+                  label: Text("Sureyi İncele", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12))),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(12)),
+                  ),
                 ),
-              ),
+              ],
             ),
             if (isFullText) ...[
               SizedBox(height: Responsive.h(16)),

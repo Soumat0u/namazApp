@@ -791,9 +791,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildMiniStat(r, "Namaz", "+25 XP", Icons.mosque_rounded),
-              _buildMiniStat(r, "Zikir", "+10 XP", Icons.circle_outlined),
-              _buildMiniStat(r, "Dua", "+5 XP", Icons.volunteer_activism_rounded),
+              _buildMiniStat(r, "Namaz", "+XP", Icons.mosque_rounded),
+              _buildMiniStat(r, "Zikir", "+XP", Icons.circle_outlined),
+              _buildMiniStat(r, "Dua", "+XP", Icons.volunteer_activism_rounded),
             ],
           ),
         ],

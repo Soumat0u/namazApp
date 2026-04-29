@@ -1,6 +1,7 @@
 class SeviyeServisi {
   static const int namazXp = 20; // Her vaktin ödülü
   static const int tamGunBonusu = 25; // 5 vakit tamamlanınca gelen ekstra
+  static const int aminXp = 1; // Dua beğenme ödülü
 
   static final Map<int, String> unvanlar = {
     0: "Talip",

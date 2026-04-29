@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "namaz_app" "\0"
+            VALUE "FileDescription", "Takva Yolum" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "namaz_app" "\0"
+            VALUE "InternalName", "Takva Yolum" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "namaz_app.exe" "\0"
-            VALUE "ProductName", "namaz_app" "\0"
+            VALUE "OriginalFilename", "Takva Yolum.exe" "\0"
+            VALUE "ProductName", "Takva Yolum" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

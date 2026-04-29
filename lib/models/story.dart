@@ -8,6 +8,9 @@ class UserStory {
   final String imageUrl; // Base64 string
   final DateTime createdAt;
 
+  final List<String> viewers;
+  final List<Map<String, dynamic>> viewerProfiles; // [{uid, displayName, photoUrl}]
+
   UserStory({
     required this.uid,
     required this.username,
@@ -15,6 +18,8 @@ class UserStory {
     this.photoUrl,
     required this.imageUrl,
     required this.createdAt,
+    this.viewers = const [],
+    this.viewerProfiles = const [],
   });
 
   factory UserStory.fromFirestore(DocumentSnapshot doc) {
@@ -26,6 +31,8 @@ class UserStory {
       photoUrl: data['photoUrl'],
       imageUrl: data['imageUrl'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      viewers: List<String>.from(data['viewers'] ?? []),
+      viewerProfiles: List<Map<String, dynamic>>.from(data['viewerProfiles'] ?? []),
     );
   }
 
@@ -37,6 +44,8 @@ class UserStory {
       'photoUrl': photoUrl,
       'imageUrl': imageUrl,
       'createdAt': Timestamp.fromDate(createdAt),
+      'viewers': viewers,
+      'viewerProfiles': viewerProfiles,
     };
   }
 }

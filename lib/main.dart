@@ -66,7 +66,7 @@ class NamazTakipApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Takva Yolu',
+      title: 'Takva Yolum',
       theme: themeProvider.buildThemeData(),
       home: const _AuthGate(),
     );
