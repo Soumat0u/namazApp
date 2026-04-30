@@ -28,7 +28,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   final TextEditingController _duaController = TextEditingController();
   final FocusNode _duaFocusNode = FocusNode();
   final FirebaseService _firebaseService = FirebaseService();
-  int _selectedTab = 0; // 0: Dualarım, 1: Arkadaşların, 2: Keşfet
+  int _selectedTab = 0; // 0: Dualarım, 1: Arkadaşların, 2: Global
 
 
   // 🔥 Stream'leri cache'le — her rebuild'de yeniden oluşmasını engelle
@@ -46,14 +46,18 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   List<String> _lastFriendsList = [];
   Stream<List<PrayerPost>>? _cachedFriendsStream;
 
+  bool _isSubmitting = false; // Paylaşım kontrolü
+  String _lastSubmittedText = ""; // Mükerrer kayıt kontrolü
+
 
   @override
   void initState() {
     super.initState();
+    final currentUid = Provider.of<NamazProvider>(context, listen: false).currentUid;
     _leaderboardStream = _firebaseService.getLeaderboard(limit: 5);
     _fullLeaderboardStream = _firebaseService.getLeaderboard(limit: 50);
-    _fullPrayersStream = _firebaseService.getPrayers(limit: 50);
-    _cachedDiscoverStream = _firebaseService.getPrayers(limit: 10);
+    _fullPrayersStream = _firebaseService.getPrayers(limit: 200, excludeUid: currentUid);
+    _cachedDiscoverStream = _firebaseService.getPrayers(limit: 10, excludeUid: currentUid);
     _cachedMyPrayersStream = null; // build içinde UID geldikçe oluşacak
 
     // 🔥 Sosyal akış önbelleğini Firestore'dan veri geldikçe güncelle
@@ -78,12 +82,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     final r = context.renkler;
 
     // 🔥 BUGÜNKÜ XP HESAPLAMA (PRATİK YÖNTEM)
-    int bugunNamazXp = provider.kildiMi.values.where((v) => v).length * SeviyeServisi.namazXp;
-    if (provider.kildiMi.values.every((v) => v)) bugunNamazXp += SeviyeServisi.tamGunBonusu;
-    
-    final bugunStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    int bugunZikirXp = ((provider.zikirGecmisi[bugunStr] ?? 0) / 10).floor();
-    int toplamBugunXp = bugunNamazXp + bugunZikirXp;
+    int toplamBugunXp = provider.bugunKazanilanXp;
 
     return Scaffold(
       backgroundColor: r.arkaPlanRengi,
@@ -167,8 +166,8 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                     child: Row(
                       children: [
                         _buildMeclisTabButton("Dualarım", 0, r),
-                        _buildMeclisTabButton("Arkadaşların", 1, r),
-                        _buildMeclisTabButton("Keşfet", 2, r),
+                        _buildMeclisTabButton("Arkadaşlar", 1, r),
+                        _buildMeclisTabButton("Global", 2, r),
                       ],
                     ),
                   )
@@ -341,10 +340,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   GestureDetector(
                     onTap: () async {
                       if (hasActiveStory && provider.currentUid != null) {
-                        final story = await provider.hikayeGetir(provider.currentUid!);
-                        if (story != null && context.mounted) {
-                          _showStoryViewer(context, r, story);
-                        }
+                        _openStoryViewerWithContext(context, provider, provider.currentUid!, r);
                       }
                     },
                     child: Container(
@@ -542,18 +538,15 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   return GestureDetector(
                     onTap: () async {
                       if (hasActiveStory) {
-                        final story = await provider.hikayeGetir(friend.uid);
-                        if (story != null && mounted) {
-                          // Eğer kendi hikayesi değilse izlenme kaydı yap
-                          if (friend.uid != provider.currentUid) {
-                            _firebaseService.recordStoryView(
-                              storyUid: friend.uid,
-                              viewerUid: provider.currentUid!,
-                              viewerDisplayName: provider.currentUsername,
-                            );
-                          }
-                          _showStoryViewer(context, r, story);
+                        // Eğer kendi hikayesi değilse izlenme kaydı yap (Arka planda)
+                        if (friend.uid != provider.currentUid) {
+                          _firebaseService.recordStoryView(
+                            storyUid: friend.uid,
+                            viewerUid: provider.currentUid!,
+                            viewerDisplayName: provider.currentUsername,
+                          );
                         }
+                        _openStoryViewerWithContext(context, provider, friend.uid, r);
                       }
                     },
                     child: Container(
@@ -912,7 +905,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           }
         }
         if (_selectedTab == 2 && _cachedDiscoverStream == null) {
-          _cachedDiscoverStream = _firebaseService.getPrayers(limit: 10);
+          _cachedDiscoverStream = _firebaseService.getPrayers(limit: 10, excludeUid: provider.currentUid);
         }
 
         // Aktif sekmenin stream'ini al
@@ -928,7 +921,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         return StreamBuilder<List<PrayerPost>>(
           stream: prayerStream,
           builder: (context, snapshot) {
-            // 🔥 FLUID UX: Keşfet sekmesinde önbellekteki duaları göster, ama diğer sekmelerde datayı bekle
+            // 🔥 FLUID UX: Global sekmesinde önbellekteki duaları göster, ama diğer sekmelerde datayı bekle
             final currentPrayers = snapshot.data ?? ( _selectedTab == 2 ? provider.cachedPrayers.take(5).toList() : [] );
 
             if (snapshot.connectionState == ConnectionState.waiting && currentPrayers.isEmpty) {
@@ -942,7 +935,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               String msg = "Henüz bir dua paylaşılmamış.";
               if (_selectedTab == 0) msg = "Henüz bir dua paylaşmadın.";
               if (_selectedTab == 1) msg = "Arkadaşlarından henüz bir paylaşım yok.";
-              if (_selectedTab == 2) msg = "Şu an keşfedilecek yeni bir dua bulunmuyor.";
+              if (_selectedTab == 2) msg = "Şu an globalde yeni bir dua bulunmuyor.";
 
               return _buildEmptyState(r, "Dua Meclisi", msg);
             }
@@ -969,7 +962,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                         title: "Arkadaşlarının Duaları"
                       );
                     } else {
-                      _showDuaDuvari(context, r); 
+                      _showDuaDuvari(context, r, customStream: _firebaseService.getPrayers(limit: 100, excludeUid: provider.currentUid)); 
                     }
                   },
                   icon: Icon(Icons.arrow_forward_rounded, color: r.anaRenk, size: 18),
@@ -1043,7 +1036,21 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                           index: index,
                           onReelTap: (list, idx) { 
                             FocusScope.of(context).unfocus(); 
-                            _showPrayerReels(context, r, list, idx); 
+                            
+                            // Eğer Global akışındaysak (customStream null ise) tüm arşivi kullan
+                            List<PrayerPost> swipeList = list;
+                            int swipeIdx = idx;
+                            
+                            if (customStream == null && provider.cachedPrayers.isNotEmpty) {
+                              swipeList = provider.cachedPrayers;
+                              swipeIdx = swipeList.indexWhere((p) => p.id == list[idx].id);
+                              if (swipeIdx == -1) {
+                                swipeList = list;
+                                swipeIdx = idx;
+                              }
+                            }
+                            
+                            _showPrayerReels(context, r, swipeList, swipeIdx); 
                           },
                         );
                       },
@@ -1065,7 +1072,23 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
     return GestureDetector(
       key: ValueKey(prayer.id),
-      onTap: () => _showPrayerReels(context, r, allPrayers, index),
+      onTap: () {
+        // Eğer Global sekmesindeysek tüm arşivi (cache) kullan
+        List<PrayerPost> swipeList = allPrayers;
+        int swipeIndex = index;
+
+        if (_selectedTab == 2 && provider.cachedPrayers.isNotEmpty) {
+          swipeList = provider.cachedPrayers;
+          swipeIndex = swipeList.indexWhere((p) => p.id == prayer.id);
+          // Eğer tıklanan dua cache'de yoksa (nadir), mevcut listeyi kullanmaya devam et
+          if (swipeIndex == -1) {
+            swipeList = allPrayers;
+            swipeIndex = index;
+          }
+        }
+        
+        _showPrayerReels(context, r, swipeList, swipeIndex);
+      },
       child: Card(
         margin: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(8)),
         color: r.kartRengi,
@@ -1178,6 +1201,16 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
   void _showPrayerReels(BuildContext context, AppThemeColors r, List<PrayerPost> prayers, int initialIndex) {
     FocusScope.of(context).unfocus();
+
+    // 1. Tıklanan duayı bul
+    final clickedPrayer = prayers[initialIndex];
+    
+    // 2. Diğer tüm duaları al ve karıştır
+    final otherPrayers = prayers.where((p) => p.id != clickedPrayer.id).toList()..shuffle();
+    
+    // 3. Tıklanan duayı en başa koy, diğerlerini arkasına ekle
+    final finalPrayers = [clickedPrayer, ...otherPrayers];
+
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -1193,10 +1226,10 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               children: [
                 PageView.builder(
                   scrollDirection: Axis.vertical,
-                  controller: PageController(initialPage: initialIndex),
-                  itemCount: prayers.length,
+                  controller: PageController(initialPage: 0),
+                  itemCount: finalPrayers.length,
                   itemBuilder: (context, index) {
-                    final prayer = prayers[index];
+                    final prayer = finalPrayers[index];
                     return Center(
                       child: Container(
                         margin: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
@@ -1395,25 +1428,32 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               const SizedBox(width: 8),
               Text(
                 "Dua Ekle",
-                style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.bold, fontSize: Responsive.sp(15)),
+                style: TextStyle(
+                  color: r.yaziRengi, 
+                  fontWeight: FontWeight.bold, 
+                  fontSize: Responsive.sp(15),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-            TextField(
-              controller: _duaController,
-              focusNode: _duaFocusNode,
-              autofocus: false,
-              onTapOutside: (event) => _duaFocusNode.unfocus(),
-              maxLines: 3,
-              maxLength: 500,
+          TextField(
+            controller: _duaController,
+            focusNode: _duaFocusNode,
+            autofocus: false,
+            onTapOutside: (event) => _duaFocusNode.unfocus(),
+            maxLines: 3,
+            maxLength: 500,
             style: TextStyle(color: r.yaziRengi, fontSize: Responsive.sp(14)),
             decoration: InputDecoration(
               hintText: "Duanızı buraya yazın...",
               hintStyle: TextStyle(color: r.yaziRengi.withOpacity(0.3)),
               filled: true,
               fillColor: r.arkaPlanRengi,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15), 
+                borderSide: BorderSide.none,
+              ),
               contentPadding: const EdgeInsets.all(12),
               counterStyle: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10)),
             ),
@@ -1423,9 +1463,21 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
             width: double.infinity,
             height: Responsive.h(45),
             child: ElevatedButton(
-              onPressed: () async {
+              onPressed: _isSubmitting ? null : () async {
                 final text = _duaController.text.trim();
                 
+                if (text.isEmpty) return;
+
+                // Mükerrer kayıt kontrolü
+                if (text == _lastSubmittedText) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Aynı duayı az önce paylaştınız.")),
+                    );
+                  }
+                  return;
+                }
+
                 // İçerik moderasyonu
                 final validationError = ContentModeration.metinDogrula(text);
                 if (validationError != null) {
@@ -1446,18 +1498,35 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   return;
                 }
 
-                await _firebaseService.addPrayer(
-                  text: text,
-                  senderUid: provider.currentUid!,
-                  senderName: provider.currentUsername,
-                  senderUsername: provider.currentHandle,
-                );
+                setState(() => _isSubmitting = true);
 
-                _duaController.clear();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Duanız meclise iletildi. Allah kabul etsin!")),
+                try {
+                  await _firebaseService.addPrayer(
+                    text: text,
+                    senderUid: provider.currentUid!,
+                    senderName: provider.currentUsername,
+                    senderUsername: provider.currentHandle,
                   );
+
+                  // 🔥 XP KAZANDIRMA
+                  await provider.xpEkle(SeviyeServisi.duaXp);
+
+                  _lastSubmittedText = text; // Başarılıysa kaydet
+                  _duaController.clear();
+                  
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Duanız meclise iletildi. Allah kabul etsin!")),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Hata oluştu: $e")),
+                    );
+                  }
+                } finally {
+                  if (mounted) setState(() => _isSubmitting = false);
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -1465,13 +1534,22 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 elevation: 0,
               ),
-              child: const Text("Duanı Paylaş", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: _isSubmitting 
+                ? const SizedBox(
+                    width: 20, 
+                    height: 20, 
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text(
+                    "Duanı Paylaş", 
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
             ),
           ),
         ],
       ),
     );
-  }
+  } // <--- Buradaki noktali virgul (;) kaldirildi.
 
   // --- YARDIMCI WİDGET'LAR ---
 
@@ -2025,245 +2103,142 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   }
 
   
-  // ═══════════════════════════════════════════════
-// 📸 HİKAYE (STORY) GÖRÜNTÜLEYİCİ
+  // --- HİKAYE YÖNETİCİSİ (YÜKLEME VE AÇMA) ---
+  Future<void> _openStoryViewerWithContext(BuildContext context, NamazProvider provider, String targetUid, AppThemeColors r) async {
+    if (provider.currentUid == null) return;
+
+    // Arkadaş listesini al (Kendi hikayemiz de dahil edilecek)
+    final profile = await _firebaseService.getUserProfileFuture(provider.currentUid!);
+    final friends = profile?.friends ?? [];
+
+    // Tüm aktif hikayeleri çek
+    List<UserStory> allStories = await _firebaseService.getActiveStoriesFuture(friends, provider.currentUid!);
+    
+    if (allStories.isEmpty) return;
+
+    // 🔥 MANTIĞI GÜNCELLE:
+    // Eğer kendi storymize tıkladıysak SADECE kendi storymizi görelim.
+    // Eğer arkadaş storysine tıkladıysak SADECE arkadaşların storylerini görelim (kendimizinkini listeden çıkaralım).
+    if (targetUid == provider.currentUid) {
+      allStories = allStories.where((s) => s.uid == provider.currentUid).toList();
+    } else {
+      allStories = allStories.where((s) => s.uid != provider.currentUid).toList();
+    }
+
+    if (allStories.isEmpty) return;
+
+    // Tıklanan kullanıcının hikayesinin indexini bul
+    int initialIndex = allStories.indexWhere((s) => s.uid == targetUid);
+    if (initialIndex == -1) initialIndex = 0;
+
+    if (context.mounted) {
+      _showStoryViewer(context, r, allStories, initialIndex);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+// 📸 GELİŞMİŞ HİKAYE (STORY) GÖRÜNTÜLEYİCİ
 // ═══════════════════════════════════════════════
 
-void _showStoryViewer(BuildContext context, AppThemeColors r, UserStory story) {
+void _showStoryViewer(BuildContext context, AppThemeColors r, List<UserStory> stories, int initialIndex) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: "Story",
-    barrierColor: Colors.black.withOpacity(0.95), // Arka planı daha koyu ve şık yaptık
+    barrierColor: Colors.black.withOpacity(0.85),
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, anim1, anim2) {
-      final isMe = story.uid == context.read<NamazProvider>().currentUid;
-      
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        // 1. KRİTİK DEĞİŞİKLİK: Tüm ekranı SafeArea içine aldık, böylece çentik (notch) sorunu kökten çözüldü.
-        body: SafeArea(
-          child: GestureDetector(
-            onTap: () => Navigator.pop(context),
-            behavior: HitTestBehavior.opaque,
-            child: Stack(
-              children: [
-                // 2. HİKAYE GÖRSELİ
-                // Hero widget'ını kaldırdık çünkü kaynakta Hero yoksa animasyon sırasında taşma hatası (overflow) verir.
-                Align(
-                  alignment: Alignment.center,
-                  child: Padding(
-                    // Ekran boyutundan bağımsız, sabit güvenli boşluklar kullandık.
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 80),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: Image.memory(
-                        base64Decode(story.imageUrl),
-                        fit: BoxFit.contain,
-                        width: double.infinity,
-                      ),
-                    ),
-                  ),
-                ),
-                
-                // 3. ÜST BAR (Kullanıcı Bilgisi ve Kapatma Butonu)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.black.withOpacity(0.8), Colors.transparent],
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // İlerleme Çubuğu
-                        Container(
-                          height: 2.5,
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        // Profil Bilgileri
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 20,
-                              backgroundColor: r.anaRenk.withOpacity(0.5),
-                              child: Text(story.displayName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    story.displayName, 
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), 
-                                    maxLines: 1, 
-                                    overflow: TextOverflow.ellipsis
-                                  ),
-                                  Text(
-                                    "@${story.username} • ${DateFormat('HH:mm').format(story.createdAt)}", 
-                                    style: const TextStyle(color: Colors.white70, fontSize: 12), 
-                                    maxLines: 1, 
-                                    overflow: TextOverflow.ellipsis
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (isMe)
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.white),
-                                onPressed: () async {
-                                  await _firebaseService.deleteStory(story.uid);
-                                  if (context.mounted) Navigator.pop(context);
-                                },
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+      return _StoryViewerContent(
+        stories: stories,
+        initialIndex: initialIndex,
+        r: r,
+      );
+    },
+  );
+}
 
-                // 4. ALT BİLGİ (İzleyenler)
-                if (isMe)
-                  Positioned(
-                    bottom: 30,
-                    left: 0,
-                    right: 0,
-                    child: StreamBuilder<DocumentSnapshot>(
-                      stream: FirebaseFirestore.instance.collection('stories').doc(story.uid).snapshots(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox();
-                        final currentStory = UserStory.fromFirestore(snapshot.data!);
-                        
-                        // İzleyen listesindeki taşma sorununu engellemek için tasarımı estetik bir "Hap (Pill)" butona çevirdik
-                        return GestureDetector(
-                          onTap: () => _showStoryViewersList(context, r, currentStory),
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(color: Colors.white24),
-                                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.visibility_rounded, color: Colors.white, size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "${currentStory.viewers.length} Görüntüleme",
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                ],
-                              ),
+// ═══════════════════════════════════════════════
+// 👁 HİKAYEYİ GÖRENLER LİSTESİ (BOTTOM SHEET)
+// ═══════════════════════════════════════════════
+Future<void> _showStoryViewersList(BuildContext context, AppThemeColors r, UserStory story) async {
+  await showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) {
+      return Container(
+        height: MediaQuery.of(context).size.height * 0.5,
+        decoration: BoxDecoration(
+          color: r.arkaPlanRengi,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: r.pasifRenk.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "${story.viewerProfiles.length} Görüntüleme",
+              style: TextStyle(
+                color: r.yaziRengi,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Divider(color: r.pasifRenk.withOpacity(0.2)),
+            Expanded(
+              child: story.viewerProfiles.isEmpty
+                  ? Center(
+                      child: Text(
+                        "Hikayeni henüz kimse görmedi.",
+                        style: TextStyle(color: r.yaziRengi.withOpacity(0.5)),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      itemCount: story.viewerProfiles.length,
+                      itemBuilder: (context, index) {
+                        final viewer = story.viewerProfiles[index];
+                        final name = viewer['displayName'] ?? "İsimsiz Kardeş";
+                        final time = viewer['viewedAt'] != null 
+                            ? (viewer['viewedAt'] as Timestamp).toDate().zamanFarki 
+                            : "";
+
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: r.anaRenk.withOpacity(0.1),
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : "?",
+                              style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold),
                             ),
+                          ),
+                          title: Text(
+                            name, 
+                            style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            time,
+                            style: TextStyle(color: r.pasifRenk, fontSize: 12),
                           ),
                         );
-                      }
+                      },
                     ),
-                  ),
-              ],
             ),
-          ),
+          ],
         ),
       );
     },
   );
 }
-}
-
-  // ═══════════════════════════════════════════════
-  // 👁 HİKAYEYİ GÖRENLER LİSTESİ (BOTTOM SHEET)
-  // ═══════════════════════════════════════════════
-  void _showStoryViewersList(BuildContext context, AppThemeColors r, UserStory story) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.5, // Ekranın yarısı kadar açılır
-          decoration: BoxDecoration(
-            color: r.arkaPlanRengi,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              // Üstteki küçük tutamaç (Handle)
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: r.pasifRenk.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Başlık
-              Text(
-                "${story.viewers.length} Görüntüleme",
-                style: TextStyle(
-                  color: r.yaziRengi,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Divider(color: r.pasifRenk.withOpacity(0.2)),
-              
-              // Liste
-              Expanded(
-                child: story.viewers.isEmpty
-                    ? Center(
-                        child: Text(
-                          "Hikayeni henüz kimse görmedi.",
-                          style: TextStyle(color: r.yaziRengi.withOpacity(0.5)),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: story.viewers.length,
-                        itemBuilder: (context, index) {
-                          // Şimdilik sadece ikon ve standart metin
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: r.anaRenk.withOpacity(0.2),
-                              child: Icon(Icons.person, color: r.anaRenk),
-                            ),
-                            title: Text(
-                              "Görüntüleyen Kardeşin", 
-                              style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w600),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
 // ═══════════════════════════════════════════════
 // DUA GRID KART (Dua Duvarı modal'ında kullanılır)
@@ -2518,6 +2493,282 @@ class _AminParticleButtonState extends State<AminParticleButton> with SingleTick
           child: widget.child,
         ),
       ],
+    );
+  }
+}
+
+
+class _StoryViewerContent extends StatefulWidget {
+  final List<UserStory> stories;
+  final int initialIndex;
+  final AppThemeColors r;
+
+  const _StoryViewerContent({
+    required this.stories,
+    required this.initialIndex,
+    required this.r,
+  });
+
+  @override
+  State<_StoryViewerContent> createState() => _StoryViewerContentState();
+}
+
+class _StoryViewerContentState extends State<_StoryViewerContent> with TickerProviderStateMixin {
+  late PageController _pageController;
+  late AnimationController _progressController;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    );
+
+    _startStory();
+    
+    _progressController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _nextStory();
+      }
+    });
+  }
+
+  void _startStory() {
+    _progressController.stop();
+    _progressController.reset();
+    _progressController.forward();
+  }
+
+  void _nextStory() {
+    if (_currentIndex < widget.stories.length - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  void _previousStory() {
+    if (_currentIndex > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _progressController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.stories.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          _startStory();
+        },
+        itemBuilder: (context, index) {
+          final story = widget.stories[index];
+          final isMe = story.uid == context.read<NamazProvider>().currentUid;
+
+          return Stack(
+            children: [
+              // 1. BULANIK ARKA PLAN
+              Positioned.fill(
+                child: Image.memory(
+                  base64Decode(story.imageUrl),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                  child: Container(color: Colors.black.withOpacity(0.4)),
+                ),
+              ),
+
+              // 2. ANA İÇERİK
+              SafeArea(
+                child: Column(
+                  children: [
+                    // İlerleme Çubuğu ve Üst Bar
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Column(
+                        children: [
+                          // 🔥 İlerleme Çubuğu - Her kullanıcının tek story'si olduğu için tek parça
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                  child: AnimatedBuilder(
+                                    animation: _progressController,
+                                    builder: (context, child) {
+                                      return FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: _progressController.value,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: widget.r.anaRenk.withOpacity(0.5),
+                                child: Text(story.displayName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(story.displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                                    Text("@${story.username} • ${story.createdAt.zamanFarki}", style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
+                              if (isMe)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.white),
+                                  onPressed: () async {
+                                    _progressController.stop();
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text("Hikayeyi Sil"),
+                                        content: const Text("Bu hikayeyi silmek istediğinize emin misiniz?"),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Vazgeç")),
+                                          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Sil")),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed == true) {
+                                      await FirebaseService().deleteStory(story.uid);
+                                      if (context.mounted) Navigator.pop(context);
+                                    } else {
+                                      _progressController.forward();
+                                    }
+                                  },
+                                ),
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Hikaye Görseli
+                    Expanded(
+                      child: GestureDetector(
+                        onTapDown: (details) {
+                          final screenWidth = MediaQuery.of(context).size.width;
+                          if (details.globalPosition.dx < screenWidth / 3) {
+                            _previousStory();
+                          } else {
+                            _nextStory();
+                          }
+                        },
+                        onLongPressStart: (_) => _progressController.stop(),
+                        onLongPressEnd: (_) => _progressController.forward(),
+                        child: Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20)],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Image.memory(
+                              base64Decode(story.imageUrl),
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // İzleyenler Barı (Benim hikayemse)
+                    if (isMe)
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance.collection('stories').doc(story.uid).snapshots(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox(height: 100);
+                          final currentStory = UserStory.fromFirestore(snapshot.data!);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 30),
+                            child: GestureDetector(
+                              onTap: () {
+                                _progressController.stop();
+                                _showStoryViewersList(context, widget.r, currentStory).then((_) {
+                                  _progressController.forward();
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.6),
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(color: Colors.white24),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.visibility_rounded, color: Colors.white, size: 18),
+                                    const SizedBox(width: 8),
+                                    Text("${currentStory.viewers.length} Görüntüleme", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                      )
+                    else
+                      const SizedBox(height: 100),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

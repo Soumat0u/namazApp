@@ -27,6 +27,8 @@ class NamazProvider extends ChangeNotifier {
   // --- FIREBASE / AUTH DURUMLARI ---
   bool _needsProfile = false;
   bool get needsProfile => _needsProfile;
+  bool _isAuthReady = false;
+  bool get isAuthReady => _isAuthReady;
   String? _currentUid;
   String? get currentUid => _currentUid;
   String _currentUsername = '';
@@ -59,18 +61,34 @@ class NamazProvider extends ChangeNotifier {
   int get toplamXp => _toplamXp;
   String get mevcutUnvan => SeviyeServisi.unvanGetir(_toplamXp);
   double get seviyeIlerleme => SeviyeServisi.ilerlemeHesapla(_toplamXp);
-  
-  /// Dışarıdan XP eklemek için kullanılır (Örn: Dua beğenme)
-  Future<void> xpEkle(int miktar) async {
+
+  // 🔥 GÜNLÜK XP TAKİBİ
+  Map<String, int> _xpGecmisi = {};
+  Map<String, int> get xpGecmisi => _xpGecmisi;
+  int get bugunKazanilanXp => _xpGecmisi[getSanalGun()] ?? 0;
+
+  /// Merkezi XP güncelleme metodu
+  Future<void> _xpGuncelle(int miktar) async {
     final prefs = await SharedPreferences.getInstance();
+    final sanalBugun = getSanalGun();
+    
     _toplamXp += miktar;
-    if (_toplamXp < 0) _toplamXp = 0; // Negatif XP olmasın
+    if (_toplamXp < 0) _toplamXp = 0;
+    
+    // Günlük geçmişe işle
+    _xpGecmisi[sanalBugun] = (_xpGecmisi[sanalBugun] ?? 0) + miktar;
+    if ((_xpGecmisi[sanalBugun] ?? 0) < 0) _xpGecmisi[sanalBugun] = 0;
+    
     await prefs.setInt('toplam_xp', _toplamXp);
+    await prefs.setString('xpGecmisi', json.encode(_xpGecmisi));
     
-    // 🔥 FIREBASE CLOUD SYNC
     _firebaseCloudSync();
-    
     notifyListeners();
+  }
+  
+  /// Dışarıdan XP eklemek için kullanılır (Örn: Dua beğenme, dua ekleme)
+  Future<void> xpEkle(int miktar) async {
+    await _xpGuncelle(miktar);
   }
 
   String sonSifirlamaTarihi = "";
@@ -200,8 +218,10 @@ class NamazProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('🔐 Firebase auth kontrol hatası: $e');
       _needsProfile = true;
+    } finally {
+      _isAuthReady = true;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   /// Email/Şifre ile kayıt ol
@@ -212,8 +232,12 @@ class NamazProvider extends ChangeNotifier {
     required String username,
   }) async {
     // 1. Kullanıcı adının müsaitliğini kontrol et
-    final isAvailable = await _firebaseService.isUsernameAvailable(username);
-    if (!isAvailable) return 'Bu kullanıcı adı daha önce alınmış.';
+    try {
+      final isAvailable = await _firebaseService.isUsernameAvailable(username);
+      if (!isAvailable) return 'Bu kullanıcı adı daha önce alınmış.';
+    } catch (e) {
+      return e.toString();
+    }
 
     final result = await _firebaseService.registerWithEmail(
       email: email,
@@ -325,24 +349,27 @@ class NamazProvider extends ChangeNotifier {
         String base = googleName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
         if (base.isEmpty) base = 'kullanici';
 
-        final isAvailable = await _firebaseService.isUsernameAvailable(base);
-        
-        if (isAvailable) {
-          await _firebaseService.createUserProfile(
-            uid: user.uid,
-            username: base,
-            displayName: googleName,
-            initialXp: _toplamXp,
-            initialStreak: streakCount,
-          );
-          _currentUsername = googleName;
-          _currentHandle = base;
-          _needsProfile = false;
-          await prefs.setString('firebase_username', googleName);
-          await prefs.setString('firebase_handle', base);
-        } else {
-          // İsim doluysa UI'a sinyal gönder (UI modal açacak ve completeGoogleRegistration çağıracak)
-          return 'google_username_taken';
+        try {
+          final isAvailable = await _firebaseService.isUsernameAvailable(base);
+          if (isAvailable) {
+            await _firebaseService.createUserProfile(
+              uid: user.uid,
+              username: base,
+              displayName: googleName,
+              initialXp: _toplamXp,
+              initialStreak: streakCount,
+            );
+            _currentUsername = googleName;
+            _currentHandle = base;
+            _needsProfile = false;
+            await prefs.setString('firebase_username', googleName);
+            await prefs.setString('firebase_handle', base);
+          } else {
+            // İsim doluysa UI'a sinyal gönder (UI modal açacak ve completeGoogleRegistration çağıracak)
+            return 'google_username_taken';
+          }
+        } catch (e) {
+          return e.toString();
         }
       }
 
@@ -351,7 +378,7 @@ class NamazProvider extends ChangeNotifier {
       return null; // Hata yok
     } catch (e) {
       debugPrint('🔐 Google giriş hatası (Provider): $e');
-      return 'Google ile giriş yapılamadı.';
+      return e.toString().contains('İnternet') ? e.toString() : 'Google ile giriş yapılamadı.';
     }
   }
 
@@ -359,8 +386,12 @@ class NamazProvider extends ChangeNotifier {
   Future<String?> completeGoogleRegistration({required String username, required String displayName}) async {
     if (_currentUid == null) return 'Oturum bulunamadı.';
     
-    final isAvailable = await _firebaseService.isUsernameAvailable(username);
-    if (!isAvailable) return 'Bu kullanıcı adı daha önce alınmış.';
+    try {
+      final isAvailable = await _firebaseService.isUsernameAvailable(username);
+      if (!isAvailable) return 'Bu kullanıcı adı daha önce alınmış.';
+    } catch (e) {
+      return e.toString();
+    }
 
     final prefs = await SharedPreferences.getInstance();
     
@@ -601,6 +632,12 @@ class NamazProvider extends ChangeNotifier {
 
     // 🔥 XP YÜKLEME
     _toplamXp = prefs.getInt('toplam_xp') ?? 0;
+    final xpGecmisiStr = prefs.getString('xpGecmisi') ?? '{}';
+    try {
+      _xpGecmisi = Map<String, int>.from(json.decode(xpGecmisiStr));
+    } catch (_) {
+      _xpGecmisi = {};
+    }
 
     sonSifirlamaTarihi = prefs.getString('lastResetDate') ?? "";
     konumBilgisi = prefs.getString('cached_location') ?? "Yükleniyor...";
@@ -665,32 +702,24 @@ class NamazProvider extends ChangeNotifier {
       streakCount++;
       toplamTamamlanan++;
       
-      _toplamXp += SeviyeServisi.namazXp;
+      int miktar = SeviyeServisi.namazXp;
       int kilinanSayisi = kildiMi.values.where((v) => v == true).length;
       if (kilinanSayisi == 5) {
-        _toplamXp += SeviyeServisi.tamGunBonusu;
+        miktar += SeviyeServisi.tamGunBonusu;
       }
-      await prefs.setInt('toplam_xp', _toplamXp);
+      await _xpGuncelle(miktar);
       
     } else {
       if (streakCount > 0) streakCount--;
       if (toplamTamamlanan > 0) toplamTamamlanan--;
 
-      // Kaç adet işaretli kaldığına bak (Eğer 4 kaldıysa, demek ki az önce 5'ti ve bonus alınmıştı)
       int kilinanSayisi = kildiMi.values.where((v) => v == true).length;
       int geriAlinacakXp = SeviyeServisi.namazXp;
-      
-      // Eğer az önce 5'i bozup 4'e düşürdüyse haksız kazancı engellemek için Bonus'u da geri al
       if (kilinanSayisi == 4) {
         geriAlinacakXp += SeviyeServisi.tamGunBonusu;
       }
 
-      if (_toplamXp >= geriAlinacakXp) {
-        _toplamXp -= geriAlinacakXp;
-      } else {
-        _toplamXp = 0;
-      }
-      await prefs.setInt('toplam_xp', _toplamXp);
+      await _xpGuncelle(-geriAlinacakXp);
     }
     
     await prefs.setInt('streakCount', streakCount);
@@ -1020,7 +1049,7 @@ class NamazProvider extends ChangeNotifier {
               await _notificationService.scheduleNotification(
                 id: 100 + i,
                 title: 'Namaz Hatırlatması',
-                body: '$vakitAdi vaktine 20 dakika kaldı. $oncekiVakit namazını kılmış mıydın?',
+                body: '$vakitAdi vaktine 20 dakika kaldı. $oncekiVakit namazını kıldın mı?',
                 scheduledDate: reminderTime,
               );
             }
@@ -1106,13 +1135,9 @@ class NamazProvider extends ChangeNotifier {
 
     // Her 10 zikirde +1 XP
     if (_zikirSayaci % 10 == 0) {
-      _toplamXp += 1;
       _zikirXpKazanilan += 1;
-      await prefs.setInt('toplam_xp', _toplamXp);
       await prefs.setInt('zikirXpKazanilan', _zikirXpKazanilan);
-      
-      // 🔥 FIREBASE CLOUD SYNC
-      _firebaseCloudSync();
+      await _xpGuncelle(1);
     }
     
     notifyListeners();

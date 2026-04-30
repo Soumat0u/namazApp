@@ -42,25 +42,12 @@ class FirebaseService {
       debugPrint('🔐 Email ile kayıt başarılı: ${credential.user?.uid}');
       return (user: credential.user, error: null);
     } on FirebaseAuthException catch (e) {
-      String errorMsg;
-      switch (e.code) {
-        case 'weak-password':
-          errorMsg = 'Şifre çok zayıf. En az 6 karakter olmalı.';
-          break;
-        case 'email-already-in-use':
-          errorMsg = 'Bu e-posta adresi zaten kullanımda.';
-          break;
-        case 'invalid-email':
-          errorMsg = 'Geçersiz e-posta adresi.';
-          break;
-        default:
-          errorMsg = 'Kayıt hatası: ${e.message}';
-      }
-      debugPrint('🔐 Email kayıt hatası: $e');
+      String errorMsg = _handleAuthError(e);
+      debugPrint('🔐 Email kayıt hatası (${e.code}): ${e.message}');
       return (user: null, error: errorMsg);
     } catch (e) {
       debugPrint('🔐 Email kayıt hatası: $e');
-      return (user: null, error: 'Beklenmeyen bir hata oluştu.');
+      return (user: null, error: 'Beklenmeyen bir hata oluştu. İnternet bağlantınızı kontrol edin.');
     }
   }
 
@@ -77,29 +64,44 @@ class FirebaseService {
       debugPrint('🔐 Email ile giriş başarılı: ${credential.user?.uid}');
       return (user: credential.user, error: null);
     } on FirebaseAuthException catch (e) {
-      String errorMsg;
-      switch (e.code) {
-        case 'user-not-found':
-          errorMsg = 'Bu e-posta ile kayıtlı hesap bulunamadı.';
-          break;
-        case 'wrong-password':
-        case 'invalid-credential':
-          errorMsg = 'E-posta veya şifre hatalı.';
-          break;
-        case 'user-disabled':
-          errorMsg = 'Bu hesap devre dışı bırakılmış.';
-          break;
-        case 'invalid-email':
-          errorMsg = 'Geçersiz e-posta adresi.';
-          break;
-        default:
-          errorMsg = 'Giriş hatası: ${e.message}';
-      }
-      debugPrint('🔐 Email giriş hatası: $e');
+      String errorMsg = _handleAuthError(e);
+      debugPrint('🔐 Email giriş hatası (${e.code}): ${e.message}');
       return (user: null, error: errorMsg);
     } catch (e) {
       debugPrint('🔐 Email giriş hatası: $e');
-      return (user: null, error: 'Beklenmeyen bir hata oluştu.');
+      return (user: null, error: 'Beklenmeyen bir hata oluştu. İnternet bağlantınızı kontrol edin.');
+    }
+  }
+
+  /// Ortak Auth hata yakalayıcı
+  String _handleAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'network-request-failed':
+      case 'internal-error':
+      case 'unknown':
+        if (e.message?.contains('Chain validation failed') ?? false) {
+          return 'Bağlantı kurulamadı. Lütfen internet bağlantınızı veya cihaz saatini kontrol edin.';
+        }
+        return 'İnternet bağlantısı kurulamadı. Lütfen bağlantınızı kontrol edin.';
+      case 'user-not-found':
+        return 'Bu e-posta ile kayıtlı hesap bulunamadı.';
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'E-posta veya şifre hatalı.';
+      case 'user-disabled':
+        return 'Bu hesap devre dışı bırakılmış.';
+      case 'invalid-email':
+        return 'Geçersiz e-posta adresi.';
+      case 'weak-password':
+        return 'Şifre çok zayıf. En az 6 karakter olmalı.';
+      case 'email-already-in-use':
+        return 'Bu e-posta adresi zaten kullanımda.';
+      default:
+        // Her ihtimale karşı mesaj içinde SSL hatası arayalım
+        if (e.message?.contains('Chain validation failed') ?? false) {
+          return 'Güvenli bağlantı kurulamadı. Lütfen internet bağlantınızı veya cihaz saatini kontrol edin.';
+        }
+        return 'Hata: ${e.message ?? e.code}';
     }
   }
 
@@ -125,7 +127,10 @@ class FirebaseService {
       return userCredential.user;
     } catch (e) {
       debugPrint('🔐 Google giriş hatası: $e');
-      return null;
+      if (e.toString().contains('network_error') || e.toString().contains('SocketException')) {
+        throw 'İnternet bağlantısı kurulamadı. Lütfen kontrol edin.';
+      }
+      rethrow;
     }
   }
 
@@ -173,8 +178,18 @@ class FirebaseService {
     try {
       final doc = await _firestore.collection('usernames').doc(username).get();
       return !doc.exists;
-    } catch (_) {
-      return false; // Hata durumunda güvenlik için dolu farz et
+    } on FirebaseException catch (e) {
+      if (e.code == 'unavailable' || e.code == 'network-request-failed' || e.code == 'deadline-exceeded') {
+        throw 'İnternet bağlantısı yok veya sunucuya erişilemiyor.';
+      }
+      rethrow;
+    } catch (e) {
+      debugPrint('🔍 Username kontrol hatası: $e');
+      // Bağlantı hatalarını tahmin et
+      if (e.toString().contains('SocketException') || e.toString().contains('HandshakeException')) {
+        throw 'İnternet bağlantınızı kontrol edin.';
+      }
+      return false; // Diğer beklenmedik hatalarda güvenlik için dolu farz et
     }
   }
 
@@ -512,17 +527,19 @@ class FirebaseService {
   }
 
   /// Dua duvarını dinler (sadece onaylanan dualar, zamana göre sıralı)
-  Stream<List<PrayerPost>> getPrayers({int limit = 30}) {
+  Stream<List<PrayerPost>> getPrayers({int limit = 30, String? excludeUid}) {
     return _firestore
         .collection('prayers')
         .where('isApproved', isEqualTo: true)
         .orderBy('timestamp', descending: true)
-        .limit(limit)
+        .limit(limit + (excludeUid != null ? 1 : 0)) // Kendi duası çıkarsa yerine başkası gelsin diye +1
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      var list = snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
+          .where((prayer) => excludeUid == null || prayer.senderUid != excludeUid)
           .toList();
+      return list.take(limit).toList();
     }).asBroadcastStream();
   }
 
@@ -566,8 +583,8 @@ class FirebaseService {
     });
   }
 
-  /// Trendler / Keşfet: Son 24 saatte en çok Amîn alan dualar (Global)
-  Stream<List<PrayerPost>> getDiscoverPrayers({int limit = 30}) {
+  /// Trendler / Global: Son 24 saatte en çok Amîn alan dualar
+  Stream<List<PrayerPost>> getDiscoverPrayers({int limit = 30, String? excludeUid}) {
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
     return _firestore
         .collection('prayers')
@@ -578,6 +595,7 @@ class FirebaseService {
         .map((snapshot) {
       var list = snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
+          .where((prayer) => excludeUid == null || prayer.senderUid != excludeUid)
           .toList();
           
       // Dart (Istemci) uzerinde amîn sayısına göre sırala ki Firestore'da 
@@ -734,17 +752,42 @@ class FirebaseService {
   /// Arkadaşların aktif hikayelerini getirir (son 24 saat)
   Stream<List<UserStory>> getFriendStories(List<String> friendUids) {
     if (friendUids.isEmpty) return Stream.value([]);
-
     final yesterday = DateTime.now().subtract(const Duration(hours: 24));
-
     return _firestore
         .collection('stories')
-        .where('uid', whereIn: friendUids.take(10).toList())
-        .where('createdAt', isGreaterThan: Timestamp.fromDate(yesterday))
+        .where('uid', whereIn: friendUids.take(30).toSet().toList())
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) => UserStory.fromFirestore(doc)).toList();
+          return snapshot.docs
+              .map((doc) => UserStory.fromFirestore(doc))
+              .where((s) => s.createdAt.isAfter(yesterday))
+              .toList();
         });
+  }
+
+  /// Arkadaşların aktif hikayelerini getirir (son 24 saat) - Tek seferlik çekim
+  Future<List<UserStory>> getActiveStoriesFuture(List<String> friendUids, String currentUid) async {
+    final yesterday = DateTime.now().subtract(const Duration(hours: 24));
+    
+    // Hem benim hem arkadaşlarımın UID'lerini birleştir (Tekilleştirerek)
+    final allUids = {currentUid, ...friendUids}.toList();
+
+    // Sadece UID bazlı çekelim, tarihi hafızada filtreleyelim (İndeks hatasını önlemek için)
+    final query = await _firestore
+        .collection('stories')
+        .where('uid', whereIn: allUids.take(30).toList())
+        .get();
+
+    final stories = query.docs
+        .map((doc) => UserStory.fromFirestore(doc))
+        .where((s) => s.createdAt.isAfter(yesterday))
+        .toList();
+    
+    // Tıklama sırasına göre veya tarihe göre sıralayabiliriz. 
+    // Şimdilik tarihe göre (eskiden yeniye) sıralayalım.
+    stories.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    
+    return stories;
   }
 
   /// Belirli bir kullanıcının aktif hikayesini getirir

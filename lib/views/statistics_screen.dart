@@ -346,7 +346,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
                   ),
                   child: Icon(Icons.history_toggle_off_rounded, color: Colors.purple),
                 ),
-                title: Text("Huzur Meclisi'nde Paylaş", style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w600)),
+                title: Text("Takva Yolun'da Paylaş", style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w600)),
                 subtitle: Text("Takva Yolu arkadaşlarının görebileceği hikaye", style: TextStyle(color: r.pasifRenk, fontSize: 12)),
                 onTap: () async {
                   Navigator.pop(context);

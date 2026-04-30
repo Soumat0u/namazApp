@@ -107,8 +107,8 @@ class _AuthGateState extends State<_AuthGate> {
   Widget build(BuildContext context) {
     final provider = context.watch<NamazProvider>();
 
-    // Yükleniyor (Sadece initial shared prefs yüklemesi için)
-    if (_onboardingCompleted == null) {
+    // Yükleniyor (Shared prefs + Firebase Auth kontrolü)
+    if (_onboardingCompleted == null || !provider.isAuthReady) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -180,43 +180,46 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
 
     return Scaffold(
       body: IndexedStack(index: _seciliSayfaIndex, children: _sayfalar),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: tema.kartRengi,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          currentIndex: _seciliSayfaIndex,
-          selectedItemColor: tema.anaRenk,
-          unselectedItemColor: tema.pasifRenk,
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          iconSize: Responsive.w(22),
-          selectedFontSize: Responsive.sp(11),
-          unselectedFontSize: Responsive.sp(10),
-          onTap: (index) => setState(() => _seciliSayfaIndex = index),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'Ana Sayfa',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart_rounded),
-              label: 'İstatistik',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_alt_rounded),
-              label: 'Sosyal',
-            ),
-          ],
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          decoration: BoxDecoration(
+            color: tema.kartRengi,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 20,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: BottomNavigationBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            currentIndex: _seciliSayfaIndex,
+            selectedItemColor: tema.anaRenk,
+            unselectedItemColor: tema.pasifRenk,
+            showUnselectedLabels: true,
+            type: BottomNavigationBarType.fixed,
+            iconSize: Responsive.w(22),
+            selectedFontSize: Responsive.sp(11),
+            unselectedFontSize: Responsive.sp(10),
+            onTap: (index) => setState(() => _seciliSayfaIndex = index),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_rounded),
+                label: 'Ana Sayfa',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.bar_chart_rounded),
+                label: 'İstatistik',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.people_alt_rounded),
+                label: 'Sosyal',
+              ),
+            ],
+          ),
         ),
       ),
     );
