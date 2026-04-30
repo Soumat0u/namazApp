@@ -891,7 +891,7 @@ class NamazProvider extends ChangeNotifier {
       if (sound == "ozel" && path != null) {
         // Özel dosya yolu varsa çal
         await _audioPlayer.play(DeviceFileSource(path));
-      } else if (sound.startsWith("ezan") || sound == "beep") {
+      } else if (sound != "varsayilan") {
         // Assets/sounds klasöründeki dosyayı çal (uzantı .mp3 varsayıyoruz)
         await _audioPlayer.play(AssetSource('sounds/$sound.mp3'));
       }

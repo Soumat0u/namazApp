@@ -200,4 +200,4 @@ class NotificationService {
   Future<void> cancelKazaHatirlatma() async {
     await _notificationsPlugin.cancel(id: 700);
   }
-}
+}
