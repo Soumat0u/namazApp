@@ -63,29 +63,51 @@ class NotificationService {
     required String title,
     required String body,
     required DateTime scheduledDate,
+    String sound = "varsayilan",
+    String? ozelSesYolu,
   }) async {
+    // Android'de kanal bazlı ses değişimi için her ses tipine özel kanal ID'si kullanıyoruz
+    final String channelId = sound == "varsayilan" ? 'namaz_vakti_channel' : 'namaz_vakti_channel_$sound';
+
     await _notificationsPlugin.zonedSchedule(
       id: id,
       title: title,
       body: body,
       scheduledDate: tz.TZDateTime.from(scheduledDate, tz.local),
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          'namaz_vakti_channel',
+          channelId,
           'Namaz Vakitleri',
           channelDescription: 'Namaz vakitleri bildirim kanalı',
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
+          sound: _getAndroidSound(sound, ozelSesYolu),
         ),
         iOS: DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          sound: _getIosSound(sound),
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
+  }
+
+  AndroidNotificationSound? _getAndroidSound(String sound, String? ozelSesYolu) {
+    if (sound == "varsayilan") return null; // Sistem varsayılanı
+    if (sound == "ozel" && ozelSesYolu != null) {
+      return UriAndroidNotificationSound(ozelSesYolu);
+    }
+    // ÖNEMLİ: Android bildirim sesleri 'android/app/src/main/res/raw/' klasöründe olmalıdır.
+    // Dosya uzantısı (örn: .mp3) eklenmemelidir.
+    return RawResourceAndroidNotificationSound(sound);
+  }
+
+  String? _getIosSound(String sound) {
+    if (sound == "varsayilan") return null;
+    return '$sound.caf'; // iOS için .caf formatı yaygındır
   }
 
   Future<void> cancel(int id) async {
@@ -98,26 +120,19 @@ class NotificationService {
 
   /// Her 5 saatte bir rastgele ayet veya hadis bildirimi planlar
   Future<void> scheduleManeviRehberNotifications() async {
-    // Önce eski planlanmış manevi rehber bildirimlerini iptal et (ID: 500-600 arası)
     for (int i = 500; i <= 600; i++) {
       await _notificationsPlugin.cancel(id: i);
     }
 
     final allQuotes = ManeviRehberData.getAll();
-    allQuotes.shuffle(); // Karıştır
+    allQuotes.shuffle();
 
     final now = DateTime.now();
-    
-    // Önümüzdeki 50 slot için planla (Her slot 5 saat ara ile)
     for (int i = 0; i < 50; i++) {
       final scheduledTime = now.add(Duration(hours: (i + 1) * 5));
-      
-      // Quote seç (Shuffle edildiği için sırayla alabiliriz, 50 tane var zaten)
       final quote = allQuotes[i % allQuotes.length];
-      
-      final bool isAyet = quote.contains('(') && quote.contains(')'); // Basit bir ayrım
+      final bool isAyet = quote.contains('(') && quote.contains(')');
       final title = isAyet ? "📖 Bir Ayet" : "💬 Bir Hadis";
-
       await _notificationsPlugin.zonedSchedule(
         id: 500 + i,
         title: title,
@@ -137,4 +152,52 @@ class NotificationService {
       );
     }
   }
-}
+
+  /// Kaza namazı günlük hatırlatma bildirimi kurar (ID: 700)
+  Future<void> scheduleKazaHatirlatma({
+    required int hour, 
+    required int minute,
+    String sound = "varsayilan",
+    String? ozelSesYolu,
+  }) async {
+    await _notificationsPlugin.cancel(id: 700);
+    final now = DateTime.now();
+    var scheduled = DateTime(now.year, now.month, now.day, hour, minute);
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    
+    final String channelId = sound == "varsayilan" ? 'kaza_namaz_channel' : 'kaza_namaz_channel_$sound';
+
+    await _notificationsPlugin.zonedSchedule(
+      id: 700,
+      title: "⏳ Kaza Namazı Vakti",
+      body: "Bugünkü kaza namazı hedefinizi kılmayı unutmayın.",
+      scheduledDate: tz.TZDateTime.from(scheduled, tz.local),
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          'Kaza Namazı Hatırlatmaları',
+          channelDescription: 'Günlük kaza namazı hatırlatma bildirimleri',
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          sound: _getAndroidSound(sound, ozelSesYolu),
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          sound: _getIosSound(sound),
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time, // Her gün tekrarla
+    );
+  }
+
+  /// Kaza hatırlatma bildirimini iptal eder
+  Future<void> cancelKazaHatirlatma() async {
+    await _notificationsPlugin.cancel(id: 700);
+  }
+}

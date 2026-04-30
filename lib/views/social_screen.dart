@@ -2127,6 +2127,21 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
     if (allStories.isEmpty) return;
 
+    // 🔥 SIRALAMA MANTIĞI: Arkadaş listesindeki görsel sırayla aynı olmalı.
+    // (Hikayesi olanlar zaten filtrelendi, şimdi Online ve Son Aktifliğe göre sıralayalım)
+    if (targetUid != provider.currentUid) {
+      final profiles = await _firebaseService.getFriendsProfilesStream(friends).first;
+      allStories.sort((a, b) {
+        final profileA = profiles.firstWhere((p) => p.uid == a.uid, orElse: () => UserProfile(uid: a.uid, username: a.username, displayName: a.displayName, totalXp: 0, unvan: "Talip", streak: 0, createdAt: DateTime.now()));
+        final profileB = profiles.firstWhere((p) => p.uid == b.uid, orElse: () => UserProfile(uid: b.uid, username: b.username, displayName: b.displayName, totalXp: 0, unvan: "Talip", streak: 0, createdAt: DateTime.now()));
+        
+        if (profileA.isOnline != profileB.isOnline) return profileA.isOnline ? -1 : 1;
+        final aTime = profileA.lastActive ?? DateTime(0);
+        final bTime = profileB.lastActive ?? DateTime(0);
+        return bTime.compareTo(aTime);
+      });
+    }
+
     // Tıklanan kullanıcının hikayesinin indexini bul
     int initialIndex = allStories.indexWhere((s) => s.uid == targetUid);
     if (initialIndex == -1) initialIndex = 0;
@@ -2574,15 +2589,19 @@ class _StoryViewerContentState extends State<_StoryViewerContent> with TickerPro
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: widget.stories.length,
-        onPageChanged: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          _startStory();
-        },
+      body: Dismissible(
+        key: const Key('story-viewer'),
+        direction: DismissDirection.down,
+        onDismissed: (_) => Navigator.pop(context),
+        child: PageView.builder(
+          controller: _pageController,
+          itemCount: widget.stories.length,
+          onPageChanged: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+            _startStory();
+          },
         itemBuilder: (context, index) {
           final story = widget.stories[index];
           final isMe = story.uid == context.read<NamazProvider>().currentUid;
@@ -2769,8 +2788,9 @@ class _StoryViewerContentState extends State<_StoryViewerContent> with TickerPro
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 

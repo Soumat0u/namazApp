@@ -5,6 +5,7 @@ import '../providers/theme_provider.dart';
 import 'qibla_screen.dart';
 import 'zikirmatik_screen.dart'; // Eklendi
 import 'settings_screen.dart'; // Ayarlar Eklendi
+import 'kaza_screen.dart';
 
 
 class AraclarSayfasi extends StatelessWidget {
@@ -67,8 +68,12 @@ class AraclarSayfasi extends StatelessWidget {
               icon: Icons.event_repeat_rounded,
               title: "Kaza Planlayıcı",
               color: Colors.orange,
-              isSoon: true,
-              onTap: () => _showYakinda(context),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const KazaTakipSayfasi()),
+                );
+              },
             ),
             _buildAracCard(
               context: context,
@@ -106,70 +111,76 @@ class AraclarSayfasi extends StatelessWidget {
     bool isSoon = false,
   }) {
     final tema = context.watch<ThemeProvider>().aktifTema;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(Responsive.w(20)),
-      child: Container(
-        decoration: BoxDecoration(
-          color: tema.kartRengi,
+    return Container(
+      decoration: BoxDecoration(
+        color: tema.kartRengi,
+        borderRadius: BorderRadius.circular(Responsive.w(20)),
+        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            debugPrint("Tapped on: $title");
+            onTap();
+          },
           borderRadius: BorderRadius.circular(Responsive.w(20)),
-          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(Responsive.w(16)),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
-                      shape: BoxShape.circle,
+          child: Stack(
+            children: [
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(Responsive.w(16)),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: color, size: Responsive.w(36)),
                     ),
-                    child: Icon(icon, color: color, size: Responsive.w(36)),
-                  ),
-                  SizedBox(height: Responsive.h(12)),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: tema.yaziRengi,
-                      fontWeight: FontWeight.bold,
-                      fontSize: Responsive.sp(14),
+                    SizedBox(height: Responsive.h(12)),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: tema.yaziRengi,
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.sp(14),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (isSoon)
-              Positioned(
-                top: Responsive.w(12),
-                right: Responsive.w(12),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(4)),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(Responsive.w(10)),
-                  ),
-                  child: Text(
-                    "YAKINDA",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: Responsive.sp(9),
-                      fontWeight: FontWeight.bold,
+              if (isSoon)
+                Positioned(
+                  top: Responsive.w(12),
+                  right: Responsive.w(12),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(4)),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(Responsive.w(10)),
+                    ),
+                    child: Text(
+                      "YAKINDA",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: Responsive.sp(9),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

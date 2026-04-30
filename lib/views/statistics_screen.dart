@@ -67,6 +67,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
     final pazartesi = sanalBugun.subtract(Duration(days: pztUzaklik));
 
     List<int> gunlukSayilar = [];
+    List<int> kazaSayilar = [];
     Map<String, int> vakitFrekanslari = {
       "Sabah": 0,
       "Öğle": 0,
@@ -87,6 +88,10 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
         count = provider.aylikGecmis[dateKey] ?? 0;
       }
       gunlukSayilar.add(count);
+      
+      int kazaCount = provider.kazaGecmisi[dateKey] ?? 0;
+      kazaSayilar.add(kazaCount);
+
       toplamVakit += count;
 
       // Vakit detaylarını kontrol et
@@ -124,6 +129,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
 
     return {
       'gunlukSayilar': gunlukSayilar,
+      'kazaSayilar': kazaSayilar,
       'toplamVakit': toplamVakit,
       'enSadikVakit': enSadikVakit,
       'enSadikFrekans': maxFrekans,
@@ -391,6 +397,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
   Widget _buildHaftalikGrafik(BuildContext context, NamazProvider provider) {
     final veri = _haftalikVeriHesapla(provider);
     final List<int> gunlukSayilar = veri['gunlukSayilar'];
+    final List<int> kazaSayilar = veri['kazaSayilar'];
     final int toplamVakit = veri['toplamVakit'];
     final String enSadikVakit = veri['enSadikVakit'];
     final int enSadikFrekans = veri['enSadikFrekans'];
@@ -449,49 +456,92 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
           ),
           SizedBox(height: Responsive.h(20)),
           SizedBox(
-            height: Responsive.h(180),
+            height: Responsive.h(200),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
                 final count = gunlukSayilar[i];
-                final barHeight = count == 0 ? Responsive.h(6) : (count / 5) * Responsive.h(120);
+                final kazaCount = kazaSayilar[i];
+
+                // Toplam yükseklik sınırı: 130h (taşma engellendi)
+                const double maxBarH = 120.0;
+                final double normalH = count == 0 ? 6.0 : (count / 5) * maxBarH;
+                final double kazaRaw = kazaCount == 0 ? 0.0 : (kazaCount / 20) * maxBarH;
+                // Toplam max'u geçmesin
+                final double kazaH = (normalH + kazaRaw) > Responsive.h(maxBarH)
+                    ? Responsive.h(maxBarH) - Responsive.h(normalH)
+                    : Responsive.h(kazaRaw);
+
                 final isTam = count == 5;
+
                 return Expanded(
                   child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: Responsive.w(4)),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text(
-                          "$count",
-                          style: TextStyle(
-                            fontSize: Responsive.sp(11),
-                            fontWeight: FontWeight.bold,
-                            color: isTam ? r.anaRenk : r.yaziRengi.withOpacity(0.5),
-                          ),
-                        ),
                         SizedBox(height: Responsive.h(4)),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 600),
-                          height: barHeight,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(Responsive.w(6)),
-                            gradient: isTam
-                                ? LinearGradient(
-                                    begin: Alignment.bottomCenter,
-                                    end: Alignment.topCenter,
-                                    colors: [r.anaRenk, r.anaRenk.withOpacity(0.7)],
-                                  )
-                                : LinearGradient(
-                                    begin: Alignment.bottomCenter,
-                                    end: Alignment.topCenter,
-                                    colors: [
-                                      r.anaRenk.withOpacity(0.3),
-                                      r.anaRenk.withOpacity(0.15),
-                                    ],
+
+                        // Stacked Bar (kaza üstte, normal altta)
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (kazaCount > 0)
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 600),
+                                height: kazaH,
+                                margin: EdgeInsets.only(bottom: Responsive.h(2)), 
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(Responsive.w(6)),
+                                  color: r.anaRenk.withOpacity(0.2),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    "$kazaCount",
+                                    style: TextStyle(
+                                      fontSize: Responsive.sp(8),
+                                      fontWeight: FontWeight.bold,
+                                      color: r.yaziRengi,
+                                    ),
                                   ),
-                          ),
+                                ),
+                              ),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 600),
+                              height: Responsive.h(normalH),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(Responsive.w(6)),
+                                gradient: isTam
+                                    ? LinearGradient(
+                                        begin: Alignment.bottomCenter,
+                                        end: Alignment.topCenter,
+                                        colors: [r.anaRenk, r.anaRenk.withOpacity(0.7)],
+                                      )
+                                    : LinearGradient(
+                                        begin: Alignment.bottomCenter,
+                                        end: Alignment.topCenter,
+                                        colors: [
+                                          r.anaRenk.withOpacity(0.6),
+                                          r.anaRenk.withOpacity(0.4),
+                                        ],
+                                      ),
+                              ),
+                              child: count > 0 
+                                ? Center(
+                                    child: Text(
+                                      "$count",
+                                      style: TextStyle(
+                                        fontSize: Responsive.sp(9),
+                                        fontWeight: FontWeight.bold,
+                                        color: isTam ? Colors.white : r.yaziRengi,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                            ),
+                          ],
                         ),
+
                         SizedBox(height: Responsive.h(6)),
                         Text(
                           gunAdlari[i],
@@ -508,6 +558,23 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
               }),
             ),
           ),
+          // Lejant
+          if (kazaSayilar.any((k) => k > 0)) ...
+            [
+              SizedBox(height: Responsive.h(8)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Container(width: 10, height: 10, decoration: BoxDecoration(color: r.anaRenk, borderRadius: BorderRadius.circular(3))),
+                  SizedBox(width: Responsive.w(4)),
+                  Text("Farz", style: TextStyle(color: r.yaziRengi.withOpacity(0.5), fontSize: Responsive.sp(10))),
+                  SizedBox(width: Responsive.w(12)),
+                  Container(width: 10, height: 10, decoration: BoxDecoration(color: r.anaRenk.withOpacity(0.2), borderRadius: BorderRadius.circular(3))),
+                  SizedBox(width: Responsive.w(4)),
+                  Text("Kaza", style: TextStyle(color: r.yaziRengi.withOpacity(0.5), fontSize: Responsive.sp(10))),
+                ],
+              ),
+            ],
           SizedBox(height: Responsive.h(20)),
           Divider(color: r.pasifRenk.withOpacity(0.1)),
           SizedBox(height: Responsive.h(12)),

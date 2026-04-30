@@ -3,6 +3,7 @@ class SeviyeServisi {
   static const int tamGunBonusu = 25; // 5 vakit tamamlanınca gelen ekstra
   static const int aminXp = 1; // Dua beğenme ödülü
   static const int duaXp = 5; // Dua paylaşma ödülü
+  static const int kazaXp = 10; // Kaza namazı ödülü (Normal namazın yarısı)
 
   static final Map<int, String> unvanlar = {
     0: "Talip",

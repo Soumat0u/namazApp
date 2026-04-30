@@ -53,6 +53,13 @@ class AyarlarSayfasi extends StatelessWidget {
               onChanged: (val) => provider.bildirimAyariDegistir(val),
             ),
             const Divider(height: 1),
+            _buildActionTile(
+              r,
+              title: "Bildirim Sesi",
+              icon: Icons.music_note_outlined,
+              onTap: () => _showSoundPicker(context, provider, r),
+            ),
+            const Divider(height: 1),
             _buildInfoTile(
               r,
               title: "Kayıtlı Konum",
@@ -427,6 +434,170 @@ class AyarlarSayfasi extends StatelessWidget {
         size: Responsive.w(14),
         color: r.pasifRenk,
       ),
+    );
+  }
+
+  void _showSoundPicker(BuildContext context, NamazProvider provider, AppThemeColors r) {
+    String tempSecili = provider.bildirimSesi;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: r.arkaPlanRengi,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final List<Map<String, String>> sesler = [
+              {"id": "varsayilan", "isim": "Sistem Varsayılanı", "icon": "settings_suggest"},
+              {"id": "ezan", "isim": "Ezan", "icon": "mosque"},
+              {"id": "ney", "isim": "Ney Sesi", "icon": "music_note"},
+              {"id": "birds", "isim": "Kuş Sesleri", "icon": "nature"},
+              {"id": "su", "isim": "Su Sesi", "icon": "water_drop"},
+              {"id": "ozel", "isim": "Özel Ses Dosyası...", "icon": "library_music"},
+            ];
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.w(16),
+                  Responsive.h(16),
+                  Responsive.w(16),
+                  Responsive.h(24), // Alt kısım için güvenli boşluk
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Handle Bar
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: r.pasifRenk.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    SizedBox(height: Responsive.h(16)),
+                    Text(
+                      "Bildirim Sesi Seçin",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.sp(18),
+                        color: r.yaziRengi,
+                      ),
+                    ),
+                    SizedBox(height: Responsive.h(8)),
+                    Text(
+                      "Seçtiğiniz ses çalacaktır, onaylamak için Tamam'a basın.",
+                      style: TextStyle(
+                        fontSize: Responsive.sp(12),
+                        color: r.yaziRengi.withOpacity(0.5),
+                      ),
+                    ),
+                    SizedBox(height: Responsive.h(20)),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: sesler.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final ses = sesler[index];
+                          final isSelected = tempSecili == ses["id"];
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                setModalState(() => tempSecili = ses["id"]!);
+                                if (ses["id"] == "ozel") {
+                                  provider.ozelSesSec();
+                                } else {
+                                  provider.sesOnizlemeCal(ses["id"]!, null);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: EdgeInsets.all(Responsive.w(12)),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected ? r.anaRenk : r.pasifRenk.withOpacity(0.2),
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                  color: isSelected ? r.anaRenk.withOpacity(0.05) : Colors.transparent,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? r.anaRenk : r.pasifRenk.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        isSelected ? Icons.check_rounded : Icons.music_note_rounded,
+                                        color: isSelected ? Colors.white : r.pasifRenk,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    SizedBox(width: Responsive.w(12)),
+                                    Expanded(
+                                      child: Text(
+                                        ses["isim"]!,
+                                        style: TextStyle(
+                                          color: r.yaziRengi,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: Responsive.sp(14),
+                                        ),
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      Icon(Icons.volume_up_rounded, color: r.anaRenk, size: 20),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(height: Responsive.h(24)),
+                    SizedBox(
+                      width: double.infinity,
+                      height: Responsive.h(50),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          provider.bildirimSesiDegistir(tempSecili);
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: r.anaRenk,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          "TAMAM",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: Responsive.sp(14),
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: Responsive.h(10)), // Ekstra güvenli alan
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

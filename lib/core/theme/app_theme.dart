@@ -105,7 +105,7 @@ class AppThemeData {
     anaRenk: Color(0xFFFFB74D),
     yaziRengi: Color(0xFFE0E0E0),
     pasifRenk: Color(0xFF757575),
-    aktifRenk: Color(0xFF66BB6A),
+    aktifRenk: Color(0xFFFFCC80),
     kirmizi: Color(0xFFEF5350),
     brightness: Brightness.dark,
   );

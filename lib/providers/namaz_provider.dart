@@ -17,12 +17,15 @@ import '../models/prayer_post.dart';
 import '../models/story.dart';
 import '../services/local_db_service.dart';
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class NamazProvider extends ChangeNotifier {
   final NamazServisi _namazServisi;
   final NotificationService _notificationService;
   final FirebaseService _firebaseService;
   final LocalDbService _localDbService = LocalDbService();
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // --- FIREBASE / AUTH DURUMLARI ---
   bool _needsProfile = false;
@@ -48,6 +51,8 @@ class NamazProvider extends ChangeNotifier {
   String vaktinTemasi = "night";
   String seciliSehir = "";
   bool bildirimlerAcik = true;
+  String bildirimSesi = "varsayilan"; // "varsayilan", "ezan_mekke", "ezan_medine", "beep", "ozel"
+  String? ozelSesYolu;
 
   int streakCount = 0;
   int toplamTamamlanan = 0;
@@ -108,6 +113,7 @@ class NamazProvider extends ChangeNotifier {
   // 🔥 İSTATİSTİK VE TAKVİM İÇİN YENİ EKLENENLER
   DateTime? ilkAcilisTarihi;
   Map<String, int> aylikGecmis = {};
+  Map<String, int> kazaGecmisi = {}; // Hangi gün kaç kaza kılındı detayını tutar
   Map<String, dynamic> gunlukDetaylar = {}; // Hangi gün hangi vakit kılındı detayını tutar
   
   // 🔥 DİNİ GÜNLER API STATE
@@ -150,6 +156,7 @@ class NamazProvider extends ChangeNotifier {
     _timer?.cancel();
     kalanSureNotifier.dispose();
     guncelSaatNotifier.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -660,6 +667,8 @@ class NamazProvider extends ChangeNotifier {
     }
 
     bildirimlerAcik = prefs.getBool('bildirimler_acik') ?? true;
+    bildirimSesi = prefs.getString('bildirim_sesi') ?? "varsayilan";
+    ozelSesYolu = prefs.getString('ozel_ses_yolu');
 
     // 🔥 ZİKİRMATİK VERİLERİNİ YÜKLE
     _zikirSayaci = prefs.getInt('zikirSayaci') ?? 0;
@@ -673,12 +682,107 @@ class NamazProvider extends ChangeNotifier {
     }
 
     await istatistikleriYukle();
+    
+    // 🔥 KAZA GEÇMİŞİNİ YÜKLE
+    final kazaGecmisiStr = prefs.getString('kazaGecmisi') ?? '{}';
+    try {
+      kazaGecmisi = Map<String, int>.from(json.decode(kazaGecmisiStr));
+    } catch (_) {
+      kazaGecmisi = {};
+    }
 
     // 🔥 SOSYAL AKIŞ ÖNBELLEĞİNİ YÜKLE
     _cachedPrayers = await _localDbService.getCachedPrayers();
+    // 📿 KAZA BORÇLARINI YÜKLE
+    await kazaBorclariniYukle();
     notifyListeners();
   }
 
+  // ══════════════════════════════════════════
+  // 📿 KAZA NAMAZI YÖNETİMİ
+  // ══════════════════════════════════════════
+
+  // Kaza borç durumu: {vakit: {toplamBorc, kilinmis}}
+  Map<String, Map<String, int>> _kazaBorclari = {};
+  Map<String, Map<String, int>> get kazaBorclariMap => _kazaBorclari;
+
+  /// Toplam kaza borcu (tüm vakitler)
+  int get toplamKazaBorcu {
+    int toplam = 0;
+    for (final v in _kazaBorclari.values) toplam += v['toplamBorc'] ?? 0;
+    return toplam;
+  }
+
+  /// Toplam kılınan kaza (tüm vakitler)
+  int get toplamKilinanKaza {
+    int toplam = 0;
+    for (final v in _kazaBorclari.values) toplam += v['kilinmis'] ?? 0;
+    return toplam;
+  }
+
+  /// Kaza borç verisini SQLite'dan yükler
+  Future<void> kazaBorclariniYukle() async {
+    _kazaBorclari = await _localDbService.getKazaBorclari();
+    // Eğer eski SharedPreferences kazaNamazlari varsa onu da birleştir
+    for (final vakit in vakitIsimleri) {
+      final eskiBorc = kazaNamazlari[vakit] ?? 0;
+      if (eskiBorc > 0 && (_kazaBorclari[vakit]?['toplamBorc'] ?? 0) == 0) {
+        _kazaBorclari[vakit] = {'toplamBorc': eskiBorc, 'kilinmis': 0};
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Belirtilen vakitten [adet] kaza namazı kılar: SQLite günceller + XP kazandırır
+  Future<void> kazaKil(String vakit, {int adet = 1}) async {
+    final mevcut = _kazaBorclari[vakit] ?? {'toplamBorc': 0, 'kilinmis': 0};
+    final borc = mevcut['toplamBorc'] ?? 0;
+    final kilinmis = mevcut['kilinmis'] ?? 0;
+    final kalan = borc - kilinmis;
+    if (kalan <= 0) return;
+
+    final yeniKilinmis = (kilinmis + adet).clamp(0, borc);
+    _kazaBorclari[vakit] = {'toplamBorc': borc, 'kilinmis': yeniKilinmis};
+    await _localDbService.updateKazaBorc(vakit, kilinmis: yeniKilinmis);
+    await xpEkle(SeviyeServisi.kazaXp * adet);
+    
+    // Günlük kaza geçmişini kaydet (Haftalık grafik için)
+    final simdi = DateTime.now();
+    final bugunStr = DateFormat('yyyy-MM-dd').format(simdi);
+    kazaGecmisi[bugunStr] = (kazaGecmisi[bugunStr] ?? 0) + adet;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('kazaGecmisi', json.encode(kazaGecmisi));
+
+    notifyListeners();
+  }
+
+  /// Tüm vakitler için toplu kaza kılar (1 günlük paket = her vakitten 1)
+  Future<void> kazaKilGunlukPaket() async {
+    for (final vakit in vakitIsimleri) {
+      await kazaKil(vakit, adet: 1);
+    }
+  }
+
+  /// Hesaplanan borç miktarlarını SQLite'a kaydeder
+  Future<void> kazaBorcunuAyarla(Map<String, int> borclar) async {
+    for (final vakit in borclar.keys) {
+      final mevcutKilinmis = _kazaBorclari[vakit]?['kilinmis'] ?? 0;
+      _kazaBorclari[vakit] = {'toplamBorc': borclar[vakit]!, 'kilinmis': mevcutKilinmis};
+    }
+    await _localDbService.setKazaBorclari(borclar);
+    notifyListeners();
+  }
+
+  /// Kaza verilerini sıfırlar
+  Future<void> sifirlaKaza() async {
+    for (final vakit in vakitIsimleri) {
+      _kazaBorclari[vakit] = {'toplamBorc': 0, 'kilinmis': 0};
+    }
+    await _localDbService.sifirlaKazaBorclari();
+    notifyListeners();
+  }
+
+  /// Eski SharedPreferences tabanlı kaza metodu (geriye uyumluluk)
   Future<void> kazaGuncelle(String vakit, int miktar) async {
     final prefs = await SharedPreferences.getInstance();
     int yeniMiktar = (kazaNamazlari[vakit] ?? 0) + miktar;
@@ -687,6 +791,7 @@ class NamazProvider extends ChangeNotifier {
     await prefs.setInt('kaza_$vakit', yeniMiktar);
     notifyListeners();
   }
+
 
   Future<void> vaktiKildimIsaretle(String vakitIsmi, bool yeniDurum) async {
     // 🔥 XP SUİSTİMALİNİ ÖNLEME: Zaten aynı durumdaysa işlem yapma
@@ -735,9 +840,88 @@ class NamazProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> bildirimAyariDegistir(bool yeniDurum) async {
+    bildirimlerAcik = yeniDurum;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('bildirimler_acik', yeniDurum);
+    await _bildirimleriGuncelle();
+    notifyListeners();
+  }
+
+  Future<void> bildirimSesiDegistir(String yeniSes) async {
+    bildirimSesi = yeniSes;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('bildirim_sesi', yeniSes);
+    await _bildirimleriGuncelle();
+    notifyListeners();
+  }
+
+  Future<void> ozelSesSec() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.audio,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        ozelSesYolu = result.files.single.path;
+        bildirimSesi = "ozel";
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('bildirim_sesi', "ozel");
+        await prefs.setString('ozel_ses_yolu', ozelSesYolu!);
+        
+        await _bildirimleriGuncelle();
+        notifyListeners();
+        // Önizleme çal
+        sesOnizlemeCal("ozel", ozelSesYolu);
+      }
+    } catch (e) {
+      debugPrint("Dosya seçme hatası: $e");
+    }
+  }
+
+  Future<void> sesOnizlemeCal(String sound, String? path) async {
+    try {
+      await _audioPlayer.stop();
+      
+      if (sound == "varsayilan") {
+        return; // Sistem varsayılanı için önizleme yapılmıyor
+      }
+      
+      if (sound == "ozel" && path != null) {
+        // Özel dosya yolu varsa çal
+        await _audioPlayer.play(DeviceFileSource(path));
+      } else if (sound.startsWith("ezan") || sound == "beep") {
+        // Assets/sounds klasöründeki dosyayı çal (uzantı .mp3 varsayıyoruz)
+        await _audioPlayer.play(AssetSource('sounds/$sound.mp3'));
+      }
+    } catch (e) {
+      debugPrint("Önizleme çalma hatası ($sound): $e");
+    }
+  }
+
+
+
   Future<void> _kutucuklariSifirla(String sanalBugunStr) async {
     final prefs = await SharedPreferences.getInstance();
     
+    // 🔥 KAÇIRILAN NAMAZLARI KAZA BORCUNA EKLE
+    if (sonSifirlamaTarihi.isNotEmpty) {
+      for (final vakit in vakitIsimleri) {
+        if (kildiMi[vakit] == false) {
+          final mevcut = _kazaBorclari[vakit] ?? {'toplamBorc': 0, 'kilinmis': 0};
+          final yeniToplam = (mevcut['toplamBorc'] ?? 0) + 1;
+          _kazaBorclari[vakit] = {
+            'toplamBorc': yeniToplam, 
+            'kilinmis': mevcut['kilinmis'] ?? 0
+          };
+          // SQLite güncelle
+          await _localDbService.updateKazaBorc(vakit, toplamBorc: yeniToplam);
+        }
+      }
+      debugPrint("📅 Gün değişti: Kaçırılan namazlar kaza borcuna eklendi.");
+    }
+
     // --- YENİ: SIFIRLAMADAN ÖNCE BİTEN GÜNÜN VERİLERİNİ KAYDET ---
     if (sonSifirlamaTarihi.isNotEmpty) {
       // İstatistik özetini kaydet
@@ -1000,6 +1184,7 @@ class NamazProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     await _notificationService.cancelAll();
+    await sifirlaKaza(); // 🔥 KAZA VERİLERİNİ DE SIFIRLA (SQLite)
     await _uygulamayiBaslat();
   }
 
@@ -1035,22 +1220,24 @@ class NamazProvider extends ChangeNotifier {
               title: 'Namaz Vakti: $vakitAdi',
               body: '$vakitAdi vakti girdi. Namazını kılmayı unutma.',
               scheduledDate: vakitDateTime,
+              sound: bildirimSesi,
+              ozelSesYolu: ozelSesYolu,
             );
           }
 
           // 2. Hatırlatma Bildirimi (Sonraki vakte 20 dk kala, önceki kılanmamışsa)
-          // Örn: İkindiye 20 dk kala "Öğle namazını kıldın mı?"
           final reminderTime = vakitDateTime.subtract(const Duration(minutes: 20));
           if (reminderTime.isAfter(simdi)) {
             final oncekiVakit = i == 0 ? "Yatsı" : vakitIsimleri[i - 1];
             
-            // Eğer önceki vakit kılındı olarak işaretlenmişse, hatırlatıcıyı kurma
             if (!(kildiMi[oncekiVakit] ?? false)) {
               await _notificationService.scheduleNotification(
                 id: 100 + i,
                 title: 'Namaz Hatırlatması',
                 body: '$vakitAdi vaktine 20 dakika kaldı. $oncekiVakit namazını kıldın mı?',
                 scheduledDate: reminderTime,
+                sound: bildirimSesi,
+                ozelSesYolu: ozelSesYolu,
               );
             }
           }
@@ -1058,6 +1245,19 @@ class NamazProvider extends ChangeNotifier {
           debugPrint("Hata: $vakitAdi vakti formatlanamadı -> $e");
         }
       }
+    }
+
+    // Kaza hatırlatıcısı varsa onu da güncelle
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('kaza_hatirlatma_acik') ?? false) {
+      final hour = prefs.getInt('kaza_hatirlatma_saat') ?? 20;
+      final minute = prefs.getInt('kaza_hatirlatma_dakika') ?? 0;
+      await _notificationService.scheduleKazaHatirlatma(
+        hour: hour,
+        minute: minute,
+        sound: bildirimSesi,
+        ozelSesYolu: ozelSesYolu,
+      );
     }
   }
 
@@ -1113,13 +1313,7 @@ class NamazProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> bildirimAyariDegistir(bool acik) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('bildirimler_acik', acik);
-    bildirimlerAcik = acik;
-    await _bildirimleriGuncelle();
-    notifyListeners();
-  }
+
 
   // --- ZİKİRMATİK METOTLARI ---
   Future<void> zikirArtir() async {
