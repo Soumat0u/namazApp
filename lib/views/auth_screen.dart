@@ -400,7 +400,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                           'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
                           width: 20,
                           height: 20,
-                          errorBuilder: (_, __, ___) => Icon(Icons.g_mobiledata_rounded, size: 24, color: r.yaziRengi),
+                          errorBuilder: (_, _, _) => Icon(Icons.g_mobiledata_rounded, size: 24, color: r.yaziRengi),
                         ),
                         label: Text(
                           "Google ile Giriş Yap",

@@ -118,7 +118,7 @@ class NamazProvider extends ChangeNotifier {
   
   // 🔥 DİNİ GÜNLER API STATE
   Map<String, ReligiousDay> tumDiniGunler = {}; // Format: "yyyy-MM-dd"
-  Set<String> _aylikDiniGunlerCache = {};
+  final Set<String> _aylikDiniGunlerCache = {};
   bool isDiniGunlerLoading = false;
 
   // 🔥 SOSYAL ÖNBELLEK
@@ -709,14 +709,18 @@ class NamazProvider extends ChangeNotifier {
   /// Toplam kaza borcu (tüm vakitler)
   int get toplamKazaBorcu {
     int toplam = 0;
-    for (final v in _kazaBorclari.values) toplam += v['toplamBorc'] ?? 0;
+    for (final v in _kazaBorclari.values) {
+      toplam += v['toplamBorc'] ?? 0;
+    }
     return toplam;
   }
 
   /// Toplam kılınan kaza (tüm vakitler)
   int get toplamKilinanKaza {
     int toplam = 0;
-    for (final v in _kazaBorclari.values) toplam += v['kilinmis'] ?? 0;
+    for (final v in _kazaBorclari.values) {
+      toplam += v['kilinmis'] ?? 0;
+    }
     return toplam;
   }
 
@@ -1066,6 +1070,7 @@ class NamazProvider extends ChangeNotifier {
       }
       bitisZamani ??= sabahVakti.add(const Duration(days: 1));
 
+      bool degisti = false;
       if (aktifVakit != bulunanVakit) {
         // Vakit değiştiğinde, önceki vakit (aktifVakit) kılınmamışsa streak bozulsun
         if (!(kildiMi[aktifVakit] ?? false)) {
@@ -1077,16 +1082,22 @@ class NamazProvider extends ChangeNotifier {
           _kutucuklariSifirla(sanalBugunStr);
         }
         aktifVakit = bulunanVakit;
+        degisti = true;
       }
 
       final fark = bitisZamani.difference(simdi);
       kalanSureNotifier.value =
           "${fark.inHours.toString().padLeft(2, '0')}:${(fark.inMinutes % 60).toString().padLeft(2, '0')}:${(fark.inSeconds % 60).toString().padLeft(2, '0')}";
       guncelSaatNotifier.value = DateFormat("HH:mm").format(simdi);
-      ekranTarihi = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(simdi);
+      
+      final yeniTarih = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(simdi);
+      if (ekranTarihi != yeniTarih) {
+        ekranTarihi = yeniTarih;
+        degisti = true;
+      }
 
       _temaGuncelle();
-      notifyListeners();
+      if (degisti) notifyListeners();
     });
   }
 

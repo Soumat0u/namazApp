@@ -45,6 +45,11 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   
   List<String> _lastFriendsList = [];
   Stream<List<PrayerPost>>? _cachedFriendsStream;
+  
+  // Bildirim ve profil detayları için önbellek:
+  Stream<List<AppNotification>>? _cachedNotificationsStream;
+  List<String> _lastFriendsProfileList = [];
+  Stream<List<UserProfile>>? _cachedFriendsProfilesStream;
 
   bool _isSubmitting = false; // Paylaşım kontrolü
   String _lastSubmittedText = ""; // Mükerrer kayıt kontrolü
@@ -79,10 +84,22 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   Widget build(BuildContext context) {
     Responsive.init(context);
     final provider = context.watch<NamazProvider>();
-    final r = context.renkler;
-
     // 🔥 BUGÜNKÜ XP HESAPLAMA (PRATİK YÖNTEM)
     int toplamBugunXp = provider.bugunKazanilanXp;
+
+    // 🔥 Stream önbelleği UID bazlı sıfırlama
+    if (_cachedUid != provider.currentUid) {
+      _cachedUid = provider.currentUid;
+      _cachedUserProfileStream = provider.currentUid != null 
+          ? _firebaseService.getUserProfile(provider.currentUid!)
+          : null;
+      _cachedMyPrayersStream = null;
+      _cachedFriendsStream = null;
+      _cachedNotificationsStream = null;
+      _cachedFriendsProfilesStream = null;
+    }
+
+    final r = context.renkler;
 
     return Scaffold(
       backgroundColor: r.arkaPlanRengi,
@@ -328,7 +345,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         children: [
           // ÜST KISIM: Avatar, İsim, Unvan ve Bugün
           StreamBuilder<UserProfile?>(
-            stream: provider.currentUid != null ? _firebaseService.getUserProfile(provider.currentUid!) : null,
+            stream: _cachedUserProfileStream,
             builder: (context, snap) {
               final profile = snap.data;
               final hasActiveStory = profile?.lastStoryAt != null && 
@@ -491,14 +508,23 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     if (provider.currentUid == null) return const SizedBox();
 
     return StreamBuilder<UserProfile?>(
-      stream: _firebaseService.getUserProfile(provider.currentUid!),
+      stream: _cachedUserProfileStream,
       builder: (context, userSnap) {
         if (!userSnap.hasData || userSnap.data == null) return const SizedBox();
         final friends = userSnap.data!.friends;
         if (friends.isEmpty) return const SizedBox();
 
+        // Arkadaş profilleri stream'ini önbelleğe al
+        bool friendsChanged = _lastFriendsProfileList.length != friends.length || 
+                             !_lastFriendsProfileList.every((f) => friends.contains(f));
+        
+        if (friendsChanged || _cachedFriendsProfilesStream == null) {
+          _lastFriendsProfileList = List.from(friends);
+          _cachedFriendsProfilesStream = _firebaseService.getFriendsProfilesStream(friends);
+        }
+
         return StreamBuilder<List<UserProfile>>(
-          stream: _firebaseService.getFriendsProfilesStream(friends),
+          stream: _cachedFriendsProfilesStream,
           builder: (context, profilesSnap) {
             if (!profilesSnap.hasData) return const SizedBox();
             
@@ -829,16 +855,6 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       );
     }
 
-    // Profil stream önbelleği
-    if (_cachedUid != provider.currentUid) {
-      _cachedUid = provider.currentUid;
-      _cachedUserProfileStream = provider.currentUid != null 
-          ? _firebaseService.getUserProfile(provider.currentUid!)
-          : null;
-      _cachedMyPrayersStream = null;
-      _cachedFriendsStream = null;
-    }
-
     return StreamBuilder<UserProfile?>(
       stream: _cachedUserProfileStream,
       builder: (context, userSnap) {
@@ -943,7 +959,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
             final prayers = currentPrayers;
             return Column(
               children: [
-                ...prayers.asMap().entries.map((entry) => _buildDuaItem(context, r, entry.value, provider, prayers, entry.key)).toList(),
+                ...prayers.asMap().entries.map((entry) => _buildDuaItem(context, r, entry.value, provider, prayers, entry.key)),
                 TextButton.icon(
                   onPressed: () { 
                     FocusScope.of(context).unfocus(); 
@@ -1593,8 +1609,12 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   // ════════════════════════════════════════
   
   Widget _buildNotificationBadge(BuildContext context, AppThemeColors r, NamazProvider provider) {
+    if (_cachedNotificationsStream == null && provider.currentUid != null) {
+      _cachedNotificationsStream = FirebaseService().getNotifications(provider.currentUid!);
+    }
+
     return StreamBuilder<List<AppNotification>>(
-      stream: FirebaseService().getNotifications(provider.currentUid!),
+      stream: _cachedNotificationsStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox();
         final unreadCount = snapshot.data!.where((n) => n.status == 'pending').length;
@@ -2430,11 +2450,11 @@ class AminParticleButton extends StatefulWidget {
   final AppThemeColors r;
 
   const AminParticleButton({
-    Key? key,
+    super.key,
     required this.isAmind,
     required this.child,
     required this.r,
-  }) : super(key: key);
+  });
 
   @override
   State<AminParticleButton> createState() => _AminParticleButtonState();

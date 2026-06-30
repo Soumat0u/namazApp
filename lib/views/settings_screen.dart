@@ -501,7 +501,7 @@ class AyarlarSayfasi extends StatelessWidget {
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: sesler.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final ses = sesler[index];
                           final isSelected = tempSecili == ses["id"];
@@ -612,7 +612,7 @@ class _ThemeGroupWidget extends StatelessWidget {
   final AppThemeColors r;
 
   const _ThemeGroupWidget({
-    Key? key,
+    super.key,
     required this.isim,
     required this.lightId,
     required this.darkId,
@@ -620,7 +620,7 @@ class _ThemeGroupWidget extends StatelessWidget {
     required this.baseDarkColor,
     required this.themeProvider,
     required this.r,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

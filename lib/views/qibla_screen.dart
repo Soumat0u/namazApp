@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_qiblah/flutter_qiblah.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_compass_v2/flutter_compass_v2.dart';
 import 'package:vibration/vibration.dart';

@@ -1148,7 +1148,7 @@ class _GununAyetiCard extends StatelessWidget {
                           final bool isTarget = currentAyetNo == targetAyet;
 
                           return Container(
-                            key: ValueKey('ayet_card_$sureNo\_$currentAyetNo'),
+                            key: ValueKey('ayet_card_${sureNo}_$currentAyetNo'),
                             margin: EdgeInsets.only(bottom: Responsive.h(16)),
                             padding: EdgeInsets.all(Responsive.w(16)),
                             decoration: BoxDecoration(

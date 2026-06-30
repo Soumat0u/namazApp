@@ -79,7 +79,7 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
   }
 
   void _showOzelHedefDialog(BuildContext context, NamazProvider provider) {
-    final TextEditingController _controller = TextEditingController();
+    final TextEditingController controller = TextEditingController();
     final tema = context.read<ThemeProvider>().aktifTema;
     
     showDialog(
@@ -88,7 +88,7 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
         backgroundColor: tema.kartRengi,
         title: Text("Özel Hedef", style: TextStyle(color: tema.yaziRengi)),
         content: TextField(
-          controller: _controller,
+          controller: controller,
           keyboardType: TextInputType.number,
           style: TextStyle(color: tema.yaziRengi),
           decoration: InputDecoration(
@@ -105,7 +105,7 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
           ),
           TextButton(
             onPressed: () {
-              final val = int.tryParse(_controller.text);
+              final val = int.tryParse(controller.text);
               if (val != null && val > 0) {
                 provider.zikirHedefBelirle(val);
                 Navigator.pop(ctx);

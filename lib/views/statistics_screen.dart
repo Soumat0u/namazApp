@@ -1020,7 +1020,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
           ? () => _gunDetayiGoster(context, hucreTarihi, provider, vakitSayisi)
           : null,
       child: Tooltip(
-        message: isDiniGun ? diniGun! : "",
+        message: isDiniGun ? diniGun : "",
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
