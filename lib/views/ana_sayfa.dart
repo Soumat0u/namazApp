@@ -315,7 +315,8 @@ class _AnaSayfaState extends State<AnaSayfa> {
     final r = context.renkler;
     final cuma = DateTime.now().weekday == DateTime.friday;
     final siradaki = provider.siradakiDiniGun;
-    final geriSayim = siradaki != null && siradaki.kalan > 1 ? siradaki : null;
+    // Geri sayım yalnızca son 2 haftada görünür; daha uzaktaki günler ana ekranı meşgul etmez
+    final geriSayim = siradaki != null && siradaki.kalan > 1 && siradaki.kalan <= 14 ? siradaki : null;
     if (!cuma && geriSayim == null) return const SizedBox.shrink();
 
     Widget satir(IconData ikon, String metin, {Widget? sag}) => Row(
