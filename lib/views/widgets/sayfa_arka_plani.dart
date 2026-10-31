@@ -81,10 +81,10 @@ class _SayfaArkaPlaniState extends State<SayfaArkaPlani> with SingleTickerProvid
       'night': (Color(0xFF1A237E), Color(0xFF4A148C)),
     };
     final (ust, alt) = renkler[widget.vakitTemasi] ?? renkler['night']!;
-    final oran = widget.koyuTema ? 0.30 : 0.22;
+    final oran = widget.koyuTema ? 0.55 : 0.45;
     return (
       Color.lerp(widget.zemin, ust, oran)!,
-      Color.lerp(widget.zemin, alt, oran * 0.6)!,
+      Color.lerp(widget.zemin, alt, oran * 0.85)!,
     );
   }
 
@@ -100,7 +100,7 @@ class _SayfaArkaPlaniState extends State<SayfaArkaPlani> with SingleTickerProvid
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [ust, alt, widget.zemin],
-          stops: const [0, 0.55, 1],
+          stops: const [0, 0.65, 1],
         ),
       ),
     );
@@ -148,7 +148,7 @@ class _CanliPainter extends CustomPainter {
       // Yavaşça parlayıp sönen yıldızlar
       final p = Paint();
       for (final (x, y, faz, boy) in _yildizlar) {
-        final parlaklik = 0.15 + 0.35 * (0.5 + 0.5 * sin(t * 3 + faz * 2 * pi));
+        final parlaklik = 0.3 + 0.5 * (0.5 + 0.5 * sin(t * 3 + faz * 2 * pi));
         p.color = renk.withOpacity(parlaklik * guc);
         canvas.drawCircle(Offset(x * size.width, y * size.height), boy, p);
       }
@@ -162,7 +162,7 @@ class _CanliPainter extends CustomPainter {
         final yaricap = size.width * (0.35 + 0.05 * i);
         final p = Paint()
           ..shader = RadialGradient(
-            colors: [renk.withOpacity(0.18 * guc), renk.withOpacity(0)],
+            colors: [renk.withOpacity(0.32 * guc), renk.withOpacity(0)],
           ).createShader(Rect.fromCircle(center: merkez, radius: yaricap));
         canvas.drawCircle(merkez, yaricap, p);
       }
