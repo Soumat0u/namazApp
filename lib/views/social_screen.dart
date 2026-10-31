@@ -53,6 +53,8 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   Stream<List<AppNotification>>? _cachedNotificationsStream;
   List<String> _lastFriendsProfileList = [];
   Stream<List<UserProfile>>? _cachedFriendsProfilesStream;
+  // Yayın akışı son değeri saklamaz: sonradan açılan liste (ör. "Arkadaşlar • Bu Hafta") boş kalmasın
+  List<UserProfile>? _sonArkadasProfilleri;
 
   bool _kardesSiralamasi = false; // Liderlik: false = genel, true = arkadaşlar (haftalık)
 
@@ -101,6 +103,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       _cachedFriendsStream = null;
       _cachedNotificationsStream = null;
       _cachedFriendsProfilesStream = null;
+      _sonArkadasProfilleri = null;
     }
 
     final r = context.renkler;
@@ -584,7 +587,11 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         !_lastFriendsProfileList.every((f) => friends.contains(f));
     if (degisti || _cachedFriendsProfilesStream == null) {
       _lastFriendsProfileList = List.from(friends);
-      _cachedFriendsProfilesStream = _firebaseService.getFriendsProfilesStream(friends).asBroadcastStream();
+      _sonArkadasProfilleri = null;
+      _cachedFriendsProfilesStream = _firebaseService
+          .getFriendsProfilesStream(friends)
+          .map((liste) => _sonArkadasProfilleri = liste)
+          .asBroadcastStream();
     }
     return _cachedFriendsProfilesStream!;
   }
@@ -599,6 +606,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         if (ben.friends.isEmpty) return builder(ben, const []);
         return StreamBuilder<List<UserProfile>>(
           stream: _arkadasProfilleri(ben.friends),
+          initialData: _sonArkadasProfilleri,
           builder: (context, snap) => snap.hasData ? builder(ben, snap.data!) : const SizedBox(),
         );
       },
@@ -680,6 +688,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
         return StreamBuilder<List<UserProfile>>(
           stream: _arkadasProfilleri(friends),
+          initialData: _sonArkadasProfilleri,
           builder: (context, profilesSnap) {
             if (!profilesSnap.hasData) return const SizedBox();
             
