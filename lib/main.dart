@@ -26,9 +26,7 @@ void main() async {
   await initializeDateFormatting('tr_TR', null);
 
   // 🔥 Firebase'i başlat
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Servisleri Kur
   final namazServisi = NamazServisi();
@@ -51,7 +49,8 @@ void main() async {
       NotificationService.acilacakSekme.value = mesaj.data['sekme'] ?? 'sosyal';
     });
     final ilk = await FirebaseMessaging.instance.getInitialMessage();
-    if (ilk != null) NotificationService.acilacakSekme.value = ilk.data['sekme'] ?? 'sosyal';
+    if (ilk != null)
+      NotificationService.acilacakSekme.value = ilk.data['sekme'] ?? 'sosyal';
   } catch (e) {
     debugPrint('🔔 Push dinleyici hatası: $e');
   }
@@ -60,7 +59,8 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => NamazProvider(namazServisi, notificationService, firebaseService),
+          create: (_) =>
+              NamazProvider(namazServisi, notificationService, firebaseService),
         ),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
@@ -150,7 +150,8 @@ class AnaUygulamaEkrani extends StatefulWidget {
   State<AnaUygulamaEkrani> createState() => _AnaUygulamaEkraniState();
 }
 
-class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindingObserver {
+class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani>
+    with WidgetsBindingObserver {
   int _seciliSayfaIndex = 0;
   final FirebaseService _firebaseService = FirebaseService();
 
@@ -207,7 +208,9 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
     Responsive.init(context);
     final temaProvider = context.watch<ThemeProvider>();
     final tema = temaProvider.aktifTema;
-    final vakitTemasi = context.select<NamazProvider, String>((p) => p.vaktinTemasi);
+    final vakitTemasi = context.select<NamazProvider, String>(
+      (p) => p.vaktinTemasi,
+    );
 
     return Scaffold(
       // Yüzen alt menü: arka plan menünün çevresinden görünür
@@ -225,11 +228,16 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
           // İçerik menünün altına girmesin: menü yüksekliği kadar boşluk bırakılır
           Builder(
             builder: (context) => Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.paddingOf(context).bottom,
+              ),
               child: MediaQuery.removePadding(
                 context: context,
                 removeBottom: true,
-                child: IndexedStack(index: _seciliSayfaIndex, children: _sayfalar),
+                child: IndexedStack(
+                  index: _seciliSayfaIndex,
+                  children: _sayfalar,
+                ),
               ),
             ),
           ),
@@ -238,7 +246,12 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
-          margin: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(10)),
+          margin: EdgeInsets.fromLTRB(
+            Responsive.w(16),
+            0,
+            Responsive.w(16),
+            Responsive.h(10),
+          ),
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: tema.kartRengi,
@@ -252,32 +265,40 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
               ),
             ],
           ),
-          child: BottomNavigationBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            currentIndex: _seciliSayfaIndex,
-            selectedItemColor: tema.anaRenk,
-            unselectedItemColor: tema.pasifRenk,
-            showUnselectedLabels: true,
-            type: BottomNavigationBarType.fixed,
-            iconSize: Responsive.w(22),
-            selectedFontSize: Responsive.sp(11),
-            unselectedFontSize: Responsive.sp(10),
-            onTap: (index) => setState(() => _seciliSayfaIndex = index),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home_rounded),
-                label: 'Ana Sayfa',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.bar_chart_rounded),
-                label: 'İstatistik',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.people_alt_rounded),
-                label: 'Sosyal',
-              ),
-            ],
+          // Dokununca tüm menüye yayılan dalga/vurgu efekti kapalı
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              splashFactory: NoSplash.splashFactory,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+            ),
+            child: BottomNavigationBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              currentIndex: _seciliSayfaIndex,
+              selectedItemColor: tema.anaRenk,
+              unselectedItemColor: tema.pasifRenk,
+              showUnselectedLabels: true,
+              type: BottomNavigationBarType.fixed,
+              iconSize: Responsive.w(22),
+              selectedFontSize: Responsive.sp(11),
+              unselectedFontSize: Responsive.sp(10),
+              onTap: (index) => setState(() => _seciliSayfaIndex = index),
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_rounded),
+                  label: 'Ana Sayfa',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.bar_chart_rounded),
+                  label: 'İstatistik',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.people_alt_rounded),
+                  label: 'Sosyal',
+                ),
+              ],
+            ),
           ),
         ),
       ),
