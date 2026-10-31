@@ -106,7 +106,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     final r = context.renkler;
 
     return Scaffold(
-      backgroundColor: r.arkaPlanRengi,
+      backgroundColor: Colors.transparent, // Zemini ana iskeletteki arka plan çizer
       appBar: AppBar(
         title: Text(
           "Manevi Meclis",

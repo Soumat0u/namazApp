@@ -6,6 +6,7 @@ import '../core/utils/responsive.dart';
 import '../core/utils/extensions.dart';
 import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
+import 'widgets/sayfa_arka_plani.dart';
 import 'widgets/sehir_secici.dart';
 
 class AyarlarSayfasi extends StatelessWidget {
@@ -88,6 +89,8 @@ class AyarlarSayfasi extends StatelessWidget {
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Görünüm"),
           _buildThemeSelector(r, themeProvider),
+          SizedBox(height: Responsive.h(12)),
+          _buildArkaPlanSecici(r, themeProvider),
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Hesaplama"),
           _buildSettingsCard(r, [
@@ -237,6 +240,62 @@ class AyarlarSayfasi extends StatelessWidget {
             ),
           ),
           SizedBox(height: Responsive.h(40)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArkaPlanSecici(AppThemeColors r, ThemeProvider themeProvider) {
+    return Container(
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(16))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.wallpaper_rounded, color: r.anaRenk, size: Responsive.w(20)),
+              SizedBox(width: Responsive.w(8)),
+              Text("Arka Plan",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
+            ],
+          ),
+          SizedBox(height: Responsive.h(10)),
+          Row(
+            children: [
+              for (final mod in ArkaPlanModu.values) ...[
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => themeProvider.arkaPlanModuDegistir(mod),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: EdgeInsets.symmetric(vertical: Responsive.h(10)),
+                      decoration: BoxDecoration(
+                        color: themeProvider.arkaPlanModu == mod ? r.anaRenk.withOpacity(0.15) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: themeProvider.arkaPlanModu == mod ? r.anaRenk : r.pasifRenk.withOpacity(0.25),
+                        ),
+                      ),
+                      child: Text(
+                        mod.ad,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: Responsive.sp(12),
+                          color: themeProvider.arkaPlanModu == mod ? r.anaRenk : r.yaziRengi,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (mod != ArkaPlanModu.values.last) SizedBox(width: Responsive.w(8)),
+              ],
+            ],
+          ),
+          SizedBox(height: Responsive.h(8)),
+          Text(themeProvider.arkaPlanModu.aciklama,
+              style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11))),
         ],
       ),
     );

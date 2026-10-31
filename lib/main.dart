@@ -1,4 +1,5 @@
 import 'views/widgets/cinsiyet_secici.dart';
+import 'views/widgets/sayfa_arka_plani.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
@@ -204,10 +205,24 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final tema = context.watch<ThemeProvider>().aktifTema;
+    final temaProvider = context.watch<ThemeProvider>();
+    final tema = temaProvider.aktifTema;
+    final vakitTemasi = context.select<NamazProvider, String>((p) => p.vaktinTemasi);
 
     return Scaffold(
-      body: IndexedStack(index: _seciliSayfaIndex, children: _sayfalar),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Seçilen arka plan modu (sayfaların zemini şeffaf)
+          SayfaArkaPlani(
+            mod: temaProvider.arkaPlanModu,
+            vakitTemasi: vakitTemasi,
+            zemin: tema.arkaPlanRengi,
+            koyuTema: tema.brightness == Brightness.dark,
+          ),
+          IndexedStack(index: _seciliSayfaIndex, children: _sayfalar),
+        ],
+      ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(

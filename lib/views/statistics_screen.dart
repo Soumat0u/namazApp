@@ -615,7 +615,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
     final r = context.renkler;
 
     return Scaffold(
-      backgroundColor: r.arkaPlanRengi,
+      backgroundColor: Colors.transparent, // Zemini ana iskeletteki arka plan çizer
       appBar: AppBar(
         title: Text(
           "Vakit Analizi",
