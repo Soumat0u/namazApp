@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:quran/quran.dart' as quran;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
@@ -216,7 +217,11 @@ class KuranSureScreen extends StatefulWidget {
 class _KuranSureScreenState extends State<KuranSureScreen> {
   late final KuranOkuyucu _okuyucu = KuranOkuyucu.sure(widget.sure);
   late final int _ayetSayisi = quran.getVerseCount(widget.sure);
-  late final List<GlobalKey> _anahtarlar = List.generate(_ayetSayisi, (_) => GlobalKey());
+  // Tembel liste: yalnızca ekrandaki ayetler çizilir (Bakara gibi uzun surelerde donmayı önler);
+  // ayete numarasıyla atlanabilir.
+  final ItemScrollController _kaydirma = ItemScrollController();
+  bool get _besmele => widget.sure != 1 && widget.sure != 9; // Fâtiha'da 1. ayet, Tevbe besmelesiz
+  int _ayetIndeksi(int ayet) => ayet - 1 + (_besmele ? 1 : 0);
   bool _mealGoster = true;
   double _yaziBoyutu = 26;
   int? _kaldigimAyet;
@@ -243,18 +248,16 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
       _indirildi = indirildi;
     });
     await _okuyucu.hizAyarla(p.getDouble('kuran_hiz') ?? 1.0);
-    // Yazı boyutu/meal ayarı sayfanın düzenini değiştirdiği için kaldığın yere ayarlar yüklendikten sonra git
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ayeteGit(widget.baslangicAyet, animasyonlu: false));
   }
 
-  void _ayeteGit(int ayet, {bool animasyonlu = true}) {
-    if (ayet <= 1) return;
-    final ctx = _anahtarlar[ayet - 1].currentContext;
-    if (ctx == null) return;
-    Scrollable.ensureVisible(ctx,
-        alignment: 0.05,
-        duration: animasyonlu ? const Duration(milliseconds: 600) : Duration.zero,
-        curve: Curves.easeInOut);
+  void _ayeteGit(int ayet) {
+    if (!_kaydirma.isAttached) return;
+    _kaydirma.scrollTo(
+      index: ayet <= 1 ? 0 : _ayetIndeksi(ayet),
+      alignment: 0.05,
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _okunaniTakipEt() {
@@ -622,25 +625,25 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
           );
         },
       ),
-      body: SingleChildScrollView(
+      // Kaldığın ayet doğrudan açılır (listede konum indeksle sabitlenir; ayarlar yüklenince kaymaz)
+      body: ScrollablePositionedList.builder(
+        itemScrollController: _kaydirma,
+        initialScrollIndex: widget.baslangicAyet <= 1 ? 0 : _ayetIndeksi(widget.baslangicAyet),
+        initialAlignment: widget.baslangicAyet <= 1 ? 0 : 0.05,
         padding: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), 100),
-        child: ListenableBuilder(
-          listenable: _okuyucu,
-          builder: (context, _) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (besmele)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
-                  child: Text(quran.basmala,
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(fontSize: _yaziBoyutu, color: r.anaRenk, height: 1.8)),
-                ),
-              for (int a = 1; a <= _ayetSayisi; a++) _ayet(r, a),
-            ],
-          ),
-        ),
+        itemCount: _ayetSayisi + (besmele ? 1 : 0),
+        itemBuilder: (context, i) {
+          if (besmele && i == 0) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
+              child: Text(quran.basmala,
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: TextStyle(fontSize: _yaziBoyutu, color: r.anaRenk, height: 1.8)),
+            );
+          }
+          return _ayet(r, i + 1 - (besmele ? 1 : 0));
+        },
       ),
     );
   }
@@ -652,7 +655,6 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
         : quran.getJuzNumber(s, a) != quran.getJuzNumber(s, a - 1);
 
     return Column(
-      key: _anahtarlar[a - 1],
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (cuzBasi)

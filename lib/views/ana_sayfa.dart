@@ -13,6 +13,7 @@ import '../models/religious_day.dart';
 import 'package:intl/intl.dart';
 import 'package:quran/quran.dart' as quran;
 import '../services/kuran_okuyucu.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'widgets/ayet_metni.dart';
 
 class AnaSayfa extends StatefulWidget {
@@ -1307,16 +1308,14 @@ class _GununAyetiCard extends StatelessWidget {
 
   // 🔊 Tilavet: okunan ayet vurgulanır ve ekran onu takip eder
   final okuyucu = KuranOkuyucu.sure(sureNo);
-  final ayetAnahtarlari = List.generate(ayetSayisi, (_) => GlobalKey());
+  // Tembel liste: yalnızca ekrandaki ayetler çizilir; ayete numarasıyla atlanır (uzun surelerde donma olmaz)
+  final kaydirma = ItemScrollController();
   int? sonTakip;
   okuyucu.addListener(() {
     final i = okuyucu.aktifIndex;
-    if (i == null || i == sonTakip) return;
+    if (i == null || i == sonTakip || !kaydirma.isAttached) return;
     sonTakip = i;
-    final ctx = ayetAnahtarlari[i].currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(ctx, alignment: 0.1, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
-    }
+    kaydirma.scrollTo(index: i, alignment: 0.1, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
   });
 
   showGeneralDialog(
@@ -1326,20 +1325,6 @@ class _GununAyetiCard extends StatelessWidget {
     barrierColor: Colors.black.withOpacity(0.85), // Arka planı biraz daha koyulaştırdım
     transitionDuration: const Duration(milliseconds: 500),
     pageBuilder: (context, anim1, anim2) {
-      // Ayet yükseklikleri çok farklı olduğu için tahmini offset yanlış yere götürür:
-      // tüm ayetler çizilir ve hedef ayetin gerçek konumuna kaydırılır.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final hedef = targetAyet > 1 ? ayetAnahtarlari[targetAyet - 1].currentContext : null;
-        if (targetAyet > 1 && hedef != null) {
-          Scrollable.ensureVisible(
-            hedef,
-            alignment: 0.05,
-            duration: const Duration(milliseconds: 800),
-            curve: Curves.easeOutExpo,
-          );
-        }
-      });
-
       return Align(
         alignment: Alignment.center,
         child: Padding(
@@ -1377,20 +1362,20 @@ class _GununAyetiCard extends StatelessWidget {
 
                     // --- AYETLER LİSTESİ ---
                     Expanded(
-                      child: SingleChildScrollView(
+                      // Günün ayeti doğrudan açılır
+                      child: ScrollablePositionedList.builder(
+                        itemScrollController: kaydirma,
+                        initialScrollIndex: targetAyet > 1 ? targetAyet - 1 : 0,
+                        initialAlignment: targetAyet > 1 ? 0.05 : 0,
                         physics: const BouncingScrollPhysics(),
                         padding: EdgeInsets.fromLTRB(Responsive.w(20), Responsive.h(10), Responsive.w(20), Responsive.h(30)),
-                        child: ListenableBuilder(
-                          listenable: okuyucu,
-                          builder: (context, _) => Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: List.generate(ayetSayisi, (index) {
+                        itemCount: ayetSayisi,
+                        itemBuilder: (context, index) {
                           // KRİTİK: index her zaman 0'dan başlar, ayetNo 1'den.
                           final int currentAyetNo = index + 1;
                           final bool isTarget = currentAyetNo == targetAyet;
 
                           return GestureDetector(
-                            key: ayetAnahtarlari[index],
                             // Ayete dokununca tilavet oradan başlar
                             onTap: () => okuyucu.baslat(index),
                             child: AnimatedContainer(
@@ -1477,9 +1462,7 @@ class _GununAyetiCard extends StatelessWidget {
                             ),
                           ),
                           );
-                          }),
-                        ),
-                        ),
+                        },
                       ),
                     ),
                   ],
