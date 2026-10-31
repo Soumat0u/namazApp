@@ -174,6 +174,18 @@ test('ortak hatim: üye cüz alır, üye olmayan göremez, adı sadece kuran de�
   await assertSucceeds(deleteDoc(doc(db('ali'), 'hatimler/h1')));
 });
 
+test('ortak hatim: üye yalnızca kendini çıkarabilir (hesap silme)', async () => {
+  await assertSucceeds(setDoc(doc(db('ali'), 'hatimler/h3'), {
+    ad: 'Aile', olusturan: 'ali', uyeler: ['ali', 'veli', 'ayse'], cuzler: { 3: { uid: 'veli', bitti: false } },
+  }));
+  // Başkasını çıkaramaz
+  await assertFails(updateDoc(doc(db('veli'), 'hatimler/h3'), { uyeler: arrayRemove('ayse') }));
+  // Kendini ve cüzünü çıkarabilir
+  await assertSucceeds(updateDoc(doc(db('veli'), 'hatimler/h3'), { uyeler: arrayRemove('veli'), cuzler: {} }));
+  // Çıktıktan sonra artık üye değil
+  await assertFails(getDoc(doc(db('veli'), 'hatimler/h3')));
+});
+
 // ───────────── Hikayeler ─────────────
 
 test('başkasının hikayesine izleyen olarak eklenir ama silemez', async () => {

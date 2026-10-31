@@ -527,10 +527,13 @@ class NamazProvider extends ChangeNotifier {
   }
 
   /// Google ile giriş yapar (alternatif yöntem)
-  Future<String?> googleIleGirisYap() async {
+  /// Apple ile giriş: Google ile aynı akış (yeni hesapsa kullanıcı adı önerilir)
+  Future<String?> appleIleGirisYap() => googleIleGirisYap(apple: true);
+
+  Future<String?> googleIleGirisYap({bool apple = false}) async {
     try {
-      final user = await _firebaseService.signInWithGoogle();
-      if (user == null) return 'Google girişi iptal edildi.';
+      final user = apple ? await _firebaseService.signInWithApple() : await _firebaseService.signInWithGoogle();
+      if (user == null) return apple ? 'Apple girişi iptal edildi.' : 'Google girişi iptal edildi.';
 
       _currentUid = user.uid;
       final prefs = await SharedPreferences.getInstance();
@@ -551,7 +554,9 @@ class NamazProvider extends ChangeNotifier {
         }
         await _bulutlaBirlestir(user.uid);
       } else {
-        final googleName = user.displayName ?? 'Google Kullanıcı';
+        final googleName = (user.displayName != null && user.displayName!.isNotEmpty)
+            ? user.displayName!
+            : (apple ? 'Kardeş' : 'Google Kullanıcı');
         String base = googleName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
         if (base.isEmpty) base = 'kullanici';
 
@@ -586,7 +591,9 @@ class NamazProvider extends ChangeNotifier {
       return null; // Hata yok
     } catch (e) {
       debugPrint('🔐 Google giriş hatası (Provider): $e');
-      return e.toString().contains('İnternet') ? e.toString() : 'Google ile giriş yapılamadı.';
+      return e.toString().contains('İnternet')
+          ? e.toString()
+          : (apple ? 'Apple ile giriş yapılamadı.' : 'Google ile giriş yapılamadı.');
     }
   }
 
@@ -632,6 +639,19 @@ class NamazProvider extends ChangeNotifier {
     _cinsiyetBulutKontrolEdildi = true;
     notifyListeners();
 
+    return null;
+  }
+
+  /// Hesabın giriş yöntemi ('password', 'google.com', 'apple.com'): silmede şifre sorulsun mu?
+  String? get girisYontemi => _firebaseService.girisYontemi;
+
+  /// Hesabı ve tüm verileri kalıcı olarak siler; telefondaki kayıtlar da temizlenir.
+  Future<String?> hesabiSil({String? sifre}) async {
+    final hata = await _firebaseService.hesabiSil(sifre: sifre);
+    if (hata != null) return hata;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    await cikisYap();
     return null;
   }
 

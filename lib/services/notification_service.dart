@@ -62,6 +62,16 @@ class NotificationService {
     );
   }
 
+  /// Android 14+ hassas alarm iznini varsayılan olarak vermiyor; izin yoksa
+  /// bildirim yaklaşık zamanda (birkaç dakika sapmayla) gelir ama planlama hata vermez.
+  Future<AndroidScheduleMode> _zamanlamaKipi() async {
+    final android = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return AndroidScheduleMode.exactAllowWhileIdle;
+    final izin = await android.canScheduleExactNotifications() ?? true;
+    return izin ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle;
+  }
+
   Future<void> requestPermissions() async {
     // Android için izinler
     final androidImplementation = _notificationsPlugin
@@ -121,7 +131,7 @@ class NotificationService {
           sound: _getIosSound(sound),
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: await _zamanlamaKipi(),
       payload: 'ana',
     );
   }
@@ -183,7 +193,7 @@ class NotificationService {
           ),
           iOS: DarwinNotificationDetails(),
         ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: await _zamanlamaKipi(),
       );
     }
   }
@@ -226,7 +236,7 @@ class NotificationService {
           sound: _getIosSound(sound),
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: await _zamanlamaKipi(),
       matchDateTimeComponents: DateTimeComponents.time, // Her gün tekrarla
     );
   }

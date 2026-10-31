@@ -15,6 +15,94 @@ class AyarlarSayfasi extends StatelessWidget {
   final String _hesaplamaYontemi = "Diyanet İşleri (Türkiye)";
 
 
+  /// Hesap silme: ne silineceği açıkça yazılır, şifreli hesaplarda şifre istenir
+  Future<void> _hesabiSilOnayi(BuildContext context) async {
+    final r = context.renklerOku;
+    final provider = context.read<NamazProvider>();
+    final sifreli = provider.girisYontemi == 'password';
+    final sifre = TextEditingController();
+    String? hata;
+    bool siliniyor = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, yenile) => AlertDialog(
+          backgroundColor: r.kartRengi,
+          title: Text("Hesabımı Sil", style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Bu işlem geri alınamaz. Şunlar kalıcı olarak silinir:\n\n"
+                "• Profilin, kullanıcı adın ve fotoğrafın\n"
+                "• Kardeşlik bağların ve bildirimlerin\n"
+                "• Paylaştığın dualar ve hikayelerin\n"
+                "• Kurduğun ortak hatimler\n"
+                "• Bu telefondaki namaz, kaza ve oruç kayıtların",
+                style: TextStyle(color: r.yaziRengi.withOpacity(0.8), fontSize: 13, height: 1.4),
+              ),
+              if (sifreli) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: sifre,
+                  obscureText: true,
+                  style: TextStyle(color: r.yaziRengi),
+                  decoration: InputDecoration(
+                    labelText: "Onaylamak için şifren",
+                    labelStyle: TextStyle(color: r.pasifRenk),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 10),
+                Text("Onay için hesabını bir kez daha seçmen istenecek.",
+                    style: TextStyle(color: r.pasifRenk, fontSize: 12)),
+              ],
+              if (hata != null) ...[
+                const SizedBox(height: 10),
+                Text(hata!, style: TextStyle(color: Colors.red.shade600, fontSize: 12)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: siliniyor ? null : () => Navigator.pop(ctx),
+              child: Text("Vazgeç", style: TextStyle(color: r.pasifRenk)),
+            ),
+            TextButton(
+              onPressed: siliniyor
+                  ? null
+                  : () async {
+                      yenile(() {
+                        siliniyor = true;
+                        hata = null;
+                      });
+                      final sonuc = await provider.hesabiSil(sifre: sifreli ? sifre.text : null);
+                      if (!ctx.mounted) return;
+                      if (sonuc != null) {
+                        yenile(() {
+                          siliniyor = false;
+                          hata = sonuc;
+                        });
+                        return;
+                      }
+                      Navigator.of(ctx, rootNavigator: true).popUntil((route) => route.isFirst);
+                    },
+              child: siliniyor
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text("Kalıcı Olarak Sil",
+                      style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+    sifre.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -151,6 +239,16 @@ class AyarlarSayfasi extends StatelessWidget {
                   ),
                 );
               },
+            ),
+          ]),
+          SizedBox(height: Responsive.h(8)),
+          _buildSettingsCard(r, [
+            _buildActionTile(
+              r,
+              title: "Hesabımı Sil",
+              icon: Icons.delete_forever_rounded,
+              color: Colors.red.shade600,
+              onTap: () => _hesabiSilOnayi(context),
             ),
           ]),
           SizedBox(height: Responsive.h(16)),

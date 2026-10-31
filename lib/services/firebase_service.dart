@@ -134,6 +134,157 @@ class FirebaseService {
     }
   }
 
+  /// Apple ile giriş (App Store, Google girişi olan uygulamalarda bunu da ister)
+  Future<User?> signInWithApple() async {
+    try {
+      final saglayici = AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name');
+      final sonuc = await _auth.signInWithProvider(saglayici);
+      final user = sonuc.user;
+      // Apple adı yalnızca ilk girişte verir; hesaba yaz ki profil oluşturulurken kullanılsın
+      final ad = sonuc.additionalUserInfo?.profile?['name'];
+      if (user != null && (user.displayName == null || user.displayName!.isEmpty) && ad is Map) {
+        final tam = '${ad['firstName'] ?? ''} ${ad['lastName'] ?? ''}'.trim();
+        if (tam.isNotEmpty) await user.updateDisplayName(tam);
+      }
+      return _auth.currentUser;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'canceled' || e.code == 'web-context-canceled') return null;
+      debugPrint('🔐 Apple giriş hatası: $e');
+      rethrow;
+    }
+  }
+
+  /// Hesabın giriş yöntemi: 'password', 'google.com' ya da 'apple.com'
+  String? get girisYontemi {
+    final saglayicilar = _auth.currentUser?.providerData.map((p) => p.providerId).toList() ?? [];
+    for (final s in ['password', 'google.com', 'apple.com']) {
+      if (saglayicilar.contains(s)) return s;
+    }
+    return null;
+  }
+
+  /// Hesabı ve buluttaki tüm verilerini kalıcı olarak siler (mağaza kuralı: uygulama içinden silme).
+  /// Silme işlemi yakın zamanda giriş gerektirdiği için önce kimlik yeniden doğrulanır;
+  /// doğrulama başarısızsa hiçbir veri silinmez. Hata varsa mesaj döner.
+  Future<String?> hesabiSil({String? sifre}) async {
+    final user = _auth.currentUser;
+    if (user == null) return 'Oturum bulunamadı.';
+    final uid = user.uid;
+
+    // 1) Kimliği yeniden doğrula
+    try {
+      switch (girisYontemi) {
+        case 'password':
+          if (sifre == null || sifre.isEmpty) return 'Şifreni girmelisin.';
+          await user.reauthenticateWithCredential(
+              EmailAuthProvider.credential(email: user.email!, password: sifre));
+          break;
+        case 'google.com':
+          final g = await GoogleSignIn().signIn();
+          if (g == null) return 'Doğrulama iptal edildi.';
+          final a = await g.authentication;
+          await user.reauthenticateWithCredential(
+              GoogleAuthProvider.credential(accessToken: a.accessToken, idToken: a.idToken));
+          break;
+        case 'apple.com':
+          await user.reauthenticateWithProvider(AppleAuthProvider());
+          break;
+      }
+    } on FirebaseAuthException catch (e) {
+      debugPrint('🔐 Yeniden doğrulama hatası: $e');
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') return 'Şifre yanlış.';
+      if (e.code == 'user-mismatch') return 'Bu hesapla aynı hesabı seçmelisin.';
+      if (e.code == 'network-request-failed') return 'İnternet bağlantısı yok.';
+      return 'Kimlik doğrulanamadı.';
+    } catch (e) {
+      debugPrint('🔐 Yeniden doğrulama hatası: $e');
+      return 'Kimlik doğrulanamadı.';
+    }
+
+    // 2) Buluttaki verileri sil
+    try {
+      final ben = await _firestore.collection('users').doc(uid).get();
+      final veri = ben.data() ?? {};
+      final arkadaslar = List<String>.from(veri['friends'] ?? []);
+      final kullaniciAdi = veri['username'] as String?;
+
+      // Arkadaşların listesinden çık
+      for (final a in arkadaslar) {
+        try {
+          await _firestore.collection('users').doc(a).update({
+            'friends': FieldValue.arrayRemove([uid]),
+          });
+        } catch (e) {
+          debugPrint('🗑️ Arkadaş listesinden çıkılamadı ($a): $e');
+        }
+      }
+      // Başkalarına gönderilmiş istek / kabul / hatırlatma bildirimleri
+      for (final a in {...arkadaslar, ...List<String>.from(veri['sentRequests'] ?? [])}) {
+        for (final nid in [uid, '${uid}_kabul', '${uid}_durt']) {
+          try {
+            await _firestore.collection('users').doc(a).collection('notifications').doc(nid).delete();
+          } catch (_) {}
+        }
+      }
+      // Paylaşılan dualar
+      final dualar = await _firestore.collection('prayers').where('senderUid', isEqualTo: uid).get();
+      for (final d in dualar.docs) {
+        await d.reference.delete();
+      }
+      // Ortak hatimler: kurduklarını sil, üye olduklarından ayrıl
+      final hatimler = await _firestore.collection('hatimler').where('uyeler', arrayContains: uid).get();
+      for (final h in hatimler.docs) {
+        try {
+          if (h.data()['olusturan'] == uid) {
+            await h.reference.delete();
+          } else {
+            final cuzler = Map<String, dynamic>.from(h.data()['cuzler'] ?? {});
+            cuzler.removeWhere((_, c) => c is Map && c['uid'] == uid);
+            await h.reference.update({
+              'uyeler': FieldValue.arrayRemove([uid]),
+              'cuzler': cuzler,
+            });
+          }
+        } catch (e) {
+          debugPrint('🗑️ Hatim temizlenemedi (${h.id}): $e');
+        }
+      }
+      // Hikaye, kendi bildirimleri, kullanıcı adı ve profil
+      try {
+        await _firestore.collection('stories').doc(uid).delete();
+      } catch (_) {}
+      final bildirimler = await _firestore.collection('users').doc(uid).collection('notifications').get();
+      for (final b in bildirimler.docs) {
+        await b.reference.delete();
+      }
+      if (kullaniciAdi != null && kullaniciAdi.isNotEmpty) {
+        try {
+          await _firestore.collection('usernames').doc(kullaniciAdi).delete();
+        } catch (_) {}
+      }
+      await _firestore.collection('users').doc(uid).delete();
+    } catch (e) {
+      debugPrint('🗑️ Veri silme hatası: $e');
+      return 'Veriler silinemedi. İnternet bağlantını kontrol edip tekrar dene.';
+    }
+
+    // 3) Hesabın kendisi
+    try {
+      await _tokenYenilemeAboneligi?.cancel();
+      _tokenYenilemeAboneligi = null;
+      await user.delete();
+      try {
+        await GoogleSignIn().signOut();
+      } catch (_) {}
+      return null;
+    } catch (e) {
+      debugPrint('🗑️ Hesap silme hatası: $e');
+      return 'Verilerin silindi ama hesap kapatılamadı. Lütfen tekrar dene.';
+    }
+  }
+
   /// Hesaptan çıkış yapar
   Future<void> signOut() async {
     await _tokenYenilemeAboneligi?.cancel();

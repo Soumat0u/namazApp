@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'widgets/cinsiyet_secici.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -111,14 +112,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     }
   }
 
-  Future<void> _googleIleGiris() async {
+  Future<void> _googleIleGiris({bool apple = false}) async {
     setState(() {
       _isLoading = true;
       _errorText = null;
     });
 
     final provider = context.read<NamazProvider>();
-    final error = await provider.googleIleGirisYap();
+    final error = await provider.googleIleGirisYap(apple: apple);
 
     if (error == 'google_username_taken') {
       setState(() { _isLoading = false; });
@@ -419,6 +420,27 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         ),
                       ),
                     ),
+
+                    // Apple ile Giriş (App Store kuralı: Google girişi varsa Apple da sunulmalı)
+                    if (Platform.isIOS) ...[
+                      SizedBox(height: Responsive.h(12)),
+                      SizedBox(
+                        width: double.infinity,
+                        height: Responsive.h(52),
+                        child: ElevatedButton.icon(
+                          onPressed: _isLoading ? null : () => _googleIleGiris(apple: true),
+                          icon: const Icon(Icons.apple, size: 24, color: Colors.white),
+                          label: Text(
+                            "Apple ile Giriş Yap",
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: Responsive.sp(14)),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ),
+                    ],
 
                     SizedBox(height: Responsive.h(24)),
 

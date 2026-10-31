@@ -107,7 +107,16 @@ service cloud.firestore {
       allow create: if girisli()
         && request.resource.data.olusturan == request.auth.uid
         && request.auth.uid in request.resource.data.uyeler;
+      // Üye kendini çıkarabilir (hesap silme / ayrılma)
+      function ayriliyor() {
+        let eski = resource.data.uyeler.toSet();
+        let yeni = request.resource.data.uyeler.toSet();
+        return sadeceDegisen(['uyeler', 'cuzler'])
+          && eski.difference(yeni) == [request.auth.uid].toSet()
+          && yeni.difference(eski).size() == 0;
+      }
       allow update: if (uye() && sadeceDegisen(['cuzler']))
+        || (uye() && ayriliyor())
         || (girisli() && resource.data.olusturan == request.auth.uid
             && request.resource.data.olusturan == request.auth.uid);
       allow delete: if girisli() && resource.data.olusturan == request.auth.uid;
