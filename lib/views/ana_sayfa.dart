@@ -1399,19 +1399,14 @@ class _GununAyetiCard extends StatelessWidget {
                             margin: EdgeInsets.only(bottom: Responsive.h(16)),
                             padding: EdgeInsets.all(Responsive.w(16)),
                             decoration: BoxDecoration(
-                              color: okunuyor
-                                  ? Colors.amber.withOpacity(0.22)
-                                  : isTarget ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.05),
+                              color: isTarget && !okunuyor ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.05),
                               borderRadius: BorderRadius.circular(Responsive.w(20)),
                               border: Border.all(
                                 color: okunuyor
-                                    ? Colors.amber.withOpacity(0.9)
+                                    ? Colors.amber.withOpacity(0.5)
                                     : isTarget ? Colors.white.withOpacity(0.5) : Colors.white.withOpacity(0.1),
                                 width: okunuyor || isTarget ? 1.5 : 0.5,
                               ),
-                              boxShadow: okunuyor
-                                  ? [BoxShadow(color: Colors.amber.withOpacity(0.35), blurRadius: 18)]
-                                  : null,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,

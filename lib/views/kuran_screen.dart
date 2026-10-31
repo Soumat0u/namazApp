@@ -483,15 +483,14 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
             margin: EdgeInsets.only(bottom: Responsive.h(10)),
             padding: EdgeInsets.all(Responsive.w(14)),
             decoration: BoxDecoration(
-              color: okunuyor ? Colors.amber.withOpacity(0.18) : r.kartRengi,
+              color: r.kartRengi,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: okunuyor
-                    ? Colors.amber.withOpacity(0.9)
+                    ? Colors.amber.withOpacity(0.5)
                     : kaldigim ? r.anaRenk.withOpacity(0.6) : Colors.transparent,
                 width: 1.5,
               ),
-              boxShadow: okunuyor ? [BoxShadow(color: Colors.amber.withOpacity(0.3), blurRadius: 16)] : null,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

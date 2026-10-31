@@ -200,7 +200,7 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
                         margin: const EdgeInsets.only(bottom: 6),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: kuran.aktifIndex == i ? Colors.amber.withOpacity(0.10) : Colors.transparent,
+                          color: Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: AyetMetni(okuyucu: kuran, sure: dua.sure!, ayet: dua.ayetler[i], stil: arapcaStil),
@@ -210,24 +210,10 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
               );
             }
             // Kur'an dışı: yazıdan-sese motorunun okuduğu kelime aydınlatılır
-            final aktif = _oynatici.aktifKelime;
-            final k = _oynatici.kelimeler;
-            return Text.rich(
-              TextSpan(children: [
-                for (int i = 0; i < k.length; i++) ...[
-                  TextSpan(
-                    text: k[i].$1,
-                    style: i == aktif
-                        ? arapcaStil.copyWith(backgroundColor: Colors.amber.withOpacity(0.45), fontWeight: FontWeight.bold)
-                        : (aktif != null && i < aktif)
-                            ? arapcaStil.copyWith(color: r.yaziRengi.withOpacity(0.55))
-                            : arapcaStil,
-                  ),
-                  if (i < k.length - 1) TextSpan(text: ' ', style: arapcaStil),
-                ],
-              ]),
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.right,
+            return ParlayanKelimeler(
+              kelimeler: [for (final k in _oynatici.kelimeler) k.$1],
+              aktif: _oynatici.aktifKelime,
+              stil: arapcaStil,
             );
           },
         );
