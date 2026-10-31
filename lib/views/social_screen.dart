@@ -160,20 +160,27 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               buttonText: "Tümünü Gör",
               onSeeAll: () { FocusScope.of(context).unfocus(); _showFullLeaderboard(context, r, provider); }
             ),
-            if (provider.currentUid != null)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
-                child: Row(
-                  children: [
-                    _siralamaSecimi(r, "Genel", false),
-                    SizedBox(width: Responsive.w(8)),
-                    _siralamaSecimi(r, "Arkadaşlar • Bu Hafta", true),
-                  ],
-                ),
+            // Arkadaşı yoksa "Arkadaşlar" seçenekleri gizlenir (boş durum yalnızca Arkadaşlarım'da görünür)
+            _arkadasVarsa(
+              (arkadasVar) => Column(
+                children: [
+                  if (arkadasVar)
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+                      child: Row(
+                        children: [
+                          _siralamaSecimi(r, "Genel", false),
+                          SizedBox(width: Responsive.w(8)),
+                          _siralamaSecimi(r, "Arkadaşlar • Bu Hafta", true),
+                        ],
+                      ),
+                    ),
+                  arkadasVar && _kardesSiralamasi
+                      ? _buildKardesSiralamasi(r, provider, limit: 5)
+                      : _buildIstikametPreview(context, r, provider),
+                ],
               ),
-            _kardesSiralamasi
-                ? _buildKardesSiralamasi(r, provider, limit: 5)
-                : _buildIstikametPreview(context, r, provider),
+            ),
 
             const SizedBox(height: 10),
 
@@ -203,12 +210,14 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.all(4),
-                    child: Row(
-                      children: [
-                        _buildMeclisTabButton("Dualarım", 0, r),
-                        _buildMeclisTabButton("Arkadaşlar", 1, r),
-                        _buildMeclisTabButton("Global", 2, r),
-                      ],
+                    child: _arkadasVarsa(
+                      (arkadasVar) => Row(
+                        children: [
+                          _buildMeclisTabButton("Dualarım", 0, r),
+                          if (arkadasVar) _buildMeclisTabButton("Arkadaşlar", 1, r),
+                          _buildMeclisTabButton("Global", 2, r),
+                        ],
+                      ),
                     ),
                   )
                 ],
@@ -226,6 +235,23 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         ),
       ),
       ),
+    );
+  }
+
+  /// Kullanıcının en az bir arkadaşı var mı? Arkadaş yoksa "Arkadaşlar" sekmesi seçiliyse Dualarım'a döner.
+  Widget _arkadasVarsa(Widget Function(bool arkadasVar) builder) {
+    return StreamBuilder<UserProfile?>(
+      stream: _cachedUserProfileStream,
+      initialData: _sonProfil,
+      builder: (context, snap) {
+        final arkadasVar = snap.data?.friends.isNotEmpty ?? false;
+        if (!arkadasVar && snap.data != null && _selectedTab == 1) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _selectedTab == 1) setState(() => _selectedTab = 0);
+          });
+        }
+        return builder(arkadasVar);
+      },
     );
   }
 
