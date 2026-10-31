@@ -1,0 +1,110 @@
+rules_version = '2';
+
+// Namaz App Firestore kuralları.
+// Temel ilke: herkes yalnızca kendi belgesine yazar. Başkasının belgesine yalnızca
+// dar tanımlı alanlarda (arkadaşlık, bildirim, amîn, hikaye izlenmesi) dokunulabilir.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function girisli() {
+      return request.auth != null;
+    }
+
+    function ben(uid) {
+      return girisli() && request.auth.uid == uid;
+    }
+
+    // Güncellemede yalnızca verilen alanlar değişiyor mu?
+    function sadeceDegisen(alanlar) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(alanlar);
+    }
+
+    // ───────────── Kullanıcılar ─────────────
+    match /users/{uid} {
+      allow read: if girisli();
+      allow create, delete: if ben(uid);
+      // Cinsiyet bir kez belirlenir, sonra değiştirilemez
+      allow update: if (ben(uid) && cinsiyetKorunuyor()) || arkadasligiDegistiriyor(uid);
+
+      function cinsiyetKorunuyor() {
+        return !('cinsiyet' in resource.data)
+          || resource.data.cinsiyet == null
+          || request.resource.data.get('cinsiyet', null) == resource.data.cinsiyet;
+      }
+
+      // Başkası, bu kullanıcının friends listesine yalnızca KENDİ uid'sini ekleyip çıkarabilir.
+      // Ekleme: aynı işlemde bu kullanıcının isteğini kabul etmiş olmalı
+      //   (users/{ben}/notifications/{uid} işlem sonunda 'accepted').
+      // Çıkarma: arkadaşlıktan çıkmak her zaman serbest.
+      function arkadasligiDegistiriyor(uid) {
+        let eski = resource.data.get('friends', []).toSet();
+        let yeni = request.resource.data.get('friends', []).toSet();
+        let kabul = getAfter(/databases/$(database)/documents/users/$(request.auth.uid)/notifications/$(uid));
+        return girisli()
+          && sadeceDegisen(['friends'])
+          && (
+            (yeni.difference(eski) == [request.auth.uid].toSet()
+              && eski.difference(yeni).size() == 0
+              && kabul != null && kabul.data.status == 'accepted')
+            || (eski.difference(yeni) == [request.auth.uid].toSet()
+              && yeni.difference(eski).size() == 0)
+          );
+      }
+
+      // Bildirimler: sahibi her şeyi yapar. Başkası yalnızca kendi uid'siyle başlayan
+      // belgeyi (istek: {uid}, kabul: {uid}_kabul, hatırlatma: {uid}_durt) yazıp silebilir.
+      match /notifications/{nid} {
+        allow read: if ben(uid);
+        allow update, delete: if ben(uid);
+        allow create, update: if girisli()
+          && (nid == request.auth.uid
+              || nid == request.auth.uid + '_kabul'
+              || nid == request.auth.uid + '_durt')
+          && request.resource.data.fromUid == request.auth.uid;
+        allow delete: if girisli()
+          && (nid == request.auth.uid || nid == request.auth.uid + '_kabul' || nid == request.auth.uid + '_durt');
+      }
+    }
+
+    // ───────────── Kullanıcı adları ─────────────
+    // Kayıttan önce (giriş yapılmadan) müsaitlik kontrolü yapıldığı için okuma herkese açık.
+    match /usernames/{name} {
+      allow read: if true;
+      allow create: if girisli() && request.resource.data.uid == request.auth.uid;
+      allow update: if girisli() && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if girisli() && resource.data.uid == request.auth.uid;
+    }
+
+    // ───────────── Dualar ─────────────
+    match /prayers/{id} {
+      allow read: if girisli();
+      allow create: if girisli() && request.resource.data.senderUid == request.auth.uid;
+      allow update: if girisli() && (
+        resource.data.senderUid == request.auth.uid
+        || sadeceDegisen(['aminBy', 'aminCount'])
+        || sikayetEdiyor()
+      );
+
+      // Şikâyet: listeye yalnızca kendi uid'sini ekleyebilir
+      function sikayetEdiyor() {
+        let eski = resource.data.get('sikayetEdenler', []).toSet();
+        let yeni = request.resource.data.get('sikayetEdenler', []).toSet();
+        return sadeceDegisen(['sikayetEdenler'])
+          && yeni.difference(eski) == [request.auth.uid].toSet()
+          && eski.difference(yeni).size() == 0;
+      }
+      allow delete: if girisli() && resource.data.senderUid == request.auth.uid;
+    }
+
+    // ───────────── Hikayeler (belge id = sahibin uid'si) ─────────────
+    match /stories/{uid} {
+      allow read: if girisli();
+      allow create: if ben(uid);
+      allow update: if ben(uid) || (girisli() && sadeceDegisen(['viewers', 'viewerProfiles']));
+      // Süresi dolan hikayeyi gören herkes temizleyebilir (lazy delete)
+      allow delete: if ben(uid)
+        || (girisli() && resource.data.createdAt < request.time - duration.value(24, 'h'));
+    }
+  }
+}
