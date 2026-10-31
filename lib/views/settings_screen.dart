@@ -179,6 +179,8 @@ class AyarlarSayfasi extends StatelessWidget {
           _buildThemeSelector(r, themeProvider),
           SizedBox(height: Responsive.h(12)),
           _buildArkaPlanSecici(r, themeProvider),
+          SizedBox(height: Responsive.h(12)),
+          _buildYaziBoyutuSecici(r, themeProvider),
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Hesaplama"),
           _buildSettingsCard(r, [
@@ -338,6 +340,56 @@ class AyarlarSayfasi extends StatelessWidget {
             ),
           ),
           SizedBox(height: Responsive.h(40)),
+        ],
+      ),
+    );
+  }
+
+  /// Yazı boyutu: dört seçenek, canlı örnek metinle
+  Widget _buildYaziBoyutuSecici(AppThemeColors r, ThemeProvider themeProvider) {
+    final secenekler = ThemeProvider.yaziBoyutlari;
+    final secili = secenekler.indexWhere((s) => s.$1 == themeProvider.yaziOlcegi).clamp(0, secenekler.length - 1);
+    return Container(
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(16))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.format_size_rounded, color: r.anaRenk, size: Responsive.w(20)),
+              SizedBox(width: Responsive.w(8)),
+              Expanded(
+                child: Text("Yazı Boyutu",
+                    style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
+              ),
+              Text(secenekler[secili].$2,
+                  style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12))),
+            ],
+          ),
+          SizedBox(height: Responsive.h(10)),
+          Text(
+            "Vakit girince bildirim gelir; kıldığın vakti işaretlemeyi unutma.",
+            style: TextStyle(color: r.yaziRengi.withOpacity(0.8), fontSize: Responsive.sp(13)),
+          ),
+          SizedBox(height: Responsive.h(6)),
+          Row(
+            children: [
+              Text("A", style: TextStyle(color: r.pasifRenk, fontSize: 13, fontWeight: FontWeight.bold)),
+              Expanded(
+                child: Slider(
+                  value: secili.toDouble(),
+                  min: 0,
+                  max: (secenekler.length - 1).toDouble(),
+                  divisions: secenekler.length - 1,
+                  activeColor: r.anaRenk,
+                  inactiveColor: r.pasifRenk.withOpacity(0.2),
+                  onChanged: (v) => themeProvider.yaziOlcegiDegistir(secenekler[v.round()].$1),
+                ),
+              ),
+              Text("A", style: TextStyle(color: r.pasifRenk, fontSize: 22, fontWeight: FontWeight.bold)),
+            ],
+          ),
         ],
       ),
     );

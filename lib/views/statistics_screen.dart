@@ -946,6 +946,11 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
                 child: Text(
                   g,
                   textAlign: TextAlign.center,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
+                  // Büyük yazıda sütuna sığsın diye en fazla 1,2 kat büyür
+                  textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2),
                   style: TextStyle(
                     fontSize: Responsive.sp(11),
                     fontWeight: FontWeight.bold,

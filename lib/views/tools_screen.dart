@@ -201,6 +201,8 @@ class AraclarSayfasi extends StatelessWidget {
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
+                        // Kutular sabit boyutta: adlar en fazla 1,25 kat büyür ki kesilmesin
+                        textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.25),
                         style: TextStyle(
                           color: tema.yaziRengi,
                           fontWeight: FontWeight.bold,

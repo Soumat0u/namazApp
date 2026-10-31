@@ -80,6 +80,15 @@ class NamazTakipApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Takva Yolum',
       theme: themeProvider.buildThemeData(),
+      // Uygulama içi yazı boyutu, telefonun yazı boyutuyla çarpılır (toplam en fazla 2 kat)
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        final toplam = (mq.textScaler.scale(1) * themeProvider.yaziOlcegi).clamp(0.8, 2.0);
+        return MediaQuery(
+          data: mq.copyWith(textScaler: TextScaler.linear(toplam)),
+          child: child!,
+        );
+      },
       home: const _AuthGate(),
     );
   }

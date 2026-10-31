@@ -20,6 +20,23 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Uygulama yazı boyutu çarpanı (telefonun kendi ayarıyla çarpılır): yaşlılar ve az görenler için
+  static const List<(double, String)> yaziBoyutlari = [
+    (1.0, 'Normal'),
+    (1.15, 'Büyük'),
+    (1.3, 'Daha Büyük'),
+    (1.5, 'En Büyük'),
+  ];
+  double _yaziOlcegi = 1.0;
+  double get yaziOlcegi => _yaziOlcegi;
+
+  Future<void> yaziOlcegiDegistir(double olcek) async {
+    _yaziOlcegi = olcek;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('yazi_olcegi', olcek);
+    notifyListeners();
+  }
+
   ThemeProvider() {
     _temayiYukle();
   }
@@ -29,6 +46,7 @@ class ThemeProvider extends ChangeNotifier {
     final temaId = prefs.getString('secili_tema') ?? 'varsayilan';
     _aktifTema = AppThemeData.getById(temaId);
     _arkaPlanModu = ArkaPlanModu.bul(prefs.getString('arka_plan_modu'));
+    _yaziOlcegi = prefs.getDouble('yazi_olcegi') ?? 1.0;
     notifyListeners();
   }
 
