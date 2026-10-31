@@ -224,7 +224,6 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
     super.initState();
     _ayarlariYukle();
     _okuyucu.addListener(_okunaniTakipEt);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ayeteGit(widget.baslangicAyet, animasyonlu: false));
   }
 
   Future<void> _ayarlariYukle() async {
@@ -239,6 +238,8 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
       _indirildi = indirildi;
     });
     await _okuyucu.hizAyarla(p.getDouble('kuran_hiz') ?? 1.0);
+    // Yazı boyutu/meal ayarı sayfanın düzenini değiştirdiği için kaldığın yere ayarlar yüklendikten sonra git
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ayeteGit(widget.baslangicAyet, animasyonlu: false));
   }
 
   void _ayeteGit(int ayet, {bool animasyonlu = true}) {
@@ -448,7 +449,10 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
           }
           return FloatingActionButton(
             backgroundColor: r.anaRenk,
-            onPressed: _okuyucu.calDuraklat,
+            // Okuma başlamamışsa kaldığın ayetten başla
+            onPressed: () => _okuyucu.aktifIndex == null
+                ? _okuyucu.baslat((_kaldigimAyet ?? widget.baslangicAyet) - 1)
+                : _okuyucu.calDuraklat(),
             child: _okuyucu.yukleniyor
                 ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
                 : Icon(_okuyucu.caliyor ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white),
@@ -496,7 +500,9 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
                 style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12))),
           ),
         GestureDetector(
-          onTap: () => _ayetSecenekleri(a),
+          // Dokun: buradan oku • Basılı tut: kaldığım yer / paylaş
+          onTap: () => _okuyucu.baslat(a - 1),
+          onLongPress: () => _ayetSecenekleri(a),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 350),
             margin: EdgeInsets.only(bottom: Responsive.h(10)),

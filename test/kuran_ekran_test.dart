@@ -35,7 +35,7 @@ void main() {
     // Ayete dokununca açılan menü de çalışmalı
     Navigator.of(tester.element(find.text('Okuma hızı'))).pop();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('1').first);
+    await tester.longPress(find.text('1').first);
     await tester.pumpAndSettle();
     expect(find.text('Kaldığım yer olarak işaretle'), findsOneWidget);
   });

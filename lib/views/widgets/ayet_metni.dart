@@ -27,22 +27,13 @@ class IsikliKelimeler extends StatelessWidget {
     this.hiza = TextAlign.right,
   });
 
-  TextSpan _spanlar({Paint? aktifBoya}) {
+  TextSpan _spanlar() {
     final soluk = stil.copyWith(color: stil.color?.withOpacity(0.55));
-    final renksiz = TextStyle(
-      fontSize: stil.fontSize,
-      height: stil.height,
-      fontFamily: stil.fontFamily,
-      fontWeight: stil.fontWeight,
-      letterSpacing: stil.letterSpacing,
-    );
     return TextSpan(children: [
       for (int i = 0; i < kelimeler.length; i++) ...[
         TextSpan(
           text: kelimeler[i],
-          style: i == aktif && aktifBoya != null
-              ? renksiz.copyWith(foreground: aktifBoya)
-              : (aktif != null && i < aktif!)
+          style: (aktif != null && i < aktif!)
                   ? soluk
                   : stil,
         ),
@@ -70,36 +61,68 @@ class IsikliKelimeler extends StatelessWidget {
         textAlign: hiza,
         textDirection: TextDirection.rtl,
         textScaler: olcek,
-      )..layout(maxWidth: kisit.maxWidth);
+      // minWidth da verilmeli: yoksa genişlik metne küçülür, sağa yaslama hesaba katılmaz ve ışık boşluğa düşer
+      )..layout(minWidth: kisit.maxWidth, maxWidth: kisit.maxWidth);
       final kutular = olcu.getBoxesForSelection(TextSelection(baseOffset: bas, extentOffset: son));
       olcu.dispose();
       if (kutular.isEmpty) return Text.rich(_spanlar(), textAlign: hiza, textDirection: TextDirection.rtl);
       final alan = kutular.first.toRect();
 
-      // Sağdan sola kayan ışık bandı
-      final temel = stil.color ?? Colors.black;
+      // Sağdan sola kayan ışık bandı. Yazıya doğrudan gradyan boyamak Impeller'da görünmüyor;
+      // bu yüzden metnin üstüne yalnızca okunan kelimeden oluşan bir katman konur ve o katman
+      // kayan altın bir maskeyle boyanır (harf bağlantıları bozulmaz).
       final c = ilerleme.clamp(0.0, 1.0);
-      const yari = 0.22;
-      final boya = Paint()
-        ..shader = LinearGradient(
-          colors: [temel, temel, _isik, _isik, temel, temel],
-          stops: [
-            0,
-            (c - yari).clamp(0.0, 1.0),
-            (c - yari / 3).clamp(0.0, 1.0),
-            (c + yari / 3).clamp(0.0, 1.0),
-            (c + yari).clamp(0.0, 1.0),
-            1,
-          ],
-        ).createShader(Rect.fromPoints(Offset(alan.right, alan.top), Offset(alan.left, alan.bottom)));
+      const yari = 0.3; // Bandın yarı genişliği (kelimeye oranla)
+      final seffaf = _isik.withOpacity(0);
+      final bant = LinearGradient(
+        begin: Alignment.centerRight, // 0 = kelimenin sağ ucu (ilk harf)
+        end: Alignment.centerLeft,
+        colors: [seffaf, seffaf, _isik, _isik, seffaf, seffaf],
+        stops: [
+          0,
+          (c - yari).clamp(0.0, 1.0),
+          (c - yari / 3).clamp(0.0, 1.0),
+          (c + yari / 3).clamp(0.0, 1.0),
+          (c + yari).clamp(0.0, 1.0),
+          1,
+        ],
+      );
 
-      return Text.rich(
-        _spanlar(aktifBoya: boya),
-        textAlign: hiza,
-        textDirection: TextDirection.rtl,
-        textScaler: olcek,
+      return Stack(
+        children: [
+          // Tam genişlik: kısa ayetler kendi boyuna küçülüp sola kaymasın (ölçümle aynı düzen)
+          SizedBox(
+            width: kisit.maxWidth,
+            child: Text.rich(_spanlar(), textAlign: hiza, textDirection: TextDirection.rtl, textScaler: olcek),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (_) => bant.createShader(alan),
+                child: Text.rich(_maske(), textAlign: hiza, textDirection: TextDirection.rtl, textScaler: olcek),
+              ),
+            ),
+          ),
+        ],
       );
     });
+  }
+
+  /// Maske katmanı: aynı düzen, ama yalnızca okunan kelime görünür (hafif ışıltılı)
+  TextSpan _maske() {
+    final gizli = stil.copyWith(color: Colors.transparent, shadows: const []);
+    final gorunur = stil.copyWith(
+      color: Colors.white,
+      shadows: const [Shadow(color: Colors.white, blurRadius: 10)],
+    );
+    return TextSpan(children: [
+      for (int i = 0; i < kelimeler.length; i++) ...[
+        TextSpan(text: kelimeler[i], style: i == aktif ? gorunur : gizli),
+        if (i < kelimeler.length - 1) TextSpan(text: ' ', style: gizli),
+      ],
+      if (sonEk.isNotEmpty) TextSpan(text: sonEk, style: gizli),
+    ]);
   }
 }
 
