@@ -359,10 +359,16 @@ class AyarlarSayfasi extends StatelessWidget {
             ],
           ),
           SizedBox(height: Responsive.h(10)),
-          Row(
+          // Seçenekler sığmadığında alt satıra geçer (4 + 3)
+          LayoutBuilder(builder: (context, kisit) {
+            final genislik = (kisit.maxWidth - 3 * Responsive.w(8)) / 4;
+            return Wrap(
+            spacing: Responsive.w(8),
+            runSpacing: Responsive.h(8),
             children: [
-              for (final mod in ArkaPlanModu.values) ...[
-                Expanded(
+              for (final mod in ArkaPlanModu.values)
+                SizedBox(
+                  width: genislik,
                   child: GestureDetector(
                     onTap: () => themeProvider.arkaPlanModuDegistir(mod),
                     child: AnimatedContainer(
@@ -387,10 +393,9 @@ class AyarlarSayfasi extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (mod != ArkaPlanModu.values.last) SizedBox(width: Responsive.w(8)),
-              ],
             ],
-          ),
+          );
+          }),
           SizedBox(height: Responsive.h(8)),
           Text(themeProvider.arkaPlanModu.aciklama,
               style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11))),
