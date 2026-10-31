@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -65,27 +66,53 @@ class _CamilerScreenState extends State<CamilerScreen> {
     }
   }
 
+  /// OpenStreetMap Nominatim araması (hızlı, anahtarsız). Overpass daha kapsamlı ama sık sık aşırı yüklü
+  /// olup 30 sn+ sürdüğü/502 verdiği için kullanılmıyor. Kullanım kuralı gereği uygulama kimliği gönderilir
+  /// ve aramalar arasında 1 sn beklenir.
   Future<List<Cami>> _camileriGetir(LatLng ben) async {
-    final sorgu = '[out:json][timeout:20];('
-        'node["amenity"="place_of_worship"]["religion"="muslim"](around:$_yaricap,${ben.latitude},${ben.longitude});'
-        'way["amenity"="place_of_worship"]["religion"="muslim"](around:$_yaricap,${ben.latitude},${ben.longitude});'
-        ');out center 60;';
-    final cevap = await http
-        .post(Uri.parse('https://overpass-api.de/api/interpreter'), body: {'data': sorgu})
-        .timeout(const Duration(seconds: 25));
-    if (cevap.statusCode != 200) throw Exception('Cami bilgisi alınamadı (${cevap.statusCode}).');
-    final ogeler = (json.decode(utf8.decode(cevap.bodyBytes))['elements'] as List).cast<Map<String, dynamic>>();
-    final liste = <Cami>[];
-    for (final o in ogeler) {
-      final lat = (o['lat'] ?? o['center']?['lat']) as num?;
-      final lon = (o['lon'] ?? o['center']?['lon']) as num?;
-      if (lat == null || lon == null) continue;
-      final ad = (o['tags']?['name'] as String?) ?? 'Cami';
-      final mesafe = Geolocator.distanceBetween(ben.latitude, ben.longitude, lat.toDouble(), lon.toDouble());
-      liste.add(Cami(ad, LatLng(lat.toDouble(), lon.toDouble()), mesafe));
+    // Yaklaşık 3 km'lik kutu (1° enlem ≈ 111 km)
+    final dLat = _yaricap / 111000;
+    final dLon = _yaricap / (111000 * cos(ben.latitude * pi / 180));
+    final kutu = '${ben.longitude - dLon},${ben.latitude + dLat},${ben.longitude + dLon},${ben.latitude - dLat}';
+
+    final bulunan = <String, Cami>{};
+    String? hata;
+    for (final (i, aranan) in const ['mosque', 'cami'].indexed) {
+      if (i > 0) await Future.delayed(const Duration(milliseconds: 1100));
+      try {
+        final cevap = await http.get(
+          Uri.https('nominatim.openstreetmap.org', '/search', {
+            'q': aranan,
+            'format': 'jsonv2',
+            'viewbox': kutu,
+            'bounded': '1',
+            'limit': '50',
+            'accept-language': 'tr',
+          }),
+          headers: {'User-Agent': 'TakvaYolum/1.0 (com.example.namaz_app)'},
+        ).timeout(const Duration(seconds: 15));
+        if (cevap.statusCode != 200) {
+          hata = 'Cami bilgisi alınamadı (${cevap.statusCode}).';
+          continue;
+        }
+        for (final o in (json.decode(utf8.decode(cevap.bodyBytes)) as List).cast<Map<String, dynamic>>()) {
+          if (o['type'] != 'place_of_worship') continue;
+          final lat = double.tryParse('${o['lat']}');
+          final lon = double.tryParse('${o['lon']}');
+          if (lat == null || lon == null) continue;
+          final mesafe = Geolocator.distanceBetween(ben.latitude, ben.longitude, lat, lon);
+          if (mesafe > _yaricap * 1.1) continue; // Kutunun köşeleri
+          final ad = (o['name'] as String?)?.trim();
+          bulunan['${o['osm_type']}${o['osm_id']}'] =
+              Cami(ad == null || ad.isEmpty ? 'Cami' : ad, LatLng(lat, lon), mesafe);
+        }
+      } catch (e) {
+        debugPrint('🕌 Cami arama hatası: $e');
+        hata = 'Cami bilgisi alınamadı. İnternet bağlantınızı kontrol edin.';
+      }
     }
-    liste.sort((a, b) => a.mesafe.compareTo(b.mesafe));
-    return liste;
+    if (bulunan.isEmpty && hata != null) throw Exception(hata);
+    return bulunan.values.toList()..sort((a, b) => a.mesafe.compareTo(b.mesafe));
   }
 
   Future<void> _yolTarifi(Cami c) async {
