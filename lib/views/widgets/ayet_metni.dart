@@ -27,14 +27,21 @@ class IsikliKelimeler extends StatelessWidget {
     this.hiza = TextAlign.right,
   });
 
-  TextSpan _spanlar() {
-    final soluk = stil.copyWith(color: stil.color?.withOpacity(0.55));
+  Color get _normal => stil.color ?? Colors.black;
+  Color get _soluk => _normal.withOpacity(_normal.opacity * 0.55);
+
+  /// [aktifGizli]: okunan kelime alt katmanda görünmez, üst katmanda ışıkla çizilir
+  TextSpan _spanlar({bool aktifGizli = false}) {
+    final soluk = stil.copyWith(color: _soluk);
+    final gizli = stil.copyWith(color: Colors.transparent);
     return TextSpan(children: [
       for (int i = 0; i < kelimeler.length; i++) ...[
         TextSpan(
           text: kelimeler[i],
           style: (aktif != null && i < aktif!)
-                  ? soluk
+              ? soluk
+              : (aktifGizli && i == aktif)
+                  ? gizli
                   : stil,
         ),
         if (i < kelimeler.length - 1) TextSpan(text: ' ', style: stil),
@@ -73,11 +80,11 @@ class IsikliKelimeler extends StatelessWidget {
       // kayan altın bir maskeyle boyanır (harf bağlantıları bozulmaz).
       final c = ilerleme.clamp(0.0, 1.0);
       const yari = 0.3; // Bandın yarı genişliği (kelimeye oranla)
-      final seffaf = _isik.withOpacity(0);
+      // Işığın gerisi (okunmuş harfler) soluk, altı altın, önü (okunacak harfler) normal
       final bant = LinearGradient(
         begin: Alignment.centerRight, // 0 = kelimenin sağ ucu (ilk harf)
         end: Alignment.centerLeft,
-        colors: [seffaf, seffaf, _isik, _isik, seffaf, seffaf],
+        colors: [_soluk, _soluk, _isik, _isik, _normal, _normal],
         stops: [
           0,
           (c - yari).clamp(0.0, 1.0),
@@ -93,7 +100,8 @@ class IsikliKelimeler extends StatelessWidget {
           // Tam genişlik: kısa ayetler kendi boyuna küçülüp sola kaymasın (ölçümle aynı düzen)
           SizedBox(
             width: kisit.maxWidth,
-            child: Text.rich(_spanlar(), textAlign: hiza, textDirection: TextDirection.rtl, textScaler: olcek),
+            child: Text.rich(_spanlar(aktifGizli: true),
+                textAlign: hiza, textDirection: TextDirection.rtl, textScaler: olcek),
           ),
           Positioned.fill(
             child: IgnorePointer(
@@ -112,10 +120,7 @@ class IsikliKelimeler extends StatelessWidget {
   /// Maske katmanı: aynı düzen, ama yalnızca okunan kelime görünür (hafif ışıltılı)
   TextSpan _maske() {
     final gizli = stil.copyWith(color: Colors.transparent, shadows: const []);
-    final gorunur = stil.copyWith(
-      color: Colors.white,
-      shadows: const [Shadow(color: Colors.white, blurRadius: 10)],
-    );
+    final gorunur = stil.copyWith(color: Colors.white, shadows: const []);
     return TextSpan(children: [
       for (int i = 0; i < kelimeler.length; i++) ...[
         TextSpan(text: kelimeler[i], style: i == aktif ? gorunur : gizli),
