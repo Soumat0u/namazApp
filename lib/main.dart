@@ -210,6 +210,8 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
     final vakitTemasi = context.select<NamazProvider, String>((p) => p.vaktinTemasi);
 
     return Scaffold(
+      // Yüzen alt menü: arka plan menünün çevresinden görünür
+      extendBody: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -220,19 +222,33 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
             zemin: tema.arkaPlanRengi,
             koyuTema: tema.brightness == Brightness.dark,
           ),
-          IndexedStack(index: _seciliSayfaIndex, children: _sayfalar),
+          // İçerik menünün altına girmesin: menü yüksekliği kadar boşluk bırakılır
+          Builder(
+            builder: (context) => Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+              child: MediaQuery.removePadding(
+                context: context,
+                removeBottom: true,
+                child: IndexedStack(index: _seciliSayfaIndex, children: _sayfalar),
+              ),
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
+          margin: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(10)),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: tema.kartRengi,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: tema.anaRenk.withOpacity(0.12)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 20,
-                offset: const Offset(0, -5),
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
