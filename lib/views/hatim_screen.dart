@@ -248,7 +248,7 @@ class _OrtakHatimler extends StatelessWidget {
   }
 
   Future<void> _hatimOlustur(BuildContext context, String uid) async {
-    final r = context.renkler;
+    final r = context.renklerOku; // Düğme olayında: dinlemeden oku
     final messenger = ScaffoldMessenger.of(context);
     final adController = TextEditingController(text: "Kardeşler Hatmi");
     final secili = <String>{};

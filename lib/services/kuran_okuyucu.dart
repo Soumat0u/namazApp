@@ -51,6 +51,17 @@ class KuranOkuyucu extends ChangeNotifier {
 
   int? get aktifIndex => _aktifIndex;
   int? get aktifKelime => konum.value?.kelime;
+
+  /// Okuma hızı (0.5–1.5). Kelime zamanlaması kaydın kendi zamanıyla ölçüldüğü için ışık kaymaz.
+  double _hiz = 1.0;
+  double get hiz => _hiz;
+  Future<void> hizAyarla(double hiz) async {
+    _hiz = hiz;
+    try {
+      await _oynatici.setPlaybackRate(hiz);
+    } catch (_) {}
+    _bildir();
+  }
   ({int sure, int ayet})? get aktifAyet => _aktifIndex == null ? null : ayetler[_aktifIndex!];
   bool get caliyor => _caliyor;
   bool get yukleniyor => _yukleniyor;
@@ -93,6 +104,7 @@ class KuranOkuyucu extends ChangeNotifier {
       // İndirilmişse telefondan (internetsiz), yoksa internetten çal
       final yerel = await KuranSesDeposu.dosya(a.sure, a.ayet);
       await _oynatici.play(await yerel.exists() ? DeviceFileSource(yerel.path) : UrlSource(sesAdresi(a.sure, a.ayet)));
+      if (_hiz != 1.0) await _oynatici.setPlaybackRate(_hiz);
     } catch (e) {
       debugPrint('🔊 Tilavet hatası: $e');
       hata = 'Ses yüklenemedi. İnternet bağlantınızı kontrol edin.';

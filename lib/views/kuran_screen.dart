@@ -238,6 +238,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
       _kaldigimAyet = k?.sure == widget.sure ? k!.ayet : null;
       _indirildi = indirildi;
     });
+    await _okuyucu.hizAyarla(p.getDouble('kuran_hiz') ?? 1.0);
   }
 
   void _ayeteGit(int ayet, {bool animasyonlu = true}) {
@@ -267,7 +268,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
   }
 
   Future<void> _ayetSecenekleri(int ayet) async {
-    final r = context.renkler;
+    final r = context.renklerOku; // Düğme olayında: dinlemeden oku
     final messenger = ScaffoldMessenger.of(context);
     await showModalBottomSheet(
       context: context,
@@ -333,7 +334,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
   }
 
   Future<void> _ayarlar() async {
-    final r = context.renkler;
+    final r = context.renklerOku; // Düğme olayında: dinlemeden oku
     await showModalBottomSheet(
       context: context,
       backgroundColor: r.arkaPlanRengi,
@@ -353,6 +354,25 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
                     yenile(() {});
                     SharedPreferences.getInstance().then((p) => p.setBool('kuran_meal_goster', v));
                   },
+                ),
+                ListTile(
+                  title: const Text("Okuma hızı"),
+                  subtitle: Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final h in const [0.5, 0.75, 1.0, 1.25, 1.5])
+                        ChoiceChip(
+                          label: Text(h == 1.0 ? "Normal" : "${h}x"),
+                          selected: _okuyucu.hiz == h,
+                          selectedColor: r.anaRenk.withOpacity(0.2),
+                          onSelected: (_) {
+                            _okuyucu.hizAyarla(h);
+                            yenile(() {});
+                            SharedPreferences.getInstance().then((p) => p.setDouble('kuran_hiz', h));
+                          },
+                        ),
+                    ],
+                  ),
                 ),
                 ListTile(
                   title: const Text("Yazı boyutu"),
