@@ -10,6 +10,8 @@ import 'tesbihat_screen.dart';
 import 'dua_kitapligi_screen.dart';
 import 'hatim_screen.dart';
 import 'oruc_screen.dart';
+import 'camiler_screen.dart';
+import 'zekat_screen.dart';
 
 
 class AraclarSayfasi extends StatelessWidget {
@@ -106,6 +108,20 @@ class AraclarSayfasi extends StatelessWidget {
                   MaterialPageRoute(builder: (context) => const KazaTakipSayfasi()),
                 );
               },
+            ),
+            _buildAracCard(
+              context: context,
+              icon: Icons.mosque_rounded,
+              title: "Yakındaki Camiler",
+              color: Colors.cyan.shade700,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CamilerScreen())),
+            ),
+            _buildAracCard(
+              context: context,
+              icon: Icons.calculate_rounded,
+              title: "Zekât Hesaplayıcı",
+              color: Colors.amber.shade800,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ZekatScreen())),
             ),
             _buildAracCard(
               context: context,

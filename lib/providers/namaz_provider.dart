@@ -1505,6 +1505,34 @@ class NamazProvider extends ChangeNotifier {
     return (vakit: 'Yatsı', bitis: saat(yarinSabah ?? v['Sabah']!, 1));
   }
 
+  /// Kerahat vakitleri (yaklaşık 45 dk): güneş doğarken, tam tepedeyken (öğleden önce), batarken (akşamdan önce)
+  static const Duration kerahatSuresi = Duration(minutes: 45);
+
+  static ({String neden, DateTime bitis})? kerahatHesapla(Map<String, String> v, DateTime simdi) {
+    DateTime? saat(String ad) {
+      final s = v[ad];
+      if (s == null) return null;
+      final p = s.split(' ').first.split(':');
+      return DateTime(simdi.year, simdi.month, simdi.day, int.parse(p[0]), int.parse(p[1]));
+    }
+
+    final gunes = saat('Güneş'), ogle = saat('Öğle'), aksam = saat('Akşam');
+    bool icinde(DateTime bas, DateTime son) => !simdi.isBefore(bas) && simdi.isBefore(son);
+    if (gunes != null && icinde(gunes, gunes.add(kerahatSuresi))) {
+      return (neden: 'Güneş doğuyor', bitis: gunes.add(kerahatSuresi));
+    }
+    if (ogle != null && icinde(ogle.subtract(kerahatSuresi), ogle)) {
+      return (neden: 'Güneş tam tepede (istiva)', bitis: ogle);
+    }
+    if (aksam != null && icinde(aksam.subtract(kerahatSuresi), aksam)) {
+      return (neden: 'Güneş batıyor', bitis: aksam);
+    }
+    return null;
+  }
+
+  ({String neden, DateTime bitis})? get kerahatVakti =>
+      vakitler == null ? null : kerahatHesapla(vakitler!, DateTime.now());
+
   /// Yalnızca şu anki vakit işaretlenebilir. Geçmiş vakitler sonradan işaretlenemez;
   /// kullanıcı vakit içinde bildirimlerle uygulamaya çağrılır.
   bool vakitIsaretlenebilirMi(String vakit) =>

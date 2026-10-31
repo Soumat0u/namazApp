@@ -173,6 +173,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildVakitGrid(context, provider),
+                    _buildKerahatUyarisi(context, provider),
                     SizedBox(height: Responsive.h(16)),
                     _buildPrayerButton(context, provider),
                   ],
@@ -917,6 +918,41 @@ Widget _buildVakitGrid(BuildContext context, NamazProvider provider) {
         ),
       ],
     ),
+  );
+}
+
+/// Kerahat vaktinde ince bir uyarı (saniyelik saat bildirimiyle yeniden hesaplanır)
+Widget _buildKerahatUyarisi(BuildContext context, NamazProvider provider) {
+  return ValueListenableBuilder<String>(
+    valueListenable: provider.guncelSaatNotifier,
+    builder: (context, _, __) {
+      final k = provider.kerahatVakti;
+      if (k == null) return const SizedBox.shrink();
+      final r = context.renkler;
+      final aksamOncesi = k.neden == 'Güneş batıyor';
+      return Container(
+        margin: EdgeInsets.only(top: Responsive.h(8)),
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(Responsive.w(12)),
+          border: Border.all(color: Colors.orange.withOpacity(0.4)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+            SizedBox(width: Responsive.w(8)),
+            Expanded(
+              child: Text(
+                "Kerahat vakti (${k.neden}) • ${DateFormat('HH:mm').format(k.bitis)}'e kadar namaz kılmak mekruhtur"
+                "${aksamOncesi ? '; günün ikindisi kılınmadıysa kılınabilir.' : '.'}",
+                style: TextStyle(color: r.yaziRengi, fontSize: Responsive.sp(11)),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
   );
 }
 
