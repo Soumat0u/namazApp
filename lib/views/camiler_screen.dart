@@ -19,7 +19,7 @@ class Cami {
   const Cami(this.ad, this.konum, this.mesafe);
 }
 
-/// Yakındaki camiler: OpenStreetMap verisi (Overpass API), API anahtarı gerektirmez
+/// Yakındaki camiler: OpenStreetMap verisi (Nominatim araması + harita), API anahtarı gerektirmez
 class CamilerScreen extends StatefulWidget {
   const CamilerScreen({super.key});
 
