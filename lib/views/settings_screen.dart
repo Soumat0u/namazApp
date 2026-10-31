@@ -343,65 +343,139 @@ class AyarlarSayfasi extends StatelessWidget {
     );
   }
 
+  /// Arka plan seçici: her seçenek gerçek arka planın canlı, küçültülmüş önizlemesiyle gösterilir
   Widget _buildArkaPlanSecici(AppThemeColors r, ThemeProvider themeProvider) {
-    return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(16))),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.wallpaper_rounded, color: r.anaRenk, size: Responsive.w(20)),
-              SizedBox(width: Responsive.w(8)),
-              Text("Arka Plan",
-                  style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
-            ],
-          ),
-          SizedBox(height: Responsive.h(10)),
-          // Seçenekler sığmadığında alt satıra geçer (4 + 3)
-          LayoutBuilder(builder: (context, kisit) {
-            final genislik = (kisit.maxWidth - 3 * Responsive.w(8)) / 4;
-            return Wrap(
-            spacing: Responsive.w(8),
-            runSpacing: Responsive.h(8),
-            children: [
-              for (final mod in ArkaPlanModu.values)
-                SizedBox(
-                  width: genislik,
-                  child: GestureDetector(
-                    onTap: () => themeProvider.arkaPlanModuDegistir(mod),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(vertical: Responsive.h(10)),
-                      decoration: BoxDecoration(
-                        color: themeProvider.arkaPlanModu == mod ? r.anaRenk.withOpacity(0.15) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: themeProvider.arkaPlanModu == mod ? r.anaRenk : r.pasifRenk.withOpacity(0.25),
-                        ),
-                      ),
-                      child: Text(
-                        mod.ad,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: Responsive.sp(12),
-                          color: themeProvider.arkaPlanModu == mod ? r.anaRenk : r.yaziRengi,
-                        ),
-                      ),
-                    ),
-                  ),
+    return Builder(builder: (context) {
+      final vakitTemasi = context.select<NamazProvider, String>((p) => p.vaktinTemasi);
+      final koyu = Theme.of(context).brightness == Brightness.dark;
+      final secili = themeProvider.arkaPlanModu;
+      return Container(
+        padding: EdgeInsets.fromLTRB(Responsive.w(14), Responsive.w(14), 0, Responsive.w(14)),
+        decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(16))),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.wallpaper_rounded, color: r.anaRenk, size: Responsive.w(20)),
+                SizedBox(width: Responsive.w(8)),
+                Text("Arka Plan",
+                    style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
+                const Spacer(),
+                Padding(
+                  padding: EdgeInsets.only(right: Responsive.w(14)),
+                  child: Text(secili.ad,
+                      style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12))),
                 ),
-            ],
-          );
-          }),
-          SizedBox(height: Responsive.h(8)),
-          Text(themeProvider.arkaPlanModu.aciklama,
-              style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11))),
-        ],
-      ),
-    );
+              ],
+            ),
+            SizedBox(height: Responsive.h(12)),
+            SizedBox(
+              height: Responsive.h(178),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(right: Responsive.w(14)),
+                itemCount: ArkaPlanModu.values.length,
+                separatorBuilder: (_, _) => SizedBox(width: Responsive.w(10)),
+                itemBuilder: (context, i) {
+                  final mod = ArkaPlanModu.values[i];
+                  final aktif = mod == secili;
+                  return GestureDetector(
+                    onTap: () => themeProvider.arkaPlanModuDegistir(mod),
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: Responsive.w(84),
+                          height: Responsive.h(146),
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: aktif ? r.anaRenk : r.pasifRenk.withOpacity(0.2),
+                              width: aktif ? 2.5 : 1,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(13),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                // Telefon ekranı ölçüsünde çizilip küçültülür: desenler gerçek boyutta görünür
+                                FittedBox(
+                                  fit: BoxFit.cover,
+                                  child: SizedBox(
+                                    width: 360,
+                                    height: 640,
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        SayfaArkaPlani(
+                                          mod: mod,
+                                          vakitTemasi: vakitTemasi,
+                                          zemin: r.arkaPlanRengi,
+                                          koyuTema: koyu,
+                                        ),
+                                        // Örnek kartlar: arka planın içerikle nasıl duracağı
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(24, 70, 24, 0),
+                                          child: Column(
+                                            children: [
+                                              for (final y in const [90.0, 150.0, 70.0]) ...[
+                                                Container(
+                                                  height: y,
+                                                  decoration: BoxDecoration(
+                                                    color: r.kartRengi,
+                                                    borderRadius: BorderRadius.circular(22),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 18),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (aktif)
+                                  Positioned(
+                                    top: 6,
+                                    right: 6,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(color: r.anaRenk, shape: BoxShape.circle),
+                                      child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: Responsive.h(8)),
+                        Text(
+                          mod.ad,
+                          style: TextStyle(
+                            fontSize: Responsive.sp(12),
+                            fontWeight: aktif ? FontWeight.w800 : FontWeight.w600,
+                            color: aktif ? r.anaRenk : r.yaziRengi.withOpacity(0.75),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: Responsive.h(10)),
+            Padding(
+              padding: EdgeInsets.only(right: Responsive.w(14)),
+              child: Text(secili.aciklama, style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11))),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildThemeSelector(AppThemeColors r, ThemeProvider themeProvider) {
