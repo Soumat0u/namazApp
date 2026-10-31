@@ -12,6 +12,7 @@ import 'widgets/sehir_secici.dart';
 import '../models/religious_day.dart';
 import 'package:intl/intl.dart';
 import 'package:quran/quran.dart' as quran;
+import '../services/kuran_okuyucu.dart';
 
 class AnaSayfa extends StatefulWidget {
   const AnaSayfa({super.key});
@@ -1303,6 +1304,20 @@ class _GununAyetiCard extends StatelessWidget {
   final sureAdi = quran.getSurahNameTurkish(sureNo);
   final ayetSayisi = quran.getVerseCount(sureNo);
 
+  // 🔊 Tilavet: okunan ayet vurgulanır ve ekran onu takip eder
+  final okuyucu = KuranOkuyucu.sure(sureNo);
+  final ayetAnahtarlari = List.generate(ayetSayisi, (_) => GlobalKey());
+  int? sonTakip;
+  okuyucu.addListener(() {
+    final i = okuyucu.aktifIndex;
+    if (i == null || i == sonTakip) return;
+    sonTakip = i;
+    final ctx = ayetAnahtarlari[i].currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx, alignment: 0.1, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
+    }
+  });
+
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -1312,9 +1327,8 @@ class _GununAyetiCard extends StatelessWidget {
     pageBuilder: (context, anim1, anim2) {
       // Ayet yükseklikleri çok farklı olduğu için tahmini offset yanlış yere götürür:
       // tüm ayetler çizilir ve hedef ayetin gerçek konumuna kaydırılır.
-      final hedefAnahtar = GlobalKey();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final hedef = hedefAnahtar.currentContext;
+        final hedef = targetAyet > 1 ? ayetAnahtarlari[targetAyet - 1].currentContext : null;
         if (targetAyet > 1 && hedef != null) {
           Scrollable.ensureVisible(
             hedef,
@@ -1358,31 +1372,45 @@ class _GununAyetiCard extends StatelessWidget {
                 child: Column(
                   children: [
                     // --- BAŞLIK ALANI ---
-                    _buildModalHeader(context, sureAdi, ayetSayisi, r),
+                    _buildModalHeader(context, sureAdi, ayetSayisi, r, sag: _TilavetButonu(okuyucu: okuyucu)),
 
                     // --- AYETLER LİSTESİ ---
                     Expanded(
                       child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
                         padding: EdgeInsets.fromLTRB(Responsive.w(20), Responsive.h(10), Responsive.w(20), Responsive.h(30)),
-                        child: Column(
+                        child: ListenableBuilder(
+                          listenable: okuyucu,
+                          builder: (context, _) => Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: List.generate(ayetSayisi, (index) {
                           // KRİTİK: index her zaman 0'dan başlar, ayetNo 1'den.
                           final int currentAyetNo = index + 1;
                           final bool isTarget = currentAyetNo == targetAyet;
+                          final bool okunuyor = okuyucu.aktifIndex == index;
 
-                          return Container(
-                            key: isTarget ? hedefAnahtar : ValueKey('ayet_card_${sureNo}_$currentAyetNo'),
+                          return GestureDetector(
+                            key: ayetAnahtarlari[index],
+                            // Ayete dokununca tilavet oradan başlar
+                            onTap: () => okuyucu.baslat(index),
+                            child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 350),
                             margin: EdgeInsets.only(bottom: Responsive.h(16)),
                             padding: EdgeInsets.all(Responsive.w(16)),
                             decoration: BoxDecoration(
-                              color: isTarget ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.05),
+                              color: okunuyor
+                                  ? Colors.amber.withOpacity(0.22)
+                                  : isTarget ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.05),
                               borderRadius: BorderRadius.circular(Responsive.w(20)),
                               border: Border.all(
-                                color: isTarget ? Colors.white.withOpacity(0.5) : Colors.white.withOpacity(0.1),
-                                width: isTarget ? 1.5 : 0.5,
+                                color: okunuyor
+                                    ? Colors.amber.withOpacity(0.9)
+                                    : isTarget ? Colors.white.withOpacity(0.5) : Colors.white.withOpacity(0.1),
+                                width: okunuyor || isTarget ? 1.5 : 0.5,
                               ),
+                              boxShadow: okunuyor
+                                  ? [BoxShadow(color: Colors.amber.withOpacity(0.35), blurRadius: 18)]
+                                  : null,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1453,8 +1481,10 @@ class _GununAyetiCard extends StatelessWidget {
                                 ),
                               ],
                             ),
+                          ),
                           );
                           }),
+                        ),
                         ),
                       ),
                     ),
@@ -1475,11 +1505,11 @@ class _GununAyetiCard extends StatelessWidget {
         ),
       );
     },
-  );
+  ).whenComplete(okuyucu.dispose); // Pencere kapanınca ses de durur
 }
 
 // Başlık için yardımcı widget
-Widget _buildModalHeader(BuildContext context, String name, int count, AppThemeColors r) {
+Widget _buildModalHeader(BuildContext context, String name, int count, AppThemeColors r, {Widget? sag}) {
   return Container(
     padding: EdgeInsets.all(Responsive.w(20)),
     decoration: BoxDecoration(
@@ -1512,7 +1542,7 @@ Widget _buildModalHeader(BuildContext context, String name, int count, AppThemeC
           ],
         ),
         const Spacer(),
-        const SizedBox(width: 48), // Simetri dengelemesi
+        sag ?? const SizedBox(width: 48), // Simetri dengelemesi
       ],
     ),
   );
@@ -1705,6 +1735,38 @@ Widget _buildAyetNoBadge(int no, bool isTarget, AppThemeColors r) {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Başlıktaki dinle/duraklat düğmesi
+class _TilavetButonu extends StatelessWidget {
+  final KuranOkuyucu okuyucu;
+  const _TilavetButonu({required this.okuyucu});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: okuyucu,
+      builder: (context, _) {
+        if (okuyucu.hata != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final h = okuyucu.hata;
+            if (h == null) return;
+            okuyucu.hata = null;
+            ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(h)));
+          });
+        }
+        return IconButton(
+          tooltip: okuyucu.caliyor ? "Duraklat" : "Dinle",
+          onPressed: okuyucu.calDuraklat,
+          style: IconButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.15)),
+          icon: okuyucu.yukleniyor
+              ? const SizedBox(
+                  width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Icon(okuyucu.caliyor ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white),
+        );
+      },
     );
   }
 }
