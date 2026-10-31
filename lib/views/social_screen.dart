@@ -42,6 +42,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   // Dinamik akışlar için önbellek:
   String? _cachedUid;
   Stream<UserProfile?>? _cachedUserProfileStream;
+  UserProfile? _sonProfil; // Akış son değeri saklamaz; sonradan açılan bölümler bununla başlar
   
   Stream<List<PrayerPost>>? _cachedMyPrayersStream;
   Stream<List<PrayerPost>>? _cachedDiscoverStream;
@@ -96,8 +97,9 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     // 🔥 Stream önbelleği UID bazlı sıfırlama
     if (_cachedUid != provider.currentUid) {
       _cachedUid = provider.currentUid;
-      _cachedUserProfileStream = provider.currentUid != null 
-          ? _firebaseService.getUserProfile(provider.currentUid!)
+      _sonProfil = null;
+      _cachedUserProfileStream = provider.currentUid != null
+          ? _firebaseService.getUserProfile(provider.currentUid!).map((p) => _sonProfil = p).asBroadcastStream()
           : null;
       _cachedMyPrayersStream = null;
       _cachedFriendsStream = null;
@@ -400,6 +402,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           // ÜST KISIM: Avatar, İsim, Unvan ve Bugün
           StreamBuilder<UserProfile?>(
             stream: _cachedUserProfileStream,
+            initialData: _sonProfil,
             builder: (context, snap) {
               final profile = snap.data;
               final hasActiveStory = profile?.lastStoryAt != null && 
@@ -597,17 +600,23 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   }
 
   /// Ben + arkadaşlarım (profil ve arkadaş akışlarını birleştirir)
-  Widget _kardeslerleBirlikte(Widget Function(UserProfile ben, List<UserProfile> arkadaslar) builder) {
+  /// [bosDurum]: veri henüz yoksa ya da alınamadıysa gösterilir (verilmezse hiçbir şey çizilmez)
+  Widget _kardeslerleBirlikte(Widget Function(UserProfile ben, List<UserProfile> arkadaslar) builder, {Widget? bosDurum}) {
     return StreamBuilder<UserProfile?>(
       stream: _cachedUserProfileStream,
+      initialData: _sonProfil,
       builder: (context, userSnap) {
         final ben = userSnap.data;
-        if (ben == null) return const SizedBox();
+        if (ben == null) return bosDurum ?? const SizedBox();
         if (ben.friends.isEmpty) return builder(ben, const []);
         return StreamBuilder<List<UserProfile>>(
           stream: _arkadasProfilleri(ben.friends),
           initialData: _sonArkadasProfilleri,
-          builder: (context, snap) => snap.hasData ? builder(ben, snap.data!) : const SizedBox(),
+          builder: (context, snap) {
+            if (snap.hasData) return builder(ben, snap.data!);
+            if (snap.hasError) debugPrint('👥 Arkadaş profilleri alınamadı: ${snap.error}');
+            return bosDurum ?? const SizedBox();
+          },
         );
       },
     );
@@ -673,6 +682,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
     return StreamBuilder<UserProfile?>(
       stream: _cachedUserProfileStream,
+      initialData: _sonProfil,
       builder: (context, userSnap) {
         if (!userSnap.hasData || userSnap.data == null) return const SizedBox();
         final friends = userSnap.data!.friends;
@@ -871,10 +881,19 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
   /// Ben + arkadaşlarım, bu haftaki XP'ye göre
   Widget _buildKardesSiralamasi(AppThemeColors r, NamazProvider provider, {int? limit, ScrollController? scrollController}) {
-    return _kardeslerleBirlikte((ben, arkadaslar) {
-      if (arkadaslar.isEmpty) {
-        return _buildEmptyState(r, "Arkadaş Sıralaması", "Arkadaşlarını ekle, bu hafta kimin daha gayretli olduğunu birlikte görün.");
-      }
+    final arkadasYok = _buildEmptyState(
+      r,
+      "Arkadaş Sıralaması",
+      "Henüz arkadaşın yok.\nArkadaşlarını ekle, bu hafta kimin daha gayretli olduğunu birlikte görün.",
+      icon: Icons.emoji_events_outlined,
+      butonYazisi: "Arkadaş Ekle",
+      onButon: () => _showAddFriendModal(context, r, provider),
+    );
+    return _kardeslerleBirlikte(bosDurum: Padding(
+      padding: EdgeInsets.symmetric(vertical: Responsive.h(24)),
+      child: Center(child: CircularProgressIndicator(color: r.anaRenk, strokeWidth: 2.5)),
+    ), (ben, arkadaslar) {
+      if (arkadaslar.isEmpty) return arkadasYok;
       final hafta = provider.haftalikOzet.hafta;
       final xp = {for (final a in arkadaslar) a.uid: a.buHaftaXp(hafta), ben.uid: provider.haftalikOzet.xp};
       final liste = [ben, ...arkadaslar]..sort((a, b) => xp[b.uid]!.compareTo(xp[a.uid]!));
@@ -1057,6 +1076,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
     return StreamBuilder<UserProfile?>(
       stream: _cachedUserProfileStream,
+      initialData: _sonProfil,
       builder: (context, userSnap) {
         if (userSnap.connectionState == ConnectionState.waiting && !userSnap.hasData) {
           return const Padding(
