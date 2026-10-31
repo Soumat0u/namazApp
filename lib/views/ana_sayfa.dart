@@ -1388,7 +1388,6 @@ class _GununAyetiCard extends StatelessWidget {
                           // KRİTİK: index her zaman 0'dan başlar, ayetNo 1'den.
                           final int currentAyetNo = index + 1;
                           final bool isTarget = currentAyetNo == targetAyet;
-                          final bool okunuyor = okuyucu.aktifIndex == index;
 
                           return GestureDetector(
                             key: ayetAnahtarlari[index],
@@ -1399,13 +1398,11 @@ class _GununAyetiCard extends StatelessWidget {
                             margin: EdgeInsets.only(bottom: Responsive.h(16)),
                             padding: EdgeInsets.all(Responsive.w(16)),
                             decoration: BoxDecoration(
-                              color: isTarget && !okunuyor ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.05),
+                              color: isTarget ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.05),
                               borderRadius: BorderRadius.circular(Responsive.w(20)),
                               border: Border.all(
-                                color: okunuyor
-                                    ? Colors.amber.withOpacity(0.5)
-                                    : isTarget ? Colors.white.withOpacity(0.5) : Colors.white.withOpacity(0.1),
-                                width: okunuyor || isTarget ? 1.5 : 0.5,
+                                color: isTarget ? Colors.white.withOpacity(0.5) : Colors.white.withOpacity(0.1),
+                                width: isTarget ? 1.5 : 0.5,
                               ),
                             ),
                             child: Column(

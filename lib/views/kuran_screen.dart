@@ -460,7 +460,6 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
 
   Widget _ayet(AppThemeColors r, int a) {
     final s = widget.sure;
-    final okunuyor = _okuyucu.aktifIndex == a - 1;
     final kaldigim = _kaldigimAyet == a;
     final cuzBasi = a == 1 ? quran.getJuzNumber(s, 1) != (s > 1 ? quran.getJuzNumber(s - 1, quran.getVerseCount(s - 1)) : 0)
         : quran.getJuzNumber(s, a) != quran.getJuzNumber(s, a - 1);
@@ -486,9 +485,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
               color: r.kartRengi,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: okunuyor
-                    ? Colors.amber.withOpacity(0.5)
-                    : kaldigim ? r.anaRenk.withOpacity(0.6) : Colors.transparent,
+                color: kaldigim ? r.anaRenk.withOpacity(0.6) : Colors.transparent,
                 width: 1.5,
               ),
             ),
