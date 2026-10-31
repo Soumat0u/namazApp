@@ -7,6 +7,7 @@ import 'zikirmatik_screen.dart'; // Eklendi
 import 'settings_screen.dart'; // Ayarlar Eklendi
 import 'kaza_screen.dart';
 import 'tesbihat_screen.dart';
+import 'kuran_screen.dart';
 import 'dua_kitapligi_screen.dart';
 import 'hatim_screen.dart';
 import 'oruc_screen.dart';
@@ -45,6 +46,13 @@ class AraclarSayfasi extends StatelessWidget {
           mainAxisSpacing: Responsive.h(10),
           childAspectRatio: 0.85,
           children: [
+            _buildAracCard(
+              context: context,
+              icon: Icons.import_contacts_rounded,
+              title: "Kur'an-ı Kerim",
+              color: Colors.green.shade800,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KuranScreen())),
+            ),
             _buildAracCard(
               context: context,
               icon: Icons.explore_rounded,

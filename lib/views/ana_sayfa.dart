@@ -13,6 +13,7 @@ import '../models/religious_day.dart';
 import 'package:intl/intl.dart';
 import 'package:quran/quran.dart' as quran;
 import '../services/kuran_okuyucu.dart';
+import 'widgets/ayet_metni.dart';
 
 class AnaSayfa extends StatefulWidget {
   const AnaSayfa({super.key});
@@ -1422,10 +1423,11 @@ class _GununAyetiCard extends StatelessWidget {
                                     _buildAyetNoBadge(currentAyetNo, isTarget, r),
                                     const SizedBox(width: 12),
                                     Expanded(
-                                      child: Text(
-                                        quran.getVerse(sureNo, currentAyetNo, verseEndSymbol: true),
-                                        textAlign: TextAlign.right,
-                                        style: TextStyle(
+                                      child: AyetMetni(
+                                        okuyucu: okuyucu,
+                                        sure: sureNo,
+                                        ayet: currentAyetNo,
+                                        stil: TextStyle(
                                           fontSize: Responsive.sp(22),
                                           fontFamily: 'Amiri', // Arapça fontu yüklü olmalı
                                           color: Colors.white,

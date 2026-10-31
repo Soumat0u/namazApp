@@ -4,12 +4,45 @@ import 'package:share_plus/share_plus.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/dualar.dart';
 import '../core/utils/responsive.dart';
-import '../services/kuran_okuyucu.dart';
-import 'package:quran/quran.dart' as quran;
+import '../services/dua_oynatici.dart';
+import 'widgets/ayet_metni.dart';
 
-/// Namaz ve sabah-akşam duaları: Arapça, okunuş ve meal
-class DuaKitapligiScreen extends StatelessWidget {
+/// Namaz ve sabah-akşam duaları: Arapça, okunuş ve meal. Her duanın sağındaki düğmeyle dinlenir.
+class DuaKitapligiScreen extends StatefulWidget {
   const DuaKitapligiScreen({super.key});
+
+  @override
+  State<DuaKitapligiScreen> createState() => _DuaKitapligiScreenState();
+}
+
+class _DuaKitapligiScreenState extends State<DuaKitapligiScreen> {
+  // Aynı anda tek dua çalar; başka birine basılınca önceki durur
+  DuaOynatici? _oynatici;
+
+  Future<void> _oynat(Dua dua) async {
+    if (_oynatici?.dua != dua) {
+      final eski = _oynatici;
+      _oynatici = DuaOynatici(dua)..addListener(_hataGoster);
+      setState(() {});
+      await eski?.durdur();
+      eski?.dispose();
+    }
+    await _oynatici!.calDuraklat();
+  }
+
+  void _hataGoster() {
+    final h = _oynatici?.hata;
+    if (h != null && mounted) {
+      _oynatici!.hata = null;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(h)));
+    }
+  }
+
+  @override
+  void dispose() {
+    _oynatici?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,16 +79,20 @@ class DuaKitapligiScreen extends StatelessWidget {
                       margin: EdgeInsets.only(bottom: Responsive.h(10)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       child: ListTile(
-                        title: Text(dua.baslik,
-                            style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi)),
-                        subtitle: dua.kaynak != null
-                            ? Text(dua.kaynak!, style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)))
-                            : null,
-                        trailing: Icon(Icons.chevron_right_rounded, color: r.pasifRenk),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => DuaDetayScreen(dua: dua)),
+                        title: Text(dua.baslik, style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi)),
+                        subtitle: Text(
+                          dua.kaynak ?? "Okuyan: telefonun Arapça sesi",
+                          style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
                         ),
+                        trailing: _OynatDugmesi(
+                          oynatici: _oynatici?.dua == dua ? _oynatici : null,
+                          onPressed: () => _oynat(dua),
+                        ),
+                        onTap: () async {
+                          await _oynatici?.durdur(); // Detayda kendi oynatıcısı var
+                          if (!context.mounted) return;
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => DuaDetayScreen(dua: dua)));
+                        },
                       ),
                     ),
                 ],
@@ -63,6 +100,30 @@ class DuaKitapligiScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Satırın sağındaki oynat/duraklat düğmesi
+class _OynatDugmesi extends StatelessWidget {
+  final DuaOynatici? oynatici;
+  final VoidCallback onPressed;
+  const _OynatDugmesi({required this.oynatici, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.renkler;
+    Widget dugme(bool caliyor, bool yukleniyor) => IconButton.filledTonal(
+          tooltip: caliyor ? "Duraklat" : "Dinle",
+          onPressed: onPressed,
+          icon: yukleniyor
+              ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: r.anaRenk))
+              : Icon(caliyor ? Icons.pause_rounded : Icons.play_arrow_rounded, color: r.anaRenk),
+        );
+    if (oynatici == null) return dugme(false, false);
+    return ListenableBuilder(
+      listenable: oynatici!,
+      builder: (_, __) => dugme(oynatici!.caliyor, oynatici!.yukleniyor),
     );
   }
 }
@@ -76,14 +137,19 @@ class DuaDetayScreen extends StatefulWidget {
 }
 
 class _DuaDetayScreenState extends State<DuaDetayScreen> {
-  // Kur'an'dan olan dualar ayet ayet dinlenebilir; okunan ayet vurgulanır
-  late final KuranOkuyucu? _okuyucu = widget.dua.kurandan
-      ? KuranOkuyucu([for (final a in widget.dua.ayetler) (sure: widget.dua.sure!, ayet: a)])
-      : null;
+  late final DuaOynatici _oynatici = DuaOynatici(widget.dua)..addListener(_hataGoster);
+
+  void _hataGoster() {
+    final h = _oynatici.hata;
+    if (h != null && mounted) {
+      _oynatici.hata = null;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(h)));
+    }
+  }
 
   @override
   void dispose() {
-    _okuyucu?.dispose();
+    _oynatici.dispose();
     super.dispose();
   }
 
@@ -91,9 +157,8 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
   Widget build(BuildContext context) {
     final dua = widget.dua;
     final r = context.renkler;
-    final okuyucu = _okuyucu;
 
-    Widget bolum(String baslik, Widget icerik) => Container(
+    Widget bolum(String baslik, Widget icerik, {Widget? sag}) => Container(
           width: double.infinity,
           margin: EdgeInsets.only(bottom: Responsive.h(12)),
           padding: EdgeInsets.all(Responsive.w(16)),
@@ -101,8 +166,15 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(baslik,
-                  style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12))),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(baslik,
+                        style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12))),
+                  ),
+                  if (sag != null) sag,
+                ],
+              ),
               SizedBox(height: Responsive.h(8)),
               SizedBox(width: double.infinity, child: icerik),
             ],
@@ -111,39 +183,54 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
 
     final arapcaStil = TextStyle(fontSize: Responsive.sp(24), height: 1.9, color: r.yaziRengi);
 
-    Widget arapca() {
-      if (okuyucu == null) {
-        return Text(dua.arapca, textDirection: TextDirection.rtl, style: arapcaStil);
-      }
-      return ListenableBuilder(
-        listenable: okuyucu,
-        builder: (context, _) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (int i = 0; i < dua.ayetler.length; i++)
-              GestureDetector(
-                onTap: () => okuyucu.baslat(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 350),
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: okuyucu.aktifIndex == i ? Colors.amber.withOpacity(0.22) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: okuyucu.aktifIndex == i ? Colors.amber.withOpacity(0.8) : Colors.transparent),
+    Widget arapca() => ListenableBuilder(
+          listenable: _oynatici,
+          builder: (context, _) {
+            final kuran = _oynatici.kuran;
+            if (kuran != null) {
+              // Kur'an'dan: ayet ayet, okunan kelime aydınlatılır
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (int i = 0; i < dua.ayetler.length; i++)
+                    GestureDetector(
+                      onTap: () => kuran.baslat(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kuran.aktifIndex == i ? Colors.amber.withOpacity(0.10) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: AyetMetni(okuyucu: kuran, sure: dua.sure!, ayet: dua.ayetler[i], stil: arapcaStil),
+                      ),
+                    ),
+                ],
+              );
+            }
+            // Kur'an dışı: yazıdan-sese motorunun okuduğu kelime aydınlatılır
+            final aktif = _oynatici.aktifKelime;
+            final k = _oynatici.kelimeler;
+            return Text.rich(
+              TextSpan(children: [
+                for (int i = 0; i < k.length; i++) ...[
+                  TextSpan(
+                    text: k[i].$1,
+                    style: i == aktif
+                        ? arapcaStil.copyWith(backgroundColor: Colors.amber.withOpacity(0.45), fontWeight: FontWeight.bold)
+                        : (aktif != null && i < aktif)
+                            ? arapcaStil.copyWith(color: r.yaziRengi.withOpacity(0.55))
+                            : arapcaStil,
                   ),
-                  child: Text(
-                    quran.getVerse(dua.sure!, dua.ayetler[i], verseEndSymbol: true),
-                    textDirection: TextDirection.rtl,
-                    style: arapcaStil,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
-    }
+                  if (i < k.length - 1) TextSpan(text: ' ', style: arapcaStil),
+                ],
+              ]),
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.right,
+            );
+          },
+        );
 
     return Scaffold(
       backgroundColor: r.arkaPlanRengi,
@@ -161,42 +248,22 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
           ),
         ],
       ),
-      floatingActionButton: okuyucu == null
-          ? null
-          : ListenableBuilder(
-              listenable: okuyucu,
-              builder: (context, _) {
-                if (okuyucu.hata != null) {
-                  final h = okuyucu.hata!;
-                  okuyucu.hata = null;
-                  WidgetsBinding.instance.addPostFrameCallback(
-                      (_) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(h))));
-                }
-                return FloatingActionButton.extended(
-                  backgroundColor: r.anaRenk,
-                  onPressed: okuyucu.calDuraklat,
-                  icon: okuyucu.yukleniyor
-                      ? const SizedBox(
-                          width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Icon(okuyucu.caliyor ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white),
-                  label: Text(okuyucu.caliyor ? "Duraklat" : "Dinle",
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                );
-              },
-            ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.w(16), Responsive.w(16), 90),
+        padding: EdgeInsets.all(Responsive.w(16)),
         children: [
-          bolum("Arapça", arapca()),
+          bolum("Arapça", arapca(), sag: _OynatDugmesi(oynatici: _oynatici, onPressed: _oynatici.calDuraklat)),
           bolum(
               "Okunuşu",
               Text(dua.okunus,
                   style: TextStyle(
                       fontSize: Responsive.sp(15), height: 1.6, fontStyle: FontStyle.italic, color: r.yaziRengi))),
           bolum("Anlamı", Text(dua.meal, style: TextStyle(fontSize: Responsive.sp(14), height: 1.6, color: r.yaziRengi))),
-          if (dua.kaynak != null)
-            Text("Kaynak: ${dua.kaynak} • Okuyan: Mişârî Râşid el-Afâsî",
-                style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11))),
+          Text(
+            dua.kurandan
+                ? "Kaynak: ${dua.kaynak} • Okuyan: Mişârî Râşid el-Afâsî"
+                : "Bu dua telefonun Arapça yazıdan-sese motoruyla okunur; telaffuz bir hafızın okuyuşu kadar doğru olmayabilir.",
+            style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
+          ),
         ],
       ),
     );

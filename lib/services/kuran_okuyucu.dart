@@ -1,27 +1,45 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:quran/quran.dart' as quran;
 
-/// Ayet ayet Kur'an tilaveti. Ayetler sırayla çalınır; [aktifIndex] o an okunan ayeti gösterir
-/// (ekran bunu dinleyip vurgular ve kaydırır).
-/// Ses: Islamic Network CDN, Mişârî Râşid el-Afâsî (ayet başına bir mp3, ücretsiz).
-class KuranOkuyucu extends ChangeNotifier {
-  static const String _kari = 'ar.alafasy';
+import 'kelime_deposu.dart';
 
+/// Ayet ayet Kur'an tilaveti, kelime kelime takip.
+/// [aktifIndex] okunan ayet, [aktifKelime] o ayette okunan kelimenin sırasıdır (1'den);
+/// ekran bunları dinleyip vurgular ve kaydırır.
+/// Ses ve kelime zamanlamaları: Quran.com (Mişârî Râşid el-Afâsî).
+class KuranOkuyucu extends ChangeNotifier {
   final AudioPlayer _oynatici = AudioPlayer();
   final List<({int sure, int ayet})> ayetler;
-  late final StreamSubscription<void> _bitisAboneligi;
+  final List<StreamSubscription> _abonelikler = [];
 
   int? _aktifIndex;
+  int? _aktifKelime;
   bool _caliyor = false;
   bool _yukleniyor = false;
   String? hata;
   bool _kapatildi = false;
 
+  /// Sure → ayet → kelimeler/zamanlar. Yüklenene kadar (veya internet yoksa) null: ayet düzeyinde vurgulanır.
+  final Map<int, Map<int, AyetKelime>> kelimeVerisi = {};
+
   KuranOkuyucu(this.ayetler) {
-    _bitisAboneligi = _oynatici.onPlayerComplete.listen((_) => _sonraki());
+    _abonelikler
+      ..add(_oynatici.onPlayerComplete.listen((_) => _sonraki()))
+      ..add(_oynatici.onPositionChanged.listen(_konumDegisti));
+    for (final s in {for (final a in ayetler) a.sure}) {
+      KelimeDeposu.yukle(s).then((v) {
+        if (v != null) {
+          kelimeVerisi[s] = v;
+          _bildir();
+        }
+      });
+    }
   }
 
   /// Bir surenin tüm ayetleri için
@@ -29,11 +47,14 @@ class KuranOkuyucu extends ChangeNotifier {
       KuranOkuyucu([for (int a = 1; a <= quran.getVerseCount(sure); a++) (sure: sure, ayet: a)]);
 
   int? get aktifIndex => _aktifIndex;
+  int? get aktifKelime => _aktifKelime;
   ({int sure, int ayet})? get aktifAyet => _aktifIndex == null ? null : ayetler[_aktifIndex!];
   bool get caliyor => _caliyor;
   bool get yukleniyor => _yukleniyor;
 
-  /// Mushaf'taki genel ayet sırası (1..6236): CDN dosyaları bu numarayla adlandırılmış
+  AyetKelime? kelimeler(int sure, int ayet) => kelimeVerisi[sure]?[ayet];
+
+  /// Mushaf'taki genel ayet sırası (1..6236)
   static int genelAyetNo(int sure, int ayet) {
     var toplam = 0;
     for (int s = 1; s < sure; s++) {
@@ -42,19 +63,35 @@ class KuranOkuyucu extends ChangeNotifier {
     return toplam + ayet;
   }
 
-  static String sesAdresi(int sure, int ayet) =>
-      'https://cdn.islamic.network/quran/audio/128/$_kari/${genelAyetNo(sure, ayet)}.mp3';
+  /// "002255" biçimi: Quran.com ses dosyalarının adı
+  static String dosyaAdi(int sure, int ayet) =>
+      '${sure.toString().padLeft(3, '0')}${ayet.toString().padLeft(3, '0')}';
+
+  static String sesAdresi(int sure, int ayet) => 'https://verses.quran.com/Alafasy/mp3/${dosyaAdi(sure, ayet)}.mp3';
+
+  void _konumDegisti(Duration konum) {
+    final a = aktifAyet;
+    if (a == null) return;
+    final k = kelimeler(a.sure, a.ayet)?.kelimeAt(konum.inMilliseconds);
+    if (k != null && k != _aktifKelime) {
+      _aktifKelime = k;
+      _bildir();
+    }
+  }
 
   Future<void> baslat([int index = 0]) async {
     if (index < 0 || index >= ayetler.length) return;
     _aktifIndex = index;
+    _aktifKelime = null;
     _caliyor = true;
     _yukleniyor = true;
     hata = null;
     _bildir();
     try {
       final a = ayetler[index];
-      await _oynatici.play(UrlSource(sesAdresi(a.sure, a.ayet)));
+      // İndirilmişse telefondan (internetsiz), yoksa internetten çal
+      final yerel = await KuranSesDeposu.dosya(a.sure, a.ayet);
+      await _oynatici.play(await yerel.exists() ? DeviceFileSource(yerel.path) : UrlSource(sesAdresi(a.sure, a.ayet)));
     } catch (e) {
       debugPrint('🔊 Tilavet hatası: $e');
       hata = 'Ses yüklenemedi. İnternet bağlantınızı kontrol edin.';
@@ -84,6 +121,7 @@ class KuranOkuyucu extends ChangeNotifier {
     await _oynatici.stop();
     _caliyor = false;
     _aktifIndex = null;
+    _aktifKelime = null;
     _bildir();
   }
 
@@ -94,6 +132,7 @@ class KuranOkuyucu extends ChangeNotifier {
     } else {
       _caliyor = false;
       _aktifIndex = null;
+      _aktifKelime = null;
       _bildir();
     }
   }
@@ -105,8 +144,64 @@ class KuranOkuyucu extends ChangeNotifier {
   @override
   void dispose() {
     _kapatildi = true;
-    _bitisAboneligi.cancel();
+    for (final a in _abonelikler) {
+      a.cancel();
+    }
     _oynatici.dispose();
     super.dispose();
+  }
+}
+
+/// Tilavet seslerini telefona indirir: indirilen sureler internetsiz dinlenebilir
+class KuranSesDeposu {
+  static Directory? _klasor;
+
+  static Future<Directory> _dizin() async {
+    if (_klasor != null) return _klasor!;
+    final kok = await getApplicationDocumentsDirectory();
+    _klasor = Directory('${kok.path}/kuran_ses_alafasy');
+    if (!await _klasor!.exists()) await _klasor!.create(recursive: true);
+    return _klasor!;
+  }
+
+  static Future<File> dosya(int sure, int ayet) async =>
+      File('${(await _dizin()).path}/${KuranOkuyucu.dosyaAdi(sure, ayet)}.mp3');
+
+  static Future<bool> indirildiMi(int sure) async {
+    for (int a = 1; a <= quran.getVerseCount(sure); a++) {
+      if (!await (await dosya(sure, a)).exists()) return false;
+    }
+    return true;
+  }
+
+  /// Surenin eksik ayet seslerini ve kelime zamanlamalarını indirir; [ilerleme] 0..1. Hata olursa mesaj döner.
+  static Future<String?> indir(int sure, {void Function(double)? ilerleme}) async {
+    final adet = quran.getVerseCount(sure);
+    try {
+      if (await KelimeDeposu.yukle(sure) == null) throw Exception('Kelime verisi alınamadı');
+      for (int a = 1; a <= adet; a++) {
+        final f = await dosya(sure, a);
+        if (!await f.exists()) {
+          final cevap = await http.get(Uri.parse(KuranOkuyucu.sesAdresi(sure, a))).timeout(const Duration(seconds: 30));
+          if (cevap.statusCode != 200) throw Exception('HTTP ${cevap.statusCode}');
+          // Yarım kalan dosya "indirilmiş" sayılmasın: önce geçici dosyaya yaz
+          final gecici = File('${f.path}.part');
+          await gecici.writeAsBytes(cevap.bodyBytes);
+          await gecici.rename(f.path);
+        }
+        ilerleme?.call(a / adet);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('⬇️ Sure indirme hatası: $e');
+      return 'İndirme tamamlanamadı. İnternet bağlantınızı kontrol edin.';
+    }
+  }
+
+  static Future<void> sil(int sure) async {
+    for (int a = 1; a <= quran.getVerseCount(sure); a++) {
+      final f = await dosya(sure, a);
+      if (await f.exists()) await f.delete();
+    }
   }
 }
