@@ -670,11 +670,6 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
 
             SizedBox(height: Responsive.h(24)),
 
-            // Renk Skalası Bilgilendirmesi
-            _buildRenkLejanti(context),
-
-            SizedBox(height: Responsive.h(24)),
-
             // 🏅 Rozetler
             _buildRozetler(context, provider),
 
@@ -962,10 +957,17 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
           ),
           SizedBox(height: Responsive.h(10)),
 
-          SizedBox(
-            height: Responsive.h(
-              300,
-            ), // Takvim için sabit yükseklik (PageView gereği)
+          // Yükseklik görüntülenen ayın satır sayısına göre (5 ya da 6 hafta): altta boşluk kalmaz
+          LayoutBuilder(builder: (context, kisit) {
+            final ilk = DateTime(goruntulenen.year, goruntulenen.month, 1);
+            final gunSayisi = DateTime(goruntulenen.year, goruntulenen.month + 1, 0).day;
+            final satir = ((ilk.weekday - 1 + gunSayisi) / 7).ceil();
+            final hucre = (kisit.maxWidth - 2 * Responsive.w(8) - 6 * 8) / 7;
+            final yukseklik = satir * hucre + (satir - 1) * 8 + 2;
+            return AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            height: yukseklik,
             child: PageView.builder(
               controller: _pageController,
               onPageChanged: (index) {
@@ -1050,7 +1052,11 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
                 );
               },
             ),
-          ),
+            );
+          }),
+          // Renk skalası takvim kartının içinde, ızgaranın hemen altında
+          SizedBox(height: Responsive.h(14)),
+          _buildRenkLejanti(context),
         ],
       ),
     );
@@ -1317,20 +1323,11 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
   // Renklerin ne anlama geldiğini gösteren alt kısım
   Widget _buildRenkLejanti(BuildContext context) {
     final r = context.renkler;
-    return Container(
-      padding: EdgeInsets.all(Responsive.w(12)),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "Vakit Takibi Renk Skalası",
-            style: TextStyle(
-              fontSize: Responsive.sp(12),
-              fontWeight: FontWeight.bold,
-              color: r.yaziRengi.withOpacity(0.6),
-            ),
-          ),
-          SizedBox(height: Responsive.h(10)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(6, (i) {
