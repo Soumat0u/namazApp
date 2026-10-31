@@ -265,38 +265,47 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani>
               ),
             ],
           ),
-          // Dokununca tüm menüye yayılan dalga/vurgu efekti kapalı
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              splashFactory: NoSplash.splashFactory,
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-            ),
-            child: BottomNavigationBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              currentIndex: _seciliSayfaIndex,
-              selectedItemColor: tema.anaRenk,
-              unselectedItemColor: tema.pasifRenk,
-              showUnselectedLabels: true,
-              type: BottomNavigationBarType.fixed,
-              iconSize: Responsive.w(22),
-              selectedFontSize: Responsive.sp(11),
-              unselectedFontSize: Responsive.sp(10),
-              onTap: (index) => setState(() => _seciliSayfaIndex = index),
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.home_rounded),
-                  label: 'Ana Sayfa',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.bar_chart_rounded),
-                  label: 'İstatistik',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.people_alt_rounded),
-                  label: 'Sosyal',
-                ),
+          // Her sekme ayrı düğme: dokununca yalnızca basılan düğme hafifçe aydınlanır
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Row(
+              children: [
+                for (final (i, ikon, ad) in const [
+                  (0, Icons.home_rounded, 'Ana Sayfa'),
+                  (1, Icons.bar_chart_rounded, 'İstatistik'),
+                  (2, Icons.people_alt_rounded, 'Sosyal'),
+                ])
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(22),
+                        splashColor: tema.anaRenk.withOpacity(0.12),
+                        highlightColor: tema.anaRenk.withOpacity(0.06),
+                        onTap: () => setState(() => _seciliSayfaIndex = i),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: Responsive.h(7)),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(ikon,
+                                  size: Responsive.w(23),
+                                  color: _seciliSayfaIndex == i ? tema.anaRenk : tema.pasifRenk),
+                              SizedBox(height: Responsive.h(3)),
+                              Text(
+                                ad,
+                                style: TextStyle(
+                                  fontSize: Responsive.sp(_seciliSayfaIndex == i ? 11 : 10),
+                                  fontWeight: _seciliSayfaIndex == i ? FontWeight.w700 : FontWeight.w500,
+                                  color: _seciliSayfaIndex == i ? tema.anaRenk : tema.pasifRenk,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
