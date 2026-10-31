@@ -1921,6 +1921,17 @@ class NamazProvider extends ChangeNotifier {
     }
   }
 
+  /// Tesbihattan gelen zikir: geçmişe ve XP'ye işler, zikirmatikteki sayaca dokunmaz
+  int _tesbihatSayaci = 0;
+  Future<void> tesbihatZikri() async {
+    final bugun = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _zikirGecmisi[bugun] = (_zikirGecmisi[bugun] ?? 0) + 1;
+    _tesbihatSayaci++;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('zikirGecmisi', json.encode(_zikirGecmisi));
+    if (_tesbihatSayaci % 10 == 0) await _xpGuncelle(1); // Zikirmatikle aynı oran
+  }
+
   Future<void> zikirHedefBelirle(int hedef) async {
     final prefs = await SharedPreferences.getInstance();
     _zikirHedefi = hedef;

@@ -6,6 +6,9 @@ import 'qibla_screen.dart';
 import 'zikirmatik_screen.dart'; // Eklendi
 import 'settings_screen.dart'; // Ayarlar Eklendi
 import 'kaza_screen.dart';
+import 'tesbihat_screen.dart';
+import 'dua_kitapligi_screen.dart';
+import 'hatim_screen.dart';
 
 
 class AraclarSayfasi extends StatelessWidget {
@@ -62,6 +65,27 @@ class AraclarSayfasi extends StatelessWidget {
                   MaterialPageRoute(builder: (context) => const ZikirmatikScreen()),
                 );
               },
+            ),
+            _buildAracCard(
+              context: context,
+              icon: Icons.blur_circular_rounded,
+              title: "Tesbihat",
+              color: Colors.green,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TesbihatScreen())),
+            ),
+            _buildAracCard(
+              context: context,
+              icon: Icons.menu_book_rounded,
+              title: "Dua Kitaplığı",
+              color: Colors.indigo,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DuaKitapligiScreen())),
+            ),
+            _buildAracCard(
+              context: context,
+              icon: Icons.auto_stories_rounded,
+              title: "Hatim Takibi",
+              color: Colors.brown,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HatimScreen())),
             ),
             _buildAracCard(
               context: context,

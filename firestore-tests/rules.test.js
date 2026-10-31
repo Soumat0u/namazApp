@@ -160,6 +160,20 @@ test('engellenenler listesi sadece sahibince yazılır', async () => {
   await assertFails(updateDoc(doc(db('veli'), 'users/ali'), { engellenenler: [] }));
 });
 
+// ───────────── Ortak hatim ─────────────
+
+test('ortak hatim: üye cüz alır, üye olmayan göremez, adı sadece kuran değiştirir', async () => {
+  await assertSucceeds(setDoc(doc(db('ali'), 'hatimler/h1'), {
+    ad: 'Kardeşler', olusturan: 'ali', uyeler: ['ali', 'veli'], cuzler: {},
+  }));
+  await assertFails(setDoc(doc(db('ali'), 'hatimler/h2'), { ad: 'x', olusturan: 'veli', uyeler: ['veli'] }));
+  await assertSucceeds(updateDoc(doc(db('veli'), 'hatimler/h1'), { 'cuzler.3': { uid: 'veli', bitti: false } }));
+  await assertFails(getDoc(doc(db('ayse'), 'hatimler/h1')));
+  await assertFails(updateDoc(doc(db('veli'), 'hatimler/h1'), { ad: 'değişti' }));
+  await assertFails(deleteDoc(doc(db('veli'), 'hatimler/h1')));
+  await assertSucceeds(deleteDoc(doc(db('ali'), 'hatimler/h1')));
+});
+
 // ───────────── Hikayeler ─────────────
 
 test('başkasının hikayesine izleyen olarak eklenir ama silemez', async () => {
