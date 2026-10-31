@@ -40,10 +40,10 @@ class AraclarSayfasi extends StatelessWidget {
       body: Padding(
         padding: EdgeInsets.all(Responsive.w(16)),
         child: GridView.count(
-          crossAxisCount: 2, // 2 sütunlu grid
-          crossAxisSpacing: Responsive.w(16),
-          mainAxisSpacing: Responsive.h(16),
-          childAspectRatio: 0.9,
+          crossAxisCount: 3,
+          crossAxisSpacing: Responsive.w(10),
+          mainAxisSpacing: Responsive.h(10),
+          childAspectRatio: 0.85,
           children: [
             _buildAracCard(
               context: context,
@@ -153,7 +153,7 @@ class AraclarSayfasi extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: tema.kartRengi,
-        borderRadius: BorderRadius.circular(Responsive.w(20)),
+        borderRadius: BorderRadius.circular(Responsive.w(16)),
         border: Border.all(color: color.withOpacity(0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
@@ -170,7 +170,7 @@ class AraclarSayfasi extends StatelessWidget {
             debugPrint("Tapped on: $title");
             onTap();
           },
-          borderRadius: BorderRadius.circular(Responsive.w(20)),
+          borderRadius: BorderRadius.circular(Responsive.w(16)),
           child: Stack(
             children: [
               Center(
@@ -178,21 +178,27 @@ class AraclarSayfasi extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: EdgeInsets.all(Responsive.w(16)),
+                      padding: EdgeInsets.all(Responsive.w(12)),
                       decoration: BoxDecoration(
                         color: color.withOpacity(0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(icon, color: color, size: Responsive.w(36)),
+                      child: Icon(icon, color: color, size: Responsive.w(26)),
                     ),
-                    SizedBox(height: Responsive.h(12)),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: tema.yaziRengi,
-                        fontWeight: FontWeight.bold,
-                        fontSize: Responsive.sp(14),
+                    SizedBox(height: Responsive.h(8)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(4)),
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: tema.yaziRengi,
+                          fontWeight: FontWeight.bold,
+                          fontSize: Responsive.sp(12),
+                          height: 1.2,
+                        ),
                       ),
                     ),
                   ],
