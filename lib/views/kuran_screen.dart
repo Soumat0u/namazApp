@@ -77,6 +77,11 @@ class _KuranScreenState extends State<KuranScreen> {
       child: Scaffold(
         backgroundColor: r.arkaPlanRengi,
         appBar: AppBar(
+          leading: IconButton(
+            tooltip: "Geri",
+            icon: Icon(Icons.arrow_back_rounded, color: r.yaziRengi),
+            onPressed: () => Navigator.maybePop(context),
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
@@ -271,48 +276,92 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
   Future<void> _ayetSecenekleri(int ayet) async {
     final r = context.renklerOku; // Düğme olayında: dinlemeden oku
     final messenger = ScaffoldMessenger.of(context);
+    final s = widget.sure;
+
+    Widget secenek(BuildContext sheet, IconData ikon, String baslik, String aciklama, VoidCallback onTap) => Material(
+          color: r.kartRengi,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              Navigator.pop(sheet);
+              onTap();
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration:
+                        BoxDecoration(color: r.anaRenk.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                    child: Icon(ikon, color: r.anaRenk, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(baslik, style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text(aciklama, style: TextStyle(color: r.pasifRenk, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
     await showModalBottomSheet(
       context: context,
       backgroundColor: r.arkaPlanRengi,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheet) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.bookmark_add_rounded, color: r.anaRenk),
-              title: const Text("Kaldığım yer olarak işaretle"),
-              onTap: () async {
-                Navigator.pop(sheet);
-                await KuranAyarlari.kaldigimYeriKaydet(widget.sure, ayet);
-                setState(() => _kaldigimAyet = ayet);
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration:
+                      BoxDecoration(color: r.pasifRenk.withOpacity(0.35), borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text("${quran.getSurahNameTurkish(s)} Suresi, $ayet. Ayet",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w900, fontSize: 17)),
+              const SizedBox(height: 16),
+              secenek(sheet, Icons.play_circle_rounded, "Buradan dinle", "Tilavet bu ayetten başlar",
+                  () => _okuyucu.baslat(ayet - 1)),
+              const SizedBox(height: 10),
+              secenek(sheet, Icons.bookmark_add_rounded, "Kaldığım yer olarak işaretle",
+                  "Kur'an'ı açınca buradan devam edersin", () async {
+                await KuranAyarlari.kaldigimYeriKaydet(s, ayet);
+                if (mounted) setState(() => _kaldigimAyet = ayet);
                 messenger.showSnackBar(const SnackBar(content: Text("Kaldığın yer kaydedildi.")));
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.play_circle_rounded, color: r.anaRenk),
-              title: const Text("Buradan dinle"),
-              onTap: () {
-                Navigator.pop(sheet);
-                _okuyucu.baslat(ayet - 1);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.share_rounded, color: r.anaRenk),
-              title: const Text("Paylaş"),
-              onTap: () {
-                Navigator.pop(sheet);
+              }),
+              const SizedBox(height: 10),
+              secenek(sheet, Icons.share_rounded, "Paylaş", "Arapça metin ve meal", () {
                 Share.share(
-                  "${quran.getVerse(widget.sure, ayet)}\n\n"
-                  "${quran.getVerseTranslation(widget.sure, ayet, translation: quran.Translation.trSaheeh)}\n\n"
-                  "(${quran.getSurahNameTurkish(widget.sure)} Suresi, $ayet. Ayet)",
+                  "${quran.getVerse(s, ayet)}\n\n"
+                  "${quran.getVerseTranslation(s, ayet, translation: quran.Translation.trSaheeh)}\n\n"
+                  "(${quran.getSurahNameTurkish(s)} Suresi, $ayet. Ayet)",
                 );
-              },
-            ),
-          ],
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
   }
+
 
   Future<void> _indirmeIslemi() async {
     final messenger = ScaffoldMessenger.of(context);
@@ -339,65 +388,174 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
     await showModalBottomSheet(
       context: context,
       backgroundColor: r.arkaPlanRengi,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheet) => StatefulBuilder(
-        builder: (sheet, yenile) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  value: _mealGoster,
-                  activeColor: r.anaRenk,
-                  title: const Text("Meali göster"),
-                  onChanged: (v) {
-                    setState(() => _mealGoster = v);
-                    yenile(() {});
-                    SharedPreferences.getInstance().then((p) => p.setBool('kuran_meal_goster', v));
-                  },
-                ),
-                ListTile(
-                  title: const Text("Okuma hızı"),
-                  subtitle: Wrap(
-                    spacing: 8,
-                    children: [
-                      for (final h in const [0.5, 0.75, 1.0, 1.25, 1.5])
-                        ChoiceChip(
-                          label: Text(h == 1.0 ? "Normal" : "${h}x"),
-                          selected: _okuyucu.hiz == h,
-                          selectedColor: r.anaRenk.withOpacity(0.2),
-                          onSelected: (_) {
-                            _okuyucu.hizAyarla(h);
-                            yenile(() {});
-                            SharedPreferences.getInstance().then((p) => p.setDouble('kuran_hiz', h));
-                          },
+        builder: (sheet, yenile) {
+          void guncelle(VoidCallback f) {
+            setState(f);
+            yenile(() {});
+          }
+
+          Widget kart({required IconData ikon, required String baslik, Widget? sag, Widget? alt}) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(18)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                              color: r.anaRenk.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                          child: Icon(ikon, color: r.anaRenk, size: 20),
                         ),
-                    ],
-                  ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(baslik,
+                              style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.bold, fontSize: 15)),
+                        ),
+                        if (sag != null) sag,
+                      ],
+                    ),
+                    if (alt != null) ...[const SizedBox(height: 14), alt],
+                  ],
                 ),
-                ListTile(
-                  title: const Text("Yazı boyutu"),
-                  subtitle: Slider(
-                    value: _yaziBoyutu,
-                    min: 18,
-                    max: 40,
-                    divisions: 11,
-                    activeColor: r.anaRenk,
-                    label: _yaziBoyutu.round().toString(),
-                    onChanged: (v) {
-                      setState(() => _yaziBoyutu = v);
-                      yenile(() {});
-                    },
-                    onChangeEnd: (v) => SharedPreferences.getInstance().then((p) => p.setDouble('kuran_yazi_boyutu', v)),
+              );
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: r.pasifRenk.withOpacity(0.35), borderRadius: BorderRadius.circular(2)),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  Text("Okuma Ayarları",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w900, fontSize: 18)),
+                  const SizedBox(height: 16),
+
+                  // Meal
+                  kart(
+                    ikon: Icons.translate_rounded,
+                    baslik: "Meali göster",
+                    sag: Switch(
+                      value: _mealGoster,
+                      activeColor: r.anaRenk,
+                      onChanged: (v) {
+                        guncelle(() => _mealGoster = v);
+                        SharedPreferences.getInstance().then((p) => p.setBool('kuran_meal_goster', v));
+                      },
+                    ),
+                  ),
+
+                  // Okuma hızı: tek satırda eşit genişlikte seçenekler
+                  kart(
+                    ikon: Icons.speed_rounded,
+                    baslik: "Okuma hızı",
+                    alt: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                          color: r.arkaPlanRengi, borderRadius: BorderRadius.circular(14)),
+                      child: Row(
+                        children: [
+                          for (final h in const [0.5, 0.75, 1.0, 1.25, 1.5])
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  _okuyucu.hizAyarla(h);
+                                  yenile(() {});
+                                  SharedPreferences.getInstance().then((p) => p.setDouble('kuran_hiz', h));
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _okuyucu.hiz == h ? r.anaRenk : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    h == 1.0 ? "1x" : "${h}x",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: _okuyucu.hiz == h ? Colors.white : r.yaziRengi.withOpacity(0.7),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Yazı boyutu: canlı Arapça önizleme
+                  kart(
+                    ikon: Icons.format_size_rounded,
+                    baslik: "Yazı boyutu",
+                    sag: Text("${_yaziBoyutu.round()}",
+                        style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+                    alt: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          decoration: BoxDecoration(
+                              color: r.arkaPlanRengi, borderRadius: BorderRadius.circular(12)),
+                          child: Text(
+                            quran.basmala,
+                            textAlign: TextAlign.center,
+                            textDirection: TextDirection.rtl,
+                            maxLines: 1,
+                            overflow: TextOverflow.fade,
+                            softWrap: false,
+                            style: TextStyle(fontSize: _yaziBoyutu, color: r.yaziRengi, height: 1.6),
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Text("A", style: TextStyle(color: r.pasifRenk, fontSize: 13)),
+                            Expanded(
+                              child: Slider(
+                                value: _yaziBoyutu,
+                                min: 18,
+                                max: 40,
+                                divisions: 11,
+                                activeColor: r.anaRenk,
+                                inactiveColor: r.pasifRenk.withOpacity(0.2),
+                                onChanged: (v) => guncelle(() => _yaziBoyutu = v),
+                                onChangeEnd: (v) =>
+                                    SharedPreferences.getInstance().then((p) => p.setDouble('kuran_yazi_boyutu', v)),
+                              ),
+                            ),
+                            Text("A", style: TextStyle(color: r.pasifRenk, fontSize: 22, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -409,6 +567,11 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
     return Scaffold(
       backgroundColor: r.arkaPlanRengi,
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: "Geri",
+          icon: Icon(Icons.arrow_back_rounded, color: r.yaziRengi),
+          onPressed: () => Navigator.maybePop(context),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
