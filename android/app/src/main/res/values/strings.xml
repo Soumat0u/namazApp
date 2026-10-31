@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="vakit_widget_aciklama">Sıradaki namaz vakti ve kalan süre</string>
+    <string name="vakit_widget_aciklama">Sıradaki vakit, kalan süre ve bugünkü namazlar</string>
+    <string name="vakitler_widget_aciklama">Bugünün tüm vakitleri ve kılınan namazlar</string>
+    <string name="ayet_widget_aciklama">Her gün yeni bir ayet meali</string>
 </resources>

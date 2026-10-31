@@ -43,12 +43,25 @@
             android:value="2" />
 
         <!-- Ana ekran widget'ı: sıradaki vakit -->
-        <receiver android:name=".VakitWidgetProvider" android:exported="true" android:label="Namaz Vakti">
+        <receiver android:name=".VakitWidgetProvider" android:exported="true" android:label="Sıradaki Vakit">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/vakit_widget_info" />
         </receiver>
+        <receiver android:name=".VakitlerWidgetProvider" android:exported="true" android:label="Günlük Vakitler">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/vakitler_widget_info" />
+        </receiver>
+        <receiver android:name=".AyetWidgetProvider" android:exported="true" android:label="Günün Ayeti">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ayet_widget_info" />
+        </receiver>
+        <receiver android:name=".WidgetYenileyici" android:exported="false" />
 
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         

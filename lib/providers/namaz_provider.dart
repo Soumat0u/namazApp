@@ -1739,7 +1739,14 @@ class NamazProvider extends ChangeNotifier {
         'widget_alt_bilgi',
         '${kildiMi.values.where((x) => x).length}/5 bugün${streakCount > 0 ? ' • 🔥 $streakCount gün' : ''}',
       );
-      await HomeWidget.updateWidget(androidName: 'VakitWidgetProvider');
+      await HomeWidget.saveWidgetData<String>('widget_kilinan', json.encode(kildiMi));
+      await HomeWidget.saveWidgetData<String>('widget_kilinan_gun', _gunFormati.format(bugun));
+      await HomeWidget.saveWidgetData<int>('widget_seri', streakCount);
+      await HomeWidget.saveWidgetData<String>('widget_ayet_meal', gununAyetiMeali);
+      await HomeWidget.saveWidgetData<String>('widget_ayet_ref', gununAyetiReferans);
+      for (final ad in const ['VakitWidgetProvider', 'VakitlerWidgetProvider', 'AyetWidgetProvider']) {
+        await HomeWidget.updateWidget(androidName: ad);
+      }
     } catch (e) {
       debugPrint('🧩 Widget güncelleme hatası: $e');
     }

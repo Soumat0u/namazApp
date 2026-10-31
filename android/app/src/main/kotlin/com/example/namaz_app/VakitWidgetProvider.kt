@@ -1,101 +1,42 @@
 package com.example.namaz_app
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.os.SystemClock
 import android.view.View
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
-import org.json.JSONObject
-import java.util.Calendar
+import java.util.Locale
 
-/**
- * Ana ekran widget'ı: sıradaki vakit, saati ve geri sayım.
- * Uygulama bugünün ve yarının vakitlerini kaydeder; sıradaki vakit burada hesaplanır,
- * böylece uygulama açılmasa da widget doğru kalır. Vakit değişince kendini yeniden günceller.
- */
+/** Küçük widget: sıradaki vakit, saati, geri sayım ve bugünkü 5 vaktin durumu (altın nokta = kılındı). */
 class VakitWidgetProvider : HomeWidgetProvider() {
-
-    override fun onUpdate(
-        context: Context,
-        appWidgetManager: AppWidgetManager,
-        appWidgetIds: IntArray,
-        widgetData: SharedPreferences,
-    ) {
-        val sonraki = sonrakiVakit(widgetData)
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray, widgetData: SharedPreferences) {
+        val sonraki = WidgetVerisi.sonraki(widgetData)
+        val kilinan = WidgetVerisi.kilinanlar(widgetData)
+        val seri = WidgetVerisi.seri(widgetData)
+        val noktalar = listOf(R.id.nokta_0, R.id.nokta_1, R.id.nokta_2, R.id.nokta_3, R.id.nokta_4)
         for (id in appWidgetIds) {
-            val views = RemoteViews(context.packageName, R.layout.vakit_widget)
-            val acIntent = HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java)
-            views.setOnClickPendingIntent(R.id.widget_kok, acIntent)
-
+            val v = RemoteViews(context.packageName, R.layout.vakit_widget)
+            v.setOnClickPendingIntent(R.id.widget_kok, HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java))
             if (sonraki == null) {
-                views.setTextViewText(R.id.widget_vakit, "Takva Yolum")
-                views.setTextViewText(R.id.widget_saat, "Vakitler için uygulamayı açın")
-                views.setViewVisibility(R.id.widget_geri_sayim, View.GONE)
+                v.setTextViewText(R.id.widget_vakit, "TAKVA YOLUM")
+                v.setTextViewText(R.id.widget_saat, "--:--")
+                v.setViewVisibility(R.id.widget_geri_sayim, View.GONE)
             } else {
-                views.setTextViewText(R.id.widget_vakit, "Sıradaki: ${sonraki.ad}")
-                views.setTextViewText(R.id.widget_saat, sonraki.saat)
-                views.setViewVisibility(R.id.widget_geri_sayim, View.VISIBLE)
-                val kalanMs = sonraki.zaman - System.currentTimeMillis()
-                views.setChronometer(R.id.widget_geri_sayim, SystemClock.elapsedRealtime() + kalanMs, null, true)
-                views.setChronometerCountDown(R.id.widget_geri_sayim, true)
+                v.setTextViewText(R.id.widget_vakit, sonraki.ad.uppercase(Locale("tr")))
+                v.setTextViewText(R.id.widget_saat, sonraki.saat)
+                v.setViewVisibility(R.id.widget_geri_sayim, View.VISIBLE)
+                v.setChronometer(R.id.widget_geri_sayim, SystemClock.elapsedRealtime() + (sonraki.zaman - System.currentTimeMillis()), null, true)
+                v.setChronometerCountDown(R.id.widget_geri_sayim, true)
             }
-            val bilgi = widgetData.getString("widget_alt_bilgi", "") ?: ""
-            views.setTextViewText(R.id.widget_alt, bilgi)
-            appWidgetManager.updateAppWidget(id, views)
-        }
-        if (sonraki != null) yenilemeKur(context, sonraki.zaman + 1000)
-    }
-
-    private data class Vakit(val ad: String, val saat: String, val zaman: Long)
-
-    private fun sonrakiVakit(prefs: SharedPreferences): Vakit? {
-        val ham = prefs.getString("widget_vakitler", null) ?: return null
-        return try {
-            val gunler = JSONObject(ham) // "yyyy-MM-dd" -> { "Sabah": "05:30", ... }
-            val simdi = System.currentTimeMillis()
-            val sira = listOf("Sabah", "Güneş", "Öğle", "İkindi", "Akşam", "Yatsı")
-            val anahtarlar = gunler.keys().asSequence().sorted().toList()
-            for (gun in anahtarlar) {
-                val v = gunler.getJSONObject(gun)
-                val p = gun.split("-").map { it.toInt() }
-                for (ad in sira) {
-                    val s = v.optString(ad, "")
-                    if (s.isEmpty()) continue
-                    val hm = s.split(" ")[0].split(":").map { it.toInt() }
-                    val cal = Calendar.getInstance().apply {
-                        set(p[0], p[1] - 1, p[2], hm[0], hm[1], 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }
-                    if (cal.timeInMillis > simdi) return Vakit(ad, s.split(" ")[0], cal.timeInMillis)
-                }
+            WidgetVerisi.NAMAZLAR.forEachIndexed { i, ad ->
+                v.setImageViewResource(noktalar[i], if (ad in kilinan) R.drawable.widget_nokta_dolu else R.drawable.widget_nokta_bos)
             }
-            null
-        } catch (e: Exception) {
-            null
+            v.setTextViewText(R.id.widget_alt, if (seri > 0) "🔥 $seri" else "${kilinan.size}/5")
+            appWidgetManager.updateAppWidget(id, v)
         }
-    }
-
-    /** Sıradaki vakit girince widget'ı yeniden hesaplat */
-    private fun yenilemeKur(context: Context, zaman: Long) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val ids = AppWidgetManager.getInstance(context)
-            .getAppWidgetIds(ComponentName(context, VakitWidgetProvider::class.java))
-        val intent = Intent(context, VakitWidgetProvider::class.java).apply {
-            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-        }
-        val pi = PendingIntent.getBroadcast(
-            context, 4242, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        // Tam alarm izni gerekmeyen, uyku modunda da çalışan yaklaşık alarm yeterli
-        am.setAndAllowWhileIdle(AlarmManager.RTC, zaman, pi)
+        WidgetVerisi.yenilemeKur(context, sonraki?.zaman)
     }
 }
