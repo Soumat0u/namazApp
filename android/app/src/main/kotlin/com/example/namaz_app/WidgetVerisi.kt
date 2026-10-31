@@ -53,6 +53,47 @@ object WidgetVerisi {
         } catch (e: Exception) { null }
     }
 
+    /** Sıradaki imsak (Sabah) ya da iftar (Akşam) vakti */
+    fun sonrakiOrucVakti(prefs: SharedPreferences): Vakit? {
+        val gunler = json(prefs, "widget_vakitler") ?: return null
+        val simdi = System.currentTimeMillis()
+        return try {
+            for (gun in gunler.keys().asSequence().sorted()) {
+                val v = gunler.getJSONObject(gun)
+                for (ad in listOf("Sabah", "Akşam")) {
+                    val s = v.optString(ad, "")
+                    if (s.isEmpty()) continue
+                    val z = zaman(gun, s)
+                    if (z > simdi) return Vakit(ad, s.split(" ")[0], z)
+                }
+            }
+            null
+        } catch (e: Exception) { null }
+    }
+
+    data class DiniGun(val ad: String, val tarih: String, val kalan: Int)
+
+    /** Bugün ve sonrasındaki dini günler (uygulama ["yyyy-MM-dd|Ad", ...] olarak kaydeder) */
+    fun diniGunler(prefs: SharedPreferences): List<DiniGun> {
+        val ham = prefs.getString("widget_dini_gunler", null) ?: return emptyList()
+        val bugun = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        val aylar = listOf("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
+        return try {
+            val dizi = org.json.JSONArray(ham)
+            (0 until dizi.length()).mapNotNull { i ->
+                val (tarih, ad) = dizi.getString(i).split("|", limit = 2)
+                val p = tarih.split("-").map { it.toInt() }
+                val c = Calendar.getInstance().apply {
+                    set(p[0], p[1] - 1, p[2], 12, 0, 0); set(Calendar.MILLISECOND, 0)
+                }
+                val kalan = Math.round((c.timeInMillis - bugun.timeInMillis) / 86400000.0).toInt()
+                if (kalan < 0) null else DiniGun(ad, "${p[2]} ${aylar[p[1] - 1]} ${p[0]}", kalan)
+            }.sortedBy { it.kalan }
+        } catch (e: Exception) { emptyList() }
+    }
+
     /** Bugünün 6 vakti (saat yoksa "--:--") */
     fun bugun(prefs: SharedPreferences): List<Vakit> {
         val gun = bugunAnahtari()
@@ -95,7 +136,10 @@ object WidgetVerisi {
 
     fun hepsiniGuncelle(context: Context) {
         val m = AppWidgetManager.getInstance(context)
-        for (c in listOf(VakitWidgetProvider::class.java, VakitlerWidgetProvider::class.java, AyetWidgetProvider::class.java)) {
+        for (c in listOf(
+            VakitWidgetProvider::class.java, VakitlerWidgetProvider::class.java, AyetWidgetProvider::class.java,
+            TakipWidgetProvider::class.java, OrucWidgetProvider::class.java, DiniGunWidgetProvider::class.java,
+        )) {
             val ids = m.getAppWidgetIds(ComponentName(context, c))
             if (ids.isEmpty()) continue
             context.sendBroadcast(Intent(context, c).apply {

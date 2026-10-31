@@ -61,6 +61,31 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/ayet_widget_info" />
         </receiver>
+
+        <receiver android:name=".TakipWidgetProvider" android:exported="true" android:label="Namaz Takibi">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/takip_widget_info" />
+        </receiver>
+        <receiver android:name=".OrucWidgetProvider" android:exported="true" android:label="İftar ve Sahur">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/oruc_widget_info" />
+        </receiver>
+        <receiver android:name=".DiniGunWidgetProvider" android:exported="true" android:label="Dini Günler">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/dini_gun_widget_info" />
+        </receiver>
+        <receiver android:name=".ZikirWidgetProvider" android:exported="true" android:label="Zikirmatik">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/zikir_widget_info" />
+        </receiver>
         <receiver android:name=".WidgetYenileyici" android:exported="false" />
 
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />

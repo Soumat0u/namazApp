@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_kok"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/zikir_widget_arka"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📿" android:textSize="13sp" />
+        <TextView android:id="@+id/zikir_ad" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="6dp"
+            android:text="Sübhânallah" android:textColor="#FFD54F" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.12" android:maxLines="1" />
+        <TextView android:id="@+id/zikir_sifirla" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:background="@drawable/widget_hap" android:paddingStart="8dp" android:paddingEnd="8dp" android:paddingTop="2dp" android:paddingBottom="2dp"
+            android:text="↺" android:textColor="#CCFFFFFF" android:textSize="14sp" />
+    </LinearLayout>
+
+    <TextView android:id="@+id/zikir_sayi" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="1" android:gravity="center"
+        android:text="0" android:textColor="#FFFFFF" android:textSize="40sp" android:fontFamily="sans-serif-light" android:includeFontPadding="false" />
+
+    <ProgressBar android:id="@+id/zikir_ilerleme" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="5dp"
+        android:max="33" android:progress="0" android:progressDrawable="@drawable/zikir_ilerleme" />
+
+    <TextView android:id="@+id/zikir_toplam" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:text="Saymak için dokun" android:textColor="#99FFFFFF" android:textSize="10sp" />
+</LinearLayout>

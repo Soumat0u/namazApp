@@ -3,4 +3,8 @@
     <string name="vakit_widget_aciklama">Sıradaki vakit, kalan süre ve bugünkü namazlar</string>
     <string name="vakitler_widget_aciklama">Bugünün tüm vakitleri ve kılınan namazlar</string>
     <string name="ayet_widget_aciklama">Her gün yeni bir ayet meali</string>
+    <string name="takip_widget_aciklama">Günlük seri ve bugün kılınan namazlar</string>
+    <string name="oruc_widget_aciklama">İftara ya da imsaka kalan süre</string>
+    <string name="dini_gun_widget_aciklama">Yaklaşan kandil ve bayramlara geri sayım</string>
+    <string name="zikir_widget_aciklama">Dokunarak zikir say (33\'lük turlar)</string>
 </resources>

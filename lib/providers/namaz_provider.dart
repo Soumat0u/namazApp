@@ -1744,7 +1744,21 @@ class NamazProvider extends ChangeNotifier {
       await HomeWidget.saveWidgetData<int>('widget_seri', streakCount);
       await HomeWidget.saveWidgetData<String>('widget_ayet_meal', gununAyetiMeali);
       await HomeWidget.saveWidgetData<String>('widget_ayet_ref', gununAyetiReferans);
-      for (final ad in const ['VakitWidgetProvider', 'VakitlerWidgetProvider', 'AyetWidgetProvider']) {
+      final bugunAnahtar = _gunFormati.format(bugun);
+      final diniGunler = (tumDiniGunler.entries.where((e) => e.key.compareTo(bugunAnahtar) >= 0).toList()
+            ..sort((a, b) => a.key.compareTo(b.key)))
+          .take(6)
+          .map((e) => '${e.key}|${e.value.turkishName}')
+          .toList();
+      await HomeWidget.saveWidgetData<String>('widget_dini_gunler', json.encode(diniGunler));
+      for (final ad in const [
+        'VakitWidgetProvider',
+        'VakitlerWidgetProvider',
+        'AyetWidgetProvider',
+        'TakipWidgetProvider',
+        'OrucWidgetProvider',
+        'DiniGunWidgetProvider',
+      ]) {
         await HomeWidget.updateWidget(androidName: ad);
       }
     } catch (e) {
