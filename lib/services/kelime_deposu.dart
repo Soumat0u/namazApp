@@ -20,6 +20,18 @@ class AyetKelime {
     return null;
   }
 
+  /// [ms] konumunda okunan kelime (1'den) ve o kelimenin ne kadarının okunduğu (0..1).
+  /// Kelimeler arasındaki kısa sessizlikte bir önceki kelime tamamlanmış sayılır.
+  (int, double)? konum(int ms) {
+    (int, double)? son;
+    for (final (sira, bas, bit) in zamanlar) {
+      if (ms < bas) break;
+      son = ms <= bit ? (sira, bit > bas ? (ms - bas) / (bit - bas) : 1.0) : (sira, 1.0);
+      if (ms <= bit) break;
+    }
+    return son;
+  }
+
   Map<String, dynamic> toJson() => {
         'k': kelimeler,
         'z': [for (final (s, b, e) in zamanlar) [s, b, e]],

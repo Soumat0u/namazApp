@@ -19,7 +19,10 @@ class KuranOkuyucu extends ChangeNotifier {
   final List<StreamSubscription> _abonelikler = [];
 
   int? _aktifIndex;
-  int? _aktifKelime;
+
+  /// Okunan yer: ayet sırası, kelime (1'den) ve kelime içi ilerleme (0..1).
+  /// Her karede güncellenir; yalnızca o ayetin metni dinler (sayfanın tamamı yeniden çizilmez).
+  final ValueNotifier<({int index, int kelime, double ilerleme})?> konum = ValueNotifier(null);
   bool _caliyor = false;
   bool _yukleniyor = false;
   String? hata;
@@ -47,7 +50,7 @@ class KuranOkuyucu extends ChangeNotifier {
       KuranOkuyucu([for (int a = 1; a <= quran.getVerseCount(sure); a++) (sure: sure, ayet: a)]);
 
   int? get aktifIndex => _aktifIndex;
-  int? get aktifKelime => _aktifKelime;
+  int? get aktifKelime => konum.value?.kelime;
   ({int sure, int ayet})? get aktifAyet => _aktifIndex == null ? null : ayetler[_aktifIndex!];
   bool get caliyor => _caliyor;
   bool get yukleniyor => _yukleniyor;
@@ -69,20 +72,18 @@ class KuranOkuyucu extends ChangeNotifier {
 
   static String sesAdresi(int sure, int ayet) => 'https://verses.quran.com/Alafasy/mp3/${dosyaAdi(sure, ayet)}.mp3';
 
-  void _konumDegisti(Duration konum) {
-    final a = aktifAyet;
-    if (a == null) return;
-    final k = kelimeler(a.sure, a.ayet)?.kelimeAt(konum.inMilliseconds);
-    if (k != null && k != _aktifKelime) {
-      _aktifKelime = k;
-      _bildir();
-    }
+  void _konumDegisti(Duration sure) {
+    final i = _aktifIndex;
+    if (i == null || _kapatildi) return;
+    final a = ayetler[i];
+    final k = kelimeler(a.sure, a.ayet)?.konum(sure.inMilliseconds);
+    if (k != null) konum.value = (index: i, kelime: k.$1, ilerleme: k.$2);
   }
 
   Future<void> baslat([int index = 0]) async {
     if (index < 0 || index >= ayetler.length) return;
     _aktifIndex = index;
-    _aktifKelime = null;
+    konum.value = null;
     _caliyor = true;
     _yukleniyor = true;
     hata = null;
@@ -121,7 +122,7 @@ class KuranOkuyucu extends ChangeNotifier {
     await _oynatici.stop();
     _caliyor = false;
     _aktifIndex = null;
-    _aktifKelime = null;
+    konum.value = null;
     _bildir();
   }
 
@@ -132,7 +133,7 @@ class KuranOkuyucu extends ChangeNotifier {
     } else {
       _caliyor = false;
       _aktifIndex = null;
-      _aktifKelime = null;
+      konum.value = null;
       _bildir();
     }
   }
@@ -144,6 +145,7 @@ class KuranOkuyucu extends ChangeNotifier {
   @override
   void dispose() {
     _kapatildi = true;
+    konum.dispose();
     for (final a in _abonelikler) {
       a.cancel();
     }

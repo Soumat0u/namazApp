@@ -20,5 +20,12 @@ void main() {
     expect(a.kelimeAt(1000), 3);
     expect(a.kelimeAt(2300), 4);
     expect(AyetKelime.fromJson(a.toJson()).zamanlar, a.zamanlar, reason: 'Telefona kaydedip geri okuma');
+
+    // Kelime içi ilerleme: ışığın sağdan sola nerede olduğu
+    expect(a.konum(10), isNull, reason: 'Okuma başlamadı');
+    expect(a.konum(30), (1, 0.0));
+    expect(a.konum(1220)!.$1, 3);
+    expect(a.konum(1220)!.$2, closeTo(0.5, 0.01));
+    expect(a.konum(395), (1, 1.0), reason: 'Kelimeler arası sessizlikte önceki kelime tamam');
   });
 }
