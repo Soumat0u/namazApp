@@ -29,7 +29,7 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
   Future<void> _checkVibrationSupport() async {
     bool? hasVibrator = await Vibration.hasVibrator();
     if (mounted) {
-      setState(() => _canVibrate = hasVibrator ?? false);
+      setState(() => _canVibrate = hasVibrator);
     }
   }
 
@@ -40,15 +40,17 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
   }
 
   void _zikirCek(NamazProvider provider) async {
+    // Önce sayacı artır, sonra zil modunu bekle: hızlı dokunuşlarda her dokunuş
+    // güncel sayacı görür ve hedef atlanmaz
+    final hedefeUlasti = provider.zikirSayaci + 1 == provider.zikirHedefi;
+    provider.zikirArtir();
+
     RingerModeStatus ringerStatus = RingerModeStatus.normal;
     try {
       ringerStatus = await SoundMode.ringerModeStatus;
     } catch (_) {}
 
-    // Hedefe ulaşıldı mı kontrolü
-    if (provider.zikirSayaci + 1 == provider.zikirHedefi) {
-      provider.zikirArtir();
-      
+    if (hedefeUlasti) {
       // Ses: Sadece normal modda çal
       if (ringerStatus == RingerModeStatus.normal) {
         _audioPlayer.play(AssetSource('sounds/success.mp3'));
@@ -74,7 +76,6 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> {
       if (_canVibrate && ringerStatus != RingerModeStatus.silent) {
         Vibration.vibrate(duration: 50);
       }
-      provider.zikirArtir();
     }
   }
 

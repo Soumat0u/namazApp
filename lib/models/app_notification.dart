@@ -6,8 +6,9 @@ class AppNotification {
   final String fromUid;
   final String fromUsername;
   final String fromDisplayName; // İsteği atanın görünen adı
-  final String status; // 'pending', 'accepted', 'rejected'
+  final String status; // 'pending', 'accepted', 'rejected'; bilgi bildirimlerinde 'unread' / 'read'
   final DateTime timestamp;
+  final String? vakit; // 'nudge' (hatırlatma) bildirimlerinde
 
   AppNotification({
     required this.id,
@@ -17,6 +18,7 @@ class AppNotification {
     required this.fromDisplayName,
     required this.status,
     required this.timestamp,
+    this.vakit,
   });
 
   factory AppNotification.fromFirestore(DocumentSnapshot doc) {
@@ -29,6 +31,7 @@ class AppNotification {
       fromDisplayName: data['fromDisplayName'] ?? '',
       status: data['status'] ?? 'pending',
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      vakit: data['vakit'],
     );
   }
 

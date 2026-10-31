@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
+import '../core/utils/extensions.dart';
 import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
+import 'widgets/sehir_secici.dart';
 
 class AyarlarSayfasi extends StatelessWidget {
   const AyarlarSayfasi({super.key});
@@ -62,24 +63,24 @@ class AyarlarSayfasi extends StatelessWidget {
             const Divider(height: 1),
             _buildInfoTile(
               r,
-              title: "Kayıtlı Konum",
-              subtitle: provider.konumBilgisi.toUpperCase(),
+              title: provider.seciliSehir.isEmpty ? "Konum (GPS)" : "Konum (Seçilen Şehir)",
+              subtitle: provider.konumBilgisi.trBuyuk,
               icon: Icons.location_on_outlined,
+              onTap: () => sehirSeciciGoster(context),
               trailing: IconButton(
                 icon: Icon(
                   Icons.refresh,
                   color: r.anaRenk,
                   size: Responsive.w(20),
                 ),
-
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text(
-                        "Konum güncelleme için Ana Sayfa'yı yenileyin.",
-                      ),
+                      content: Text("Vakitler güncelleniyor..."),
+                      duration: Duration(seconds: 1),
                     ),
                   );
+                  provider.konumVeApiIstegi(kullaniciTetikledi: true);
                 },
               ),
             ),
@@ -612,7 +613,6 @@ class _ThemeGroupWidget extends StatelessWidget {
   final AppThemeColors r;
 
   const _ThemeGroupWidget({
-    super.key,
     required this.isim,
     required this.lightId,
     required this.darkId,

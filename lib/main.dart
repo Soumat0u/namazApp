@@ -1,9 +1,9 @@
-import 'dart:io';
-
+import 'views/widgets/cinsiyet_secici.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 
@@ -20,17 +20,8 @@ import 'views/social_screen.dart';
 import 'views/auth_screen.dart';
 import 'views/onboarding_screen.dart';
 
-class DevHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
-  }
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  HttpOverrides.global = DevHttpOverrides(); // HTTPS/SSL hatalarını yoksaymak için
   await initializeDateFormatting('tr_TR', null);
 
   // 🔥 Firebase'i başlat
@@ -43,6 +34,26 @@ void main() async {
   final notificationService = NotificationService();
   final firebaseService = FirebaseService();
   await notificationService.init();
+
+  // 🔔 PUSH BİLDİRİMLERİ: açıkken göster, dokununca ilgili sekmeyi aç
+  try {
+    FirebaseMessaging.onMessage.listen((mesaj) {
+      final n = mesaj.notification;
+      if (n == null) return;
+      notificationService.anlikGoster(
+        title: n.title ?? '',
+        body: n.body ?? '',
+        sekme: mesaj.data['sekme'] ?? 'sosyal',
+      );
+    });
+    FirebaseMessaging.onMessageOpenedApp.listen((mesaj) {
+      NotificationService.acilacakSekme.value = mesaj.data['sekme'] ?? 'sosyal';
+    });
+    final ilk = await FirebaseMessaging.instance.getInitialMessage();
+    if (ilk != null) NotificationService.acilacakSekme.value = ilk.data['sekme'] ?? 'sosyal';
+  } catch (e) {
+    debugPrint('🔔 Push dinleyici hatası: $e');
+  }
 
   runApp(
     MultiProvider(
@@ -117,6 +128,11 @@ class _AuthGateState extends State<_AuthGate> {
       return const AuthScreen();
     }
 
+    // Cinsiyeti bilinmeyen hesaplar (Google / eski sürüm) bir kez seçer
+    if (provider.cinsiyetSorulmali) {
+      return const CinsiyetSecimEkrani();
+    }
+
     // 2. Giriş yapıldıktan sonra, onboarding tamamlanmamışsa göster
     if (!_onboardingCompleted!) {
       return OnboardingScreen(onComplete: _onOnboardingComplete);
@@ -142,10 +158,22 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani> with WidgetsBindi
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _updateStatus(true);
+    NotificationService.acilacakSekme.addListener(_bildirimdenSekmeAc);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bildirimdenSekmeAc());
+  }
+
+  /// Bildirime dokunulduysa ilgili sekmeye geç ('ana' → 0, 'sosyal' → 2)
+  void _bildirimdenSekmeAc() {
+    final sekme = NotificationService.acilacakSekme.value;
+    if (sekme == null || !mounted) return;
+    NotificationService.acilacakSekme.value = null;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    setState(() => _seciliSayfaIndex = sekme == 'sosyal' ? 2 : 0);
   }
 
   @override
   void dispose() {
+    NotificationService.acilacakSekme.removeListener(_bildirimdenSekmeAc);
     WidgetsBinding.instance.removeObserver(this);
     _updateStatus(false);
     super.dispose();

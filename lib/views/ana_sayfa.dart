@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
+import '../core/utils/extensions.dart';
 import '../providers/namaz_provider.dart';
 import 'widgets/vakit_background.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/seviye_servisi.dart';
-import 'social_screen.dart';
 import 'tools_screen.dart'; // Araçlar eklendi
+import 'widgets/sehir_secici.dart';
 import '../models/religious_day.dart';
 import 'package:intl/intl.dart';
 import 'package:quran/quran.dart' as quran;
-import 'dart:ui' as ui;
 
 class AnaSayfa extends StatefulWidget {
   const AnaSayfa({super.key});
@@ -40,6 +40,30 @@ class _AnaSayfaState extends State<AnaSayfa> {
   Widget build(BuildContext context) {
     Responsive.init(context);
     final provider = context.watch<NamazProvider>();
+    // Yeni rozet kazanıldıysa bir kez kutla
+    if (provider.yeniRozet != null) {
+      final rozet = provider.yeniRozet!;
+      provider.yeniRozet = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Row(children: [
+              Icon(rozet.ikon, color: Colors.amber),
+              const SizedBox(width: 10),
+              Expanded(child: Text("Yeni rozet: ${rozet.ad}! ${rozet.aciklama}")),
+            ]),
+          ));
+        }
+      });
+    }
+    // Seri dondurma kullanıldıysa bir kez bildir
+    if (provider.seriDondurmaMesaji != null) {
+      final mesaj = provider.seriDondurmaMesaji!;
+      provider.seriDondurmaMesaji = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mesaj)));
+      });
+    }
 
     if (provider.isLoading && provider.vakitler == null) {
       return Center(
@@ -132,6 +156,9 @@ class _AnaSayfaState extends State<AnaSayfa> {
 
               _buildDiniGunBanner(context, provider),
 
+              if (provider.vakitler == null && !provider.isLoading)
+                _buildKonumGerekliKarti(context, provider),
+
               // Senin hazırladığın Ana Saat alanı (Sayfalı yapıldı)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
@@ -147,7 +174,6 @@ class _AnaSayfaState extends State<AnaSayfa> {
                     _buildVakitGrid(context, provider),
                     SizedBox(height: Responsive.h(16)),
                     _buildPrayerButton(context, provider),
-                    SizedBox(height: Responsive.h(10)),
                   ],
                 ),
               ),
@@ -207,6 +233,75 @@ class _AnaSayfaState extends State<AnaSayfa> {
           ),
         ],
       ],
+    );
+  }
+
+  /// Konum izni yok / GPS alınamadı: kullanıcıya izin verme veya şehir seçme imkânı sun
+  Widget _buildKonumGerekliKarti(BuildContext context, NamazProvider provider) {
+    final r = context.renkler;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(16)),
+      child: Container(
+        padding: EdgeInsets.all(Responsive.w(16)),
+        decoration: BoxDecoration(
+          color: r.kartRengi,
+          borderRadius: BorderRadius.circular(Responsive.w(16)),
+          border: Border.all(color: r.anaRenk.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.location_off_rounded, color: r.anaRenk),
+                SizedBox(width: Responsive.w(8)),
+                Expanded(
+                  child: Text(
+                    "Vakitler için konum gerekli",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: Responsive.sp(15),
+                      color: r.yaziRengi,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: Responsive.h(8)),
+            Text(
+              provider.hataMesaji.isNotEmpty
+                  ? provider.hataMesaji.split('\n').first
+                  : "Konum izni verin veya bulunduğunuz şehri seçin.",
+              style: TextStyle(fontSize: Responsive.sp(12), color: r.yaziRengi.withOpacity(0.7)),
+            ),
+            SizedBox(height: Responsive.h(12)),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => provider.konumVeApiIstegi(kullaniciTetikledi: true),
+                    icon: const Icon(Icons.my_location, size: 18),
+                    label: const Text("Konum İzni Ver"),
+                    style: OutlinedButton.styleFrom(foregroundColor: r.anaRenk),
+                  ),
+                ),
+                SizedBox(width: Responsive.w(8)),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => sehirSeciciGoster(context),
+                    icon: const Icon(Icons.location_city, size: 18),
+                    label: const Text("Şehir Seç"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: r.anaRenk,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -654,7 +749,7 @@ Widget _buildMainClock(BuildContext context, NamazProvider provider) {
           ),
           SizedBox(height: Responsive.h(8)),
           Text(
-            provider.aktifVakit.toUpperCase(),
+            provider.aktifVakit.trBuyuk,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: Responsive.sp(24),
@@ -727,7 +822,7 @@ Widget _buildMainClock(BuildContext context, NamazProvider provider) {
 
 Widget _buildVakitGrid(BuildContext context, NamazProvider provider) {
   return Container(
-    padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+    padding: EdgeInsets.symmetric(vertical: Responsive.h(8)),
     decoration: _sikKutuDecoration(context),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -773,12 +868,17 @@ Widget _buildVakitGrid(BuildContext context, NamazProvider provider) {
 }
 
 Widget _buildPrayerButton(BuildContext context, NamazProvider provider) {
+  // Güneş doğduktan sonra Öğle'ye kadar kılınacak farz yok
+  if (!provider.vakitIsimleri.contains(provider.aktifVakit)) {
+    return const _AnimatedPrayerButton(
+      isDone: false,
+      onTap: null,
+      etiket: "ÖĞLE VAKTİ BEKLENİYOR",
+    );
+  }
   return _AnimatedPrayerButton(
     isDone: provider.kildiMi[provider.aktifVakit] ?? false,
-    onTap: () {
-      bool suanki = provider.kildiMi[provider.aktifVakit] ?? false;
-      provider.vaktiKildimIsaretle(provider.aktifVakit, !suanki);
-    },
+    onTap: () => _vakteDokunuldu(context, provider, provider.aktifVakit),
   );
 }
 
@@ -809,7 +909,10 @@ Widget _vakitKutusu(
   bool suan = provider.aktifVakit == ad;
   String temizSaat = saat.contains(" ") ? saat.split(" ")[0] : saat;
 
-  return AnimatedContainer(
+  return GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: () => _vakteDokunuldu(context, provider, ad),
+    child: AnimatedContainer(
     duration: const Duration(milliseconds: 400),
     padding: EdgeInsets.symmetric(
       horizontal: Responsive.w(8),
@@ -826,11 +929,22 @@ Widget _vakitKutusu(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _VakitIkonu(
-          ikon: ikon,
-          size: Responsive.w(24),
-          color: kildi ? r.anaRenk : (suan ? r.aktifYesil : r.pasifRenk),
-          isActive: suan,
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _VakitIkonu(
+              ikon: ikon,
+              size: Responsive.w(24),
+              color: kildi ? r.anaRenk : (suan ? r.aktifYesil : r.pasifRenk),
+              isActive: suan,
+            ),
+            if (kildi)
+              Positioned(
+                right: -Responsive.w(6),
+                top: -Responsive.w(4),
+                child: Icon(Icons.check_circle_rounded, size: Responsive.w(12), color: r.anaRenk),
+              ),
+          ],
         ),
         SizedBox(height: Responsive.h(6)),
         Text(
@@ -841,25 +955,46 @@ Widget _vakitKutusu(
             color: suan ? r.yaziRengi : r.yaziRengi.withOpacity(0.5),
           ),
         ),
-        SizedBox(height: Responsive.h(3)),
-        Text(
-          ad,
-          style: TextStyle(
-            fontSize: Responsive.sp(10),
-            color: suan ? r.aktifYesil : Colors.transparent,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
       ],
+    ),
     ),
   );
 }
 }
 
+/// Şu anki vakit işaretlenir/geri alınır; diğer vakitlerde nedenini söyler
+void _vakteDokunuldu(BuildContext context, NamazProvider provider, String vakit) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  if (!provider.vakitIsimleri.contains(vakit)) {
+    messenger.showSnackBar(const SnackBar(content: Text("Güneş doğuşu bir namaz vakti değil.")));
+    return;
+  }
+  if (!provider.vakitIsaretlenebilirMi(vakit)) {
+    final sira = provider.vakitIsimleri.indexOf(vakit);
+    final aktifSira = provider.vakitIsimleri.indexOf(provider.aktifVakit);
+    final gecti = aktifSira == -1 ? sira == 0 : sira < aktifSira;
+    messenger.showSnackBar(SnackBar(
+      content: Text(gecti
+          ? "$vakit vakti çıktı, artık işaretlenemez."
+          : "$vakit vakti henüz girmedi."),
+    ));
+    return;
+  }
+  final yeniDurum = !(provider.kildiMi[vakit] ?? false);
+  provider.vaktiKildimIsaretle(vakit, yeniDurum);
+  messenger.showSnackBar(SnackBar(
+    content: Text(yeniDurum ? "$vakit namazı kılındı olarak işaretlendi." : "$vakit namazının işareti kaldırıldı."),
+    duration: const Duration(seconds: 3),
+    action: SnackBarAction(label: "Geri Al", onPressed: () => provider.vaktiKildimIsaretle(vakit, !yeniDurum)),
+  ));
+}
+
 class _AnimatedPrayerButton extends StatefulWidget {
   final bool isDone;
-  final VoidCallback onTap;
-  const _AnimatedPrayerButton({required this.isDone, required this.onTap});
+  final VoidCallback? onTap; // null: buton pasif (ör. Güneş vakti)
+  final String? etiket;
+  const _AnimatedPrayerButton({required this.isDone, required this.onTap, this.etiket});
   @override
   State<_AnimatedPrayerButton> createState() => _AnimatedPrayerButtonState();
 }
@@ -894,10 +1029,11 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
     final circleSize = Responsive.w(60);
     final iconSize = Responsive.w(36);
 
+    final aktif = widget.onTap != null;
     return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) => _controller.reverse(),
-      onTapCancel: () => _controller.reverse(),
+      onTapDown: aktif ? (_) => _controller.forward() : null,
+      onTapUp: aktif ? (_) => _controller.reverse() : null,
+      onTapCancel: aktif ? () => _controller.reverse() : null,
       onTap: widget.onTap,
       child: ScaleTransition(
         scale: _scaleAnimation,
@@ -943,7 +1079,7 @@ class _AnimatedPrayerButtonState extends State<_AnimatedPrayerButton>
               ),
               SizedBox(height: Responsive.h(10)),
               Text(
-                widget.isDone ? "ALLAH KABUL ETSİN!" : "VAKTİ KILDIM",
+                widget.etiket ?? (widget.isDone ? "ALLAH KABUL ETSİN!" : "VAKTİ KILDIM"),
                 style: TextStyle(
                   fontSize: Responsive.sp(15),
                   fontWeight: FontWeight.w900,
@@ -1085,15 +1221,15 @@ class _GununAyetiCard extends StatelessWidget {
     barrierColor: Colors.black.withOpacity(0.85), // Arka planı biraz daha koyulaştırdım
     transitionDuration: const Duration(milliseconds: 500),
     pageBuilder: (context, anim1, anim2) {
-      final scrollController = ScrollController();
-      
-      // Build tamamlandıktan sonra hedef ayete kaydır
+      // Ayet yükseklikleri çok farklı olduğu için tahmini offset yanlış yere götürür:
+      // tüm ayetler çizilir ve hedef ayetin gerçek konumuna kaydırılır.
+      final hedefAnahtar = GlobalKey();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (targetAyet > 1 && scrollController.hasClients) {
-          // Tahmini bir offset hesabı yerine daha stabil bir değer
-          final offset = (targetAyet - 1) * 210.0; 
-          scrollController.animateTo(
-            offset.clamp(0, scrollController.position.maxScrollExtent),
+        final hedef = hedefAnahtar.currentContext;
+        if (targetAyet > 1 && hedef != null) {
+          Scrollable.ensureVisible(
+            hedef,
+            alignment: 0.05,
             duration: const Duration(milliseconds: 800),
             curve: Curves.easeOutExpo,
           );
@@ -1137,18 +1273,18 @@ class _GununAyetiCard extends StatelessWidget {
 
                     // --- AYETLER LİSTESİ ---
                     Expanded(
-                      child: ListView.builder(
-                        controller: scrollController,
+                      child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
                         padding: EdgeInsets.fromLTRB(Responsive.w(20), Responsive.h(10), Responsive.w(20), Responsive.h(30)),
-                        itemCount: ayetSayisi,
-                        itemBuilder: (context, index) {
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: List.generate(ayetSayisi, (index) {
                           // KRİTİK: index her zaman 0'dan başlar, ayetNo 1'den.
                           final int currentAyetNo = index + 1;
                           final bool isTarget = currentAyetNo == targetAyet;
 
                           return Container(
-                            key: ValueKey('ayet_card_${sureNo}_$currentAyetNo'),
+                            key: isTarget ? hedefAnahtar : ValueKey('ayet_card_${sureNo}_$currentAyetNo'),
                             margin: EdgeInsets.only(bottom: Responsive.h(16)),
                             padding: EdgeInsets.all(Responsive.w(16)),
                             decoration: BoxDecoration(
@@ -1229,7 +1365,8 @@ class _GununAyetiCard extends StatelessWidget {
                               ],
                             ),
                           );
-                        },
+                          }),
+                        ),
                       ),
                     ),
                   ],
@@ -1450,7 +1587,11 @@ Widget _buildAyetNoBadge(int no, bool isTarget, AppThemeColors r) {
                 ),
                 SizedBox(width: Responsive.w(8)),
                 ElevatedButton.icon(
-                  onPressed: () => _sureyiGoster(context, provider.gununAyetiSureNo, provider.gununAyetiNo, r),
+                  onPressed: () {
+                    final navigator = Navigator.of(context, rootNavigator: true);
+                    if (isFullText) navigator.pop(); // Odak modunu kapat; karartmalar üst üste binmesin
+                    _sureyiGoster(navigator.context, provider.gununAyetiSureNo, provider.gununAyetiNo, r);
+                  },
                   icon: Icon(Icons.menu_book_rounded, size: Responsive.w(16), color: Colors.white),
                   label: Text("Sureyi İncele", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: Responsive.sp(12))),
                   style: ElevatedButton.styleFrom(

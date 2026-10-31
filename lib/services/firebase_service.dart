@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -135,6 +136,8 @@ class FirebaseService {
 
   /// Hesaptan çıkış yapar
   Future<void> signOut() async {
+    await _tokenYenilemeAboneligi?.cancel();
+    _tokenYenilemeAboneligi = null;
     try {
       await Future.wait([
         _auth.signOut(),
@@ -143,6 +146,16 @@ class FirebaseService {
       debugPrint('🔐 Başarıyla çıkış yapıldı.');
     } catch (e) {
       debugPrint('🔐 Çıkış yapma hatası: $e');
+    }
+  }
+
+  /// Profil oluşturulamayan yeni hesabı siler ki aynı e-postayla tekrar kayıt olunabilsin
+  Future<void> yeniHesabiGeriAl() async {
+    try {
+      await _auth.currentUser?.delete();
+    } catch (e) {
+      debugPrint('🔐 Yarım hesap silinemedi: $e');
+      await _auth.signOut();
     }
   }
 
@@ -158,13 +171,16 @@ class FirebaseService {
     return user?.photoURL;
   }
 
-  /// Kullanıcının profil kaydının Firestore'da olup olmadığını kontrol eder
-  Future<bool> hasUserProfile(String uid) async {
+  /// Kullanıcının profil kaydının Firestore'da olup olmadığını kontrol eder.
+  /// Bağlantı hatasında `null` döner: "profil yok" ile "öğrenilemedi" ayrı tutulmalı,
+  /// aksi halde mevcut profilin üzerine yenisi yazılabilir.
+  Future<bool?> hasUserProfile(String uid) async {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
       return doc.exists;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      debugPrint('👤 Profil kontrol hatası: $e');
+      return null;
     }
   }
 
@@ -202,13 +218,17 @@ class FirebaseService {
     if (await isUsernameAvailable(base)) return base;
 
     final random = Random();
-    while (true) {
+    // isUsernameAvailable hata durumunda false döndüğü için sonsuz döngüye girmemeli
+    for (int deneme = 0; deneme < 10; deneme++) {
       String newName = '${base}_${random.nextInt(9999)}';
       if (await isUsernameAvailable(newName)) return newName;
     }
+    throw 'Kullanıcı adı oluşturulamadı. Lütfen tekrar deneyin.';
   }
 
-  /// Yeni kullanıcı profili oluşturur (ilk girişte kullanıcı adı seçtikten sonra)
+  /// Yeni kullanıcı profili oluşturur (ilk girişte kullanıcı adı seçtikten sonra).
+  /// Kullanıcı adı rezervasyonu ve profil tek bir transaction'da yazılır; ad bu arada
+  /// başkası tarafından alındıysa [kullaniciAdiAlindiHatasi] fırlatır. Diğer hatalar da fırlatılır.
   Future<void> createUserProfile({
     required String uid,
     required String username,
@@ -216,39 +236,38 @@ class FirebaseService {
     int initialXp = 0,
     int initialStreak = 0,
   }) async {
-    try {
-      final token = await _getMessagingToken();
-      final profile = UserProfile(
-        uid: uid,
-        username: username,
-        displayName: displayName,
-        totalXp: initialXp,
-        unvan: SeviyeServisi.unvanGetir(initialXp),
-        streak: initialStreak,
-        fcmToken: token,
-        createdAt: DateTime.now(),
-      );
-      
-      final batch = _firestore.batch();
-      
-      // 1. users koleksiyonuna ekle
-      final profileRef = _firestore.collection('users').doc(uid);
-      batch.set(profileRef, profile.toFirestore());
+    final token = await _getMessagingToken();
+    final profile = UserProfile(
+      uid: uid,
+      username: username,
+      displayName: displayName,
+      totalXp: initialXp,
+      unvan: SeviyeServisi.unvanGetir(initialXp),
+      streak: initialStreak,
+      fcmToken: token,
+      createdAt: DateTime.now(),
+    );
 
-      // 2. usernames koleksiyonuna eklearak rezerve et
-      final usernameRef = _firestore.collection('usernames').doc(username);
-      batch.set(usernameRef, {
-        'uid': uid, 
-        'createdAt': FieldValue.serverTimestamp()
+    final profileRef = _firestore.collection('users').doc(uid);
+    final usernameRef = _firestore.collection('usernames').doc(username);
+
+    await _firestore.runTransaction((transaction) async {
+      final mevcut = await transaction.get(usernameRef);
+      final sahibi = mevcut.data()?['uid'];
+      if (mevcut.exists && sahibi != uid) {
+        throw kullaniciAdiAlindiHatasi;
+      }
+      transaction.set(profileRef, profile.toFirestore());
+      transaction.set(usernameRef, {
+        'uid': uid,
+        'createdAt': FieldValue.serverTimestamp(),
       });
+    });
 
-      await batch.commit();
-
-      debugPrint('👤 Profil oluşturuldu: $username (XP: $initialXp)');
-    } catch (e) {
-      debugPrint('👤 Profil oluşturma hatası: $e');
-    }
+    debugPrint('👤 Profil oluşturuldu: $username (XP: $initialXp)');
   }
+
+  static const String kullaniciAdiAlindiHatasi = 'Bu kullanıcı adı daha önce alınmış.';
 
   /// Kullanıcının XP, streak ve unvan bilgilerini günceller (fire-and-forget)
   Future<void> updateUserStats({
@@ -264,6 +283,47 @@ class FirebaseService {
       });
     } catch (e) {
       debugPrint('📊 Stats güncelleme hatası: $e');
+    }
+  }
+
+  /// Arkadaş sıralaması, ortak hedef ve "bugün kıldıkları" için özet durumu yazar
+  Future<void> updateSosyalDurum({
+    required String uid,
+    required String haftaKey,
+    required int haftalikXp,
+    required int haftalikNamaz,
+    required String bugunTarih,
+    required List<String> bugunKilinan,
+  }) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'haftaKey': haftaKey,
+        'haftalikXp': haftalikXp,
+        'haftalikNamaz': haftalikNamaz,
+        'bugunTarih': bugunTarih,
+        'bugunKilinan': bugunKilinan,
+      });
+    } catch (e) {
+      debugPrint('📊 Sosyal durum güncelleme hatası: $e');
+    }
+  }
+
+  /// Profil fotoğrafı: küçültülmüş JPEG, "data:image/jpeg;base64,..." olarak saklanır. null → kaldır
+  Future<bool> updateProfilFoto(String uid, String? fotoDataUri) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({'photoUrl': fotoDataUri});
+      return true;
+    } catch (e) {
+      debugPrint('🖼️ Profil fotoğrafı güncelleme hatası: $e');
+      return false;
+    }
+  }
+
+  Future<void> updateCinsiyet(String uid, String cinsiyet) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({'cinsiyet': cinsiyet});
+    } catch (e) {
+      debugPrint('👤 Cinsiyet güncelleme hatası: $e');
     }
   }
 
@@ -321,9 +381,16 @@ class FirebaseService {
         .collection('notifications')
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => AppNotification.fromFirestore(doc)).toList());
+        .map((snapshot) => snapshot.docs
+            .map((doc) => AppNotification.fromFirestore(doc))
+            .where((n) => !engellenenler.contains(n.fromUid))
+            .toList());
   }
 
+  /// Karşı taraf zaten bize istek atmışsa yeni istek yerine o istek kabul edilir.
+  static const String arkadasOlduMesaji = 'arkadas_oldu';
+
+  /// Hata mesajı, karşılıklı istekte [arkadasOlduMesaji] veya başarıda null döner.
   Future<String?> sendFriendRequest({
     required String targetUsername,
     required String senderUid,
@@ -332,21 +399,40 @@ class FirebaseService {
   }) async {
     try {
       final cleanUsername = targetUsername.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
+      if (cleanUsername.isEmpty) return 'Geçerli bir kullanıcı adı girin.';
       if (cleanUsername == senderUsername) return 'Kendinize istek gönderemezsiniz.';
-      
+
       final snap = await _firestore.collection('usernames').doc(cleanUsername).get();
       if (!snap.exists) return 'Bu kullanıcı adı sistemde bulunamadı.';
-      
+
       final targetUid = snap.data()?['uid'] as String?;
       if (targetUid == null) return 'Kullanıcı hesabı hatalı.';
       if (targetUid == senderUid) return 'Kendinize istek gönderemezsiniz.';
-      
-      final targetProfile = await _firestore.collection('users').doc(targetUid).get();
-      final targetFriends = List<String>.from(targetProfile.data()?['friends'] ?? []);
-      if (targetFriends.contains(senderUid)) return 'Bu kardeşimizle zaten arkadaşsınız.';
 
-      final notificationRef = _firestore.collection('users').doc(targetUid).collection('notifications').doc(senderUid); 
-      
+      final senderProfile = await _firestore.collection('users').doc(senderUid).get();
+      final myFriends = List<String>.from(senderProfile.data()?['friends'] ?? []);
+      if (myFriends.contains(targetUid)) return 'Bu kardeşimizle zaten arkadaşsınız.';
+
+      // Karşı taraf bize zaten istek göndermişse: ikinci bir istek yerine kabul et
+      final gelenIstek = await _firestore
+          .collection('users').doc(senderUid).collection('notifications').doc(targetUid).get();
+      if (gelenIstek.exists && gelenIstek.data()?['status'] == 'pending') {
+        final hata = await respondToFriendRequest(
+          currentUid: senderUid,
+          targetUid: targetUid,
+          accept: true,
+          currentUsername: senderUsername,
+          currentDisplayName: senderDisplayName,
+        );
+        return hata ?? arkadasOlduMesaji;
+      }
+
+      final notificationRef = _firestore.collection('users').doc(targetUid).collection('notifications').doc(senderUid);
+      final mevcut = await notificationRef.get();
+      if (mevcut.exists && mevcut.data()?['status'] == 'pending') {
+        return 'Bu kardeşimize zaten istek gönderdin, cevabı bekleniyor.';
+      }
+
       await notificationRef.set({
         'type': 'friend_request',
         'fromUid': senderUid,
@@ -355,42 +441,115 @@ class FirebaseService {
         'status': 'pending',
         'timestamp': FieldValue.serverTimestamp(),
       });
+      await _firestore.collection('users').doc(senderUid).update({
+        'gonderilenIstekler': FieldValue.arrayUnion([targetUid]),
+      });
 
       return null;
     } catch (e) {
       debugPrint('Arkadaş ekleme hatası: $e');
-      return 'Bir hata oluştu.';
+      return 'İstek gönderilemedi. İnternet bağlantınızı kontrol edin.';
     }
   }
 
-  Future<void> respondToFriendRequest({
+  /// İsteği kabul eder / reddeder. Hata olursa kullanıcıya gösterilecek mesajı döner.
+  Future<String?> respondToFriendRequest({
     required String currentUid,
     required String targetUid,
     required bool accept,
+    String currentUsername = '',
+    String currentDisplayName = '',
   }) async {
     try {
       final batch = _firestore.batch();
       final notifRef = _firestore.collection('users').doc(currentUid).collection('notifications').doc(targetUid);
-      
+      final hedefBildirimleri = _firestore.collection('users').doc(targetUid).collection('notifications');
+
       if (accept) {
         batch.update(notifRef, {'status': 'accepted'});
-        
-        final currentUserRef = _firestore.collection('users').doc(currentUid);
-        batch.update(currentUserRef, {
+        batch.update(_firestore.collection('users').doc(currentUid), {
           'friends': FieldValue.arrayUnion([targetUid])
         });
-        
-        final targetUserRef = _firestore.collection('users').doc(targetUid);
-        batch.update(targetUserRef, {
+        batch.update(_firestore.collection('users').doc(targetUid), {
           'friends': FieldValue.arrayUnion([currentUid])
         });
+        // Karşılıklı gönderilmiş istek varsa o da artık geçersiz
+        batch.delete(hedefBildirimleri.doc(currentUid));
+        // İsteği gönderene "kabul edildi" haberi
+        batch.set(hedefBildirimleri.doc('${currentUid}_kabul'), {
+          'type': 'friend_accepted',
+          'fromUid': currentUid,
+          'fromUsername': currentUsername,
+          'fromDisplayName': currentDisplayName,
+          'status': 'unread',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
       } else {
-        batch.update(notifRef, {'status': 'rejected'});
+        // Reddedilen istek silinir: karşı taraf ileride tekrar istek gönderebilir
+        batch.delete(notifRef);
       }
-      
+
       await batch.commit();
+      return null;
     } catch (e) {
       debugPrint('İstek cevaplama hatası: $e');
+      return 'İşlem tamamlanamadı. İnternet bağlantınızı kontrol edin.';
+    }
+  }
+
+  /// Arkadaşa "namazını kıldın mı?" hatırlatması gönderir (her arkadaşa günde bir kez).
+  /// Hata ya da bilgi mesajı, başarıda null döner.
+  Future<String?> durtGonder({
+    required String fromUid,
+    required String fromUsername,
+    required String fromDisplayName,
+    required String targetUid,
+    required String vakit,
+    required String gun,
+  }) async {
+    try {
+      final ref = _firestore.collection('users').doc(targetUid).collection('notifications').doc('${fromUid}_durt');
+      final mevcut = await ref.get();
+      if (mevcut.exists && mevcut.data()?['gun'] == gun) {
+        return 'Bu kardeşine bugün zaten hatırlattın.';
+      }
+      await ref.set({
+        'type': 'nudge',
+        'fromUid': fromUid,
+        'fromUsername': fromUsername,
+        'fromDisplayName': fromDisplayName,
+        'status': 'unread',
+        'vakit': vakit,
+        'gun': gun,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      return null;
+    } catch (e) {
+      debugPrint('👋 Hatırlatma gönderme hatası: $e');
+      return 'Hatırlatma gönderilemedi. İnternet bağlantınızı kontrol edin.';
+    }
+  }
+
+  /// Okunmamış bilgi bildirimlerini (kabul, hatırlatma) okundu yapar
+  Future<void> bildirimleriOkunduYap(String uid, List<String> bildirimIdleri) async {
+    if (bildirimIdleri.isEmpty) return;
+    try {
+      final batch = _firestore.batch();
+      final koleksiyon = _firestore.collection('users').doc(uid).collection('notifications');
+      for (final id in bildirimIdleri) {
+        batch.update(koleksiyon.doc(id), {'status': 'read'});
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint('🔔 Okundu işaretleme hatası: $e');
+    }
+  }
+
+  Future<void> bildirimiSil(String uid, String bildirimId) async {
+    try {
+      await _firestore.collection('users').doc(uid).collection('notifications').doc(bildirimId).delete();
+    } catch (e) {
+      debugPrint('🔔 Bildirim silme hatası: $e');
     }
   }
 
@@ -440,40 +599,78 @@ class FirebaseService {
     }
   }
 
-  /// Arkadaşların profil bilgilerini anlık (stream) olarak dinler
+  /// Arkadaşların profil bilgilerini anlık (stream) olarak dinler.
+  /// Firestore 'whereIn' en fazla 30 değer aldığı için liste parçalara bölünüp birleştirilir.
   Stream<List<UserProfile>> getFriendsProfilesStream(List<String> friendUids) {
     if (friendUids.isEmpty) return Stream.value([]);
-    
-    // Firestore 'whereIn' sınırı nedeniyle max 30 arkadaş (güncel Firestore limiti 30)
-    final targetUids = friendUids.take(30).toList();
 
-    return _firestore
-        .collection('users')
-        .where(FieldPath.documentId, whereIn: targetUids)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => UserProfile.fromFirestore(doc)).toList());
+    final parcalar = [
+      for (int i = 0; i < friendUids.length; i += 30)
+        friendUids.sublist(i, min(i + 30, friendUids.length)),
+    ];
+    final sonuclar = List<List<UserProfile>?>.filled(parcalar.length, null);
+    final abonelikler = <StreamSubscription>[];
+    late final StreamController<List<UserProfile>> controller;
+    controller = StreamController<List<UserProfile>>(
+      onListen: () {
+        for (int i = 0; i < parcalar.length; i++) {
+          abonelikler.add(_firestore
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: parcalar[i])
+              .snapshots()
+              .listen((snapshot) {
+            sonuclar[i] = snapshot.docs.map((doc) => UserProfile.fromFirestore(doc)).toList();
+            // Tüm parçalar en az bir kez geldiğinde yayınla
+            if (sonuclar.every((p) => p != null)) {
+              controller.add([for (final p in sonuclar) ...p!]);
+            }
+          }, onError: controller.addError));
+        }
+      },
+      onCancel: () async {
+        for (final a in abonelikler) {
+          await a.cancel();
+        }
+      },
+    );
+    return controller.stream;
   }
 
-  /// Arkadaş Önerileri: Kendisi ve halihazırda arkadaşı olmayan popüler kullanıcılar
-  Future<List<UserProfile>> getSuggestedFriends(String currentUid, List<String> currentFriends) async {
+  /// Arkadaş önerileri: önce ortak arkadaşı en çok olanlar, sonra en aktif kullanıcılar.
+  /// Kendisi, arkadaşları ve zaten istek gönderdikleri hariç tutulur.
+  Future<List<UserProfile>> getSuggestedFriends(
+    String currentUid,
+    List<String> currentFriends, {
+    List<String> haric = const [],
+  }) async {
+    final disarida = {currentUid, ...currentFriends, ...haric};
     try {
-      final snap = await _firestore
-          .collection('users')
-          .orderBy('totalXp', descending: true) // En aktif kişileri öne çıkar
-          .limit(20)
-          .get();
-          
-      final users = snap.docs.map((doc) => UserProfile.fromFirestore(doc)).toList();
-      
-      // Filtreleme: Kendisini ve arkadaşlarını çıkar
-      var suggestions = users.where((u) {
-        if (u.uid == currentUid) return false;
-        if (currentFriends.contains(u.uid)) return false;
-        return true;
-      }).toList();
-      
-      // Çeşitlilik veya karma isterseniz users.shuffle() burada yapılabilir
-      return suggestions.take(10).toList();
+      // Ortak arkadaş sayıları
+      final ortak = <String, int>{};
+      for (final arkadas in await getFriendsProfilesStream(currentFriends).first) {
+        for (final uid in arkadas.friends) {
+          if (!disarida.contains(uid)) ortak[uid] = (ortak[uid] ?? 0) + 1;
+        }
+      }
+      final ortakSirali = ortak.keys.toList()..sort((a, b) => ortak[b]!.compareTo(ortak[a]!));
+      final oneriler = ortakSirali.isEmpty
+          ? <UserProfile>[]
+          : await getFriendsProfilesStream(ortakSirali.take(10).toList()).first;
+      oneriler.sort((a, b) => ortak[b.uid]!.compareTo(ortak[a.uid]!));
+
+      if (oneriler.length < 10) {
+        final snap = await _firestore
+            .collection('users')
+            .orderBy('totalXp', descending: true)
+            .limit(30)
+            .get();
+        for (final doc in snap.docs) {
+          if (oneriler.length >= 10) break;
+          if (disarida.contains(doc.id) || oneriler.any((o) => o.uid == doc.id)) continue;
+          oneriler.add(UserProfile.fromFirestore(doc));
+        }
+      }
+      return oneriler;
     } catch (e) {
       debugPrint('Önerilen arkadaş getirme hatası: $e');
       return [];
@@ -497,6 +694,70 @@ class FirebaseService {
   // ════════════════════════════════════════
   // 🤲 DUA DUVARI İŞLEMLERİ
   // ════════════════════════════════════════
+
+  // ════════════════════════════════════════
+  // 🛡️ MODERASYON: şikâyet ve engelleme
+  // ════════════════════════════════════════
+
+  /// Bu kadar farklı kişi şikâyet eden dua herkesten gizlenir (sunucu da isApproved=false yapar)
+  static const int sikayetEsigi = 3;
+
+  /// Oturumdaki kullanıcı ve engelledikleri: akışlardan gizlenir (provider günceller)
+  static String? oturumUid;
+  static Set<String> engellenenler = {};
+
+  static bool duaGorunurMu(PrayerPost p) =>
+      p.sikayetEdenler.length < sikayetEsigi &&
+      !(oturumUid != null && p.sikayetEdenler.contains(oturumUid)) &&
+      !engellenenler.contains(p.senderUid);
+
+  Future<String?> duayiSikayetEt(String prayerId, String uid) async {
+    try {
+      await _firestore.collection('prayers').doc(prayerId).update({
+        'sikayetEdenler': FieldValue.arrayUnion([uid]),
+      });
+      return null;
+    } catch (e) {
+      debugPrint('🛡️ Şikâyet hatası: $e');
+      return 'Şikâyet gönderilemedi. İnternet bağlantınızı kontrol edin.';
+    }
+  }
+
+  Future<String?> duayiSil(String prayerId) async {
+    try {
+      await _firestore.collection('prayers').doc(prayerId).delete();
+      return null;
+    } catch (e) {
+      debugPrint('🤲 Dua silme hatası: $e');
+      return 'Dua silinemedi.';
+    }
+  }
+
+  /// Kullanıcıyı engeller: arkadaşlıktan çıkarır, duaları ve bildirimleri gizlenir
+  Future<String?> kullaniciyiEngelle(String uid, String hedefUid) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'engellenenler': FieldValue.arrayUnion([hedefUid]),
+      });
+      await removeFriend(currentUid: uid, targetUid: hedefUid);
+      engellenenler = {...engellenenler, hedefUid};
+      return null;
+    } catch (e) {
+      debugPrint('🛡️ Engelleme hatası: $e');
+      return 'Kullanıcı engellenemedi.';
+    }
+  }
+
+  Future<void> engeliKaldir(String uid, String hedefUid) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'engellenenler': FieldValue.arrayRemove([hedefUid]),
+      });
+      engellenenler = {...engellenenler}..remove(hedefUid);
+    } catch (e) {
+      debugPrint('🛡️ Engel kaldırma hatası: $e');
+    }
+  }
 
   /// Yeni dua paylaşır
   Future<void> addPrayer({
@@ -526,16 +787,24 @@ class FirebaseService {
   }
 
   /// Dua duvarını dinler (sadece onaylanan dualar, zamana göre sıralı)
+  /// Dualar haftalık gösterilir: her pazartesi 00:00'da akış sıfırlanır (veriler silinmez)
+  static DateTime haftaBaslangici() {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day - (n.weekday - 1));
+  }
+
   Stream<List<PrayerPost>> getPrayers({int limit = 30, String? excludeUid}) {
     return _firestore
         .collection('prayers')
         .where('isApproved', isEqualTo: true)
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(haftaBaslangici()))
         .orderBy('timestamp', descending: true)
         .limit(limit + (excludeUid != null ? 1 : 0)) // Kendi duası çıkarsa yerine başkası gelsin diye +1
         .snapshots()
         .map((snapshot) {
       var list = snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
+          .where(duaGorunurMu)
           .where((prayer) => excludeUid == null || prayer.senderUid != excludeUid)
           .toList();
       return list.take(limit).toList();
@@ -551,6 +820,7 @@ class FirebaseService {
         .map((snapshot) {
       var list = snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
+          .where(duaGorunurMu)
           .toList();
       // Firestore composite index hatası almamak için Dart tarafında sıralıyoruz
       list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -574,7 +844,8 @@ class FirebaseService {
         .map((snapshot) {
       var list = snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
-          .where((prayer) => prayer.isApproved)
+          .where(duaGorunurMu)
+          .where((prayer) => prayer.isApproved && !prayer.timestamp.isBefore(haftaBaslangici()))
           .toList();
       // Firestore composite index hatası almamak için orderBy ve limit'i Dart'ta yapıyoruz
       list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -594,6 +865,7 @@ class FirebaseService {
         .map((snapshot) {
       var list = snapshot.docs
           .map((doc) => PrayerPost.fromFirestore(doc))
+          .where(duaGorunurMu)
           .where((prayer) => excludeUid == null || prayer.senderUid != excludeUid)
           .toList();
           
@@ -701,13 +973,17 @@ class FirebaseService {
       });
     }
 
-    // Token yenilenirse güncelle
-    _messaging.onTokenRefresh.listen((newToken) {
+    // Token yenilenirse güncelle (her girişte yeni dinleyici eklenmesin)
+    await _tokenYenilemeAboneligi?.cancel();
+    _tokenYenilemeAboneligi = _messaging.onTokenRefresh.listen((newToken) {
       _firestore.collection('users').doc(uid).update({
         'fcmToken': newToken,
       });
     });
   }
+
+  // Uygulamada birden çok FirebaseService örneği oluşturulduğu için static
+  static StreamSubscription<String>? _tokenYenilemeAboneligi;
 
   // ════════════════════════════════════════
   // 📸 HİKAYE (STORY) İŞLEMLERİ

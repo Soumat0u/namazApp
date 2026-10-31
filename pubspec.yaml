@@ -40,6 +40,8 @@ dependencies:
   screenshot: ^3.0.0
   path_provider: ^2.1.5
   file_picker: ^8.3.6
+  image_picker: ^1.2.4
+  home_widget: ^0.10.0
 
 
 dev_dependencies:

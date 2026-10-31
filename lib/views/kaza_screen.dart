@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
-import '../services/notification_service.dart';
 
 class KazaTakipSayfasi extends StatefulWidget {
   const KazaTakipSayfasi({super.key});
@@ -32,6 +31,11 @@ class _KazaTakipSayfasiState extends State<KazaTakipSayfasi> with SingleTickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    final provider = context.read<NamazProvider>();
+    _bildirimSaati = TimeOfDay(
+      hour: provider.kazaHatirlatmaSaat,
+      minute: provider.kazaHatirlatmaDakika,
+    );
   }
 
   @override
@@ -265,12 +269,15 @@ class _KazaTakipSayfasiState extends State<KazaTakipSayfasi> with SingleTickerPr
 
           // 1 Günlük Paket Butonu
           InkWell(
-            onTap: () {
-              provider.kazaKilGunlukPaket();
-              ScaffoldMessenger.of(context).showSnackBar(
+            onTap: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final kilinan = await provider.kazaKilGunlukPaket();
+              messenger.showSnackBar(
                 SnackBar(
-                  content: const Text("1 günlük kaza namazı eklendi (5 vakit)."),
-                  backgroundColor: Colors.green,
+                  content: Text(kilinan > 0
+                      ? "$kilinan vakit kaza namazı kılındı olarak kaydedildi."
+                      : "Kılınacak kaza borcunuz bulunmuyor."),
+                  backgroundColor: kilinan > 0 ? Colors.green : tema.pasifRenk,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -537,7 +544,8 @@ class _KazaTakipSayfasiState extends State<KazaTakipSayfasi> with SingleTickerPr
             
           SizedBox(height: Responsive.h(32)),
 
-          // Kadın Özel Hal
+          // Kadın Özel Hal (yalnızca kadın kullanıcılara)
+          if (context.watch<NamazProvider>().kadinMi) ...[
           Container(
             decoration: BoxDecoration(
               color: tema.kartRengi,
@@ -552,8 +560,8 @@ class _KazaTakipSayfasiState extends State<KazaTakipSayfasi> with SingleTickerPr
               onChanged: (val) => setState(() => _kadinOzelHal = val),
             ),
           ),
-          
           SizedBox(height: Responsive.h(16)),
+          ],
 
           // Bildirim Saati
           Container(
@@ -583,6 +591,10 @@ class _KazaTakipSayfasiState extends State<KazaTakipSayfasi> with SingleTickerPr
                 );
                 if (time != null) {
                   setState(() => _bildirimSaati = time);
+                  // Hatırlatıcı zaten kuruluysa yeni saati hemen uygula
+                  if (provider.kazaHatirlatmaAcik) {
+                    provider.kazaHatirlatmaAyarla(saat: time.hour, dakika: time.minute);
+                  }
                 }
               },
             ),
@@ -785,7 +797,8 @@ class _KazaTakipSayfasiState extends State<KazaTakipSayfasi> with SingleTickerPr
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen tarih aralığı seçiniz.")));
         return;
       }
-      toplamGun = _endDate!.difference(_startDate!).inDays;
+      // Başlangıç ve bitiş günleri dahil
+      toplamGun = _endDate!.difference(_startDate!).inDays + 1;
     }
 
     if (toplamGun <= 0) {
@@ -793,7 +806,7 @@ class _KazaTakipSayfasiState extends State<KazaTakipSayfasi> with SingleTickerPr
       return;
     }
 
-    if (_kadinOzelHal) {
+    if (_kadinOzelHal && context.read<NamazProvider>().kadinMi) {
       double toplamAy = toplamGun / 30.0;
       int dusulecekGun = (toplamAy * 7).toInt();
       toplamGun -= dusulecekGun;
@@ -810,8 +823,7 @@ class _KazaTakipSayfasiState extends State<KazaTakipSayfasi> with SingleTickerPr
 
     provider.kazaBorcunuAyarla(yeniBorclar);
     
-    final NotificationService notificationService = NotificationService();
-    notificationService.scheduleKazaHatirlatma(hour: _bildirimSaati.hour, minute: _bildirimSaati.minute);
+    provider.kazaHatirlatmaAyarla(saat: _bildirimSaati.hour, dakika: _bildirimSaati.minute);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

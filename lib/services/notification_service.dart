@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
@@ -5,6 +6,9 @@ import '../core/constants/quotes.dart';
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
+
+  /// Bildirime dokununca açılacak sekme ('ana' | 'sosyal'). Ana ekran dinler ve değeri tüketir.
+  static final ValueNotifier<String?> acilacakSekme = ValueNotifier(null);
 
   Future<void> init() async {
     tz.initializeTimeZones();
@@ -27,8 +31,34 @@ class NotificationService {
     await _notificationsPlugin.initialize(
       settings: initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse details) {
-        // Bildirime tıklandığında yapılacaklar
+        acilacakSekme.value = details.payload ?? 'ana';
       },
+    );
+
+    // Uygulama kapalıyken bir bildirime dokunularak açıldıysa
+    final acilis = await _notificationsPlugin.getNotificationAppLaunchDetails();
+    if (acilis?.didNotificationLaunchApp ?? false) {
+      acilacakSekme.value = acilis!.notificationResponse?.payload ?? 'ana';
+    }
+  }
+
+  /// Uygulama açıkken gelen push bildirimini (FCM ön planda göstermez) yerel bildirim olarak gösterir
+  Future<void> anlikGoster({required String title, required String body, String sekme = 'sosyal'}) async {
+    await _notificationsPlugin.show(
+      id: DateTime.now().millisecondsSinceEpoch % 100000 + 1000,
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'sosyal_channel',
+          'Kardeşlerim',
+          channelDescription: 'Arkadaşlık istekleri, hatırlatmalar ve amîn bildirimleri',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
+      ),
+      payload: sekme,
     );
   }
 
@@ -92,6 +122,7 @@ class NotificationService {
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      payload: 'ana',
     );
   }
 
@@ -118,18 +149,22 @@ class NotificationService {
     await _notificationsPlugin.cancelAll();
   }
 
-  /// Her 5 saatte bir rastgele ayet veya hadis bildirimi planlar
-  Future<void> scheduleManeviRehberNotifications() async {
-    for (int i = 500; i <= 600; i++) {
-      await _notificationsPlugin.cancel(id: i);
-    }
-
+  /// Her 5 saatte bir rastgele ayet veya hadis bildirimi planlar (gece 23:00-08:00 arası atlanır).
+  /// iOS en fazla 64 bekleyen bildirim tuttuğu için vakit bildirimlerine yer bırakacak kadar planlanır.
+  /// Not: Çağıran taraf (NamazProvider) öncesinde cancelAll() yapar.
+  Future<void> scheduleManeviRehberNotifications({int adet = 14}) async {
     final allQuotes = ManeviRehberData.getAll();
     allQuotes.shuffle();
 
     final now = DateTime.now();
-    for (int i = 0; i < 50; i++) {
-      final scheduledTime = now.add(Duration(hours: (i + 1) * 5));
+    final zamanlar = <DateTime>[];
+    for (int adim = 1; zamanlar.length < adet && adim < adet * 4; adim++) {
+      final t = now.add(Duration(hours: adim * 5));
+      if (t.hour >= 8 && t.hour < 23) zamanlar.add(t);
+    }
+
+    for (int i = 0; i < zamanlar.length; i++) {
+      final scheduledTime = zamanlar[i];
       final quote = allQuotes[i % allQuotes.length];
       final bool isAyet = quote.contains('(') && quote.contains(')');
       final title = isAyet ? "📖 Bir Ayet" : "💬 Bir Hadis";

@@ -18,3 +18,11 @@ extension DateTimeExt on DateTime {
     return DateFormat('d MMM', 'tr_TR').format(this);
   }
 }
+
+extension TurkceMetinExt on String {
+  /// Türkçe kurallarıyla büyük harf (i → İ, ı → I). Dart'ın toUpperCase'i "İKINDI" üretir.
+  String get trBuyuk => replaceAll('i', 'İ').replaceAll('ı', 'I').toUpperCase();
+
+  /// Türkçe kurallarıyla küçük harf (İ → i, I → ı).
+  String get trKucuk => replaceAll('İ', 'i').replaceAll('I', 'ı').toLowerCase();
+}

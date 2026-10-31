@@ -4,7 +4,6 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../providers/namaz_provider.dart';
 import 'package:intl/intl.dart';
-import '../core/utils/dini_gunler_util.dart';
 import '../models/religious_day.dart';
 import '../services/seviye_servisi.dart';
 import 'package:screenshot/screenshot.dart';
@@ -21,7 +20,6 @@ class IstatistikSayfasi extends StatefulWidget {
 }
 
 class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
-  DateTime? _goruntulenenTarih;
   late PageController _pageController;
   final int _initialPage = 1000;
   late int _currentPageIndex;
@@ -656,10 +654,88 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
             // Renk Skalası Bilgilendirmesi
             _buildRenkLejanti(context),
 
+            SizedBox(height: Responsive.h(24)),
+
+            // 🏅 Rozetler
+            _buildRozetler(context, provider),
+
             SizedBox(height: Responsive.h(40)),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRozetler(BuildContext context, NamazProvider provider) {
+    final r = context.renkler;
+    final rozetler = provider.rozetler;
+    final kazanilan = rozetler.where((x) => x.kazanildi).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text("Rozetler",
+                style: TextStyle(fontSize: Responsive.sp(17), fontWeight: FontWeight.w900, color: r.yaziRengi)),
+            const Spacer(),
+            Text("$kazanilan / ${rozetler.length}",
+                style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(13))),
+          ],
+        ),
+        SizedBox(height: Responsive.h(12)),
+        GridView.count(
+          crossAxisCount: 4,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: Responsive.h(10),
+          crossAxisSpacing: Responsive.w(8),
+          childAspectRatio: 0.78,
+          children: [
+            for (final rozet in rozetler)
+              Tooltip(
+                message: rozet.aciklama,
+                triggerMode: TooltipTriggerMode.tap,
+                child: Column(
+                  children: [
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: Responsive.w(52),
+                          height: Responsive.w(52),
+                          child: CircularProgressIndicator(
+                            value: rozet.ilerleme,
+                            strokeWidth: 3,
+                            backgroundColor: r.pasifRenk.withOpacity(0.15),
+                            color: rozet.kazanildi ? Colors.amber : r.anaRenk.withOpacity(0.5),
+                          ),
+                        ),
+                        CircleAvatar(
+                          radius: Responsive.w(21),
+                          backgroundColor: rozet.kazanildi ? Colors.amber.withOpacity(0.18) : r.kartRengi,
+                          child: Icon(rozet.ikon,
+                              color: rozet.kazanildi ? Colors.amber.shade700 : r.pasifRenk.withOpacity(0.5),
+                              size: Responsive.w(22)),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: Responsive.h(6)),
+                    Text(
+                      rozet.ad,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      style: TextStyle(
+                        fontSize: Responsive.sp(10),
+                        fontWeight: FontWeight.bold,
+                        color: rozet.kazanildi ? r.yaziRengi : r.pasifRenk,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1078,7 +1154,8 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
       'dd MMMM yyyy, EEEE',
       'tr_TR',
     ).format(tarih);
-    String bugunKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    // Gece yarısı ile sabah arası hâlâ dünkü dini gündeyiz (canlı veri o güne ait)
+    String bugunKey = provider.getSanalGun();
 
     final ReligiousDay? religiousDay = provider.tumDiniGunler[dateKey];
     final String? diniGun = religiousDay?.turkishName;

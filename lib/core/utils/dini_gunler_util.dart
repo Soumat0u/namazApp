@@ -1,70 +1,36 @@
 import '../../models/religious_day.dart';
 import 'package:intl/intl.dart';
 
-class DiniGunlerUtil {
-  /// Aladhan API'den gelen İngilizce bayram isimlerini Türkçeye çevirir.
-  static String? _translateHoliday(String englishName) {
-    switch (englishName.toLowerCase()) {
-      case 'ramadan starts':
-      case 'ramadan':
-        return 'Ramazan Başlangıcı';
-      case 'eid al-fitr':
-      case 'eid-ul-fitr':
-        return 'Ramazan Bayramı';
-      case 'laylat al-qadr':
-        return 'Kadir Gecesi';
-      case 'eid al-adha':
-      case 'eid-ul-adha':
-        return 'Kurban Bayramı';
-      case 'ashura':
-        return 'Aşure Günü';
-      case 'islamic new year':
-        return 'Hicri Yılbaşı';
-      case 'mawlid al-nabi':
-      case 'milad un nabi':
-        return 'Mevlid Kandili';
-      case 'arafa':
-      case 'day of arafah':
-      case 'arafat (hajj) day':
-        return 'Kurban Bayramı Arefesi';
-      default:
-        // Bilinmeyen veya özel olmayanları atla
-        return null;
-    }
-  }
+/// Hicri gün/ay çifti
+typedef _HicriGun = ({int ay, int gun});
 
-  /// Verilen Miladi gün için, API'nin döndüğü Hicri tarih bilgisine bakarak
-  /// Türkiye'ye özgü Kandillerin olup olmadığını kontrol eder.
-  static String? _checkLocalKandil(int hicriAy, int hicriGun, DateTime miladiTarih) {
-    // 1. Regaib Kandili: Recep ayının (7. ay) ilk Perşembeyi Cumaya bağlayan gecesi.
-    // Takvimde Perşembe günü gündüzü Regaib Kandili olarak işaretlenir.
-    if (hicriAy == 7 && miladiTarih.weekday == DateTime.thursday && hicriGun <= 7) {
-      return 'Regaib Kandili';
-    }
-    // 2. Miraç Kandili: Recep ayının 27. gecesi (Takvimde 26. günü veya 27. günü olabilir, biz 26'sını baz alıp hata payını tolere etmek için 27 diyelim, genelde takvimlerde 27. gece yazılır)
-    if (hicriAy == 7 && hicriGun == 27) {
-      return 'Mirac Kandili';
-    }
-    // 3. Berat Kandili: Şaban ayının 15. gecesi
-    if (hicriAy == 8 && hicriGun == 15) {
-      return 'Berat Kandili';
-    }
-    // 4. Mevlid Kandili (Eğer API döndürmezse diye yedek)
-    if (hicriAy == 3 && hicriGun == 12) {
-      return 'Mevlid Kandili';
-    }
-    // 5. Kurban Bayramı Arefesi (Zilhicce 9, eğer API döndürmezse)
-    if (hicriAy == 12 && hicriGun == 9) {
-      return 'Kurban Bayramı Arefesi';
-    }
-    // 6. Ramazan Bayramı Arefesi (Ramazan'ın son günü 29 veya 30'u)
-    // Aladhan API Arefe'yi Ramazan için açıkça döndürmediği için, 
-    // Ramazan 29 veya 30. günü (kaba taslak son günü) Arefe sayabiliriz.
-    // Ancak bu kesinliği yansıtmaz. Biz şimdilik 29 ve 30'u kontrol edelim ama sadece 1 tanesi tutacaktır (ay uzunluğuna göre).
-    // Not: Aladhan API üzerinden Ramazan Arefesini tam bulmak için ertesi günün Şevval 1 olup olmadığına bakmak gerekir.
-    // Şimdilik 30'u Arefe kabul edelim (veya 29'u).
-    return null;
-  }
+class DiniGunlerUtil {
+  /// Aladhan'ın hicri takvimi (Suudi HJCoSA) bazı aylarda Diyanet'ten bir gün önce başlar.
+  /// Anahtar: "hicriYıl-hicriAy", değer: Diyanet gün numarası için eklenecek fark.
+  /// Diyanet Ramazan 1447'yi 19 Şubat 2026'da başlattı, Aladhan 18 Şubat diyor.
+  static const Map<String, int> _diyanetFarki = {
+    '1447-9': -1,
+  };
+
+  // Gündüz idrak edilen günler (o günün hicri tarihine göre)
+  static const Map<_HicriGun, String> _gunduzGunleri = {
+    (ay: 9, gun: 1): 'Ramazan Başlangıcı',
+    (ay: 10, gun: 1): 'Ramazan Bayramı',
+    (ay: 12, gun: 9): 'Kurban Bayramı Arefesi',
+    (ay: 12, gun: 10): 'Kurban Bayramı',
+    (ay: 1, gun: 1): 'Hicri Yılbaşı',
+    (ay: 1, gun: 10): 'Aşure Günü',
+  };
+
+  // Gece idrak edilenler: hicri gün akşam başladığı için takvimde bir önceki miladi güne yazılır.
+  // Anahtar = ertesi günün hicri tarihi.
+  static const Map<_HicriGun, String> _geceler = {
+    (ay: 7, gun: 27): 'Mirac Kandili',
+    (ay: 8, gun: 15): 'Berat Kandili',
+    (ay: 9, gun: 27): 'Kadir Gecesi',
+    (ay: 3, gun: 12): 'Mevlid Kandili',
+    (ay: 10, gun: 1): 'Ramazan Bayramı Arefesi',
+  };
 
   static const Map<String, String> _aciklamalar = {
     'Regaib Kandili': 'Rahmet, bereket ve mağfiret mevsimi olan üç ayların başlangıcını müjdeler. Allah\'ın lütfunun bol bol ihsan edildiği gecedir.',
@@ -81,57 +47,60 @@ class DiniGunlerUtil {
     'Ramazan Bayramı Arefesi': 'Ramazan Bayramı\'ndan bir önceki gündür. Bir aylık oruç ibadetinin tamamlandığı, bayram sevincinin başladığı hazırlık günüdür.',
   };
 
-  /// Aladhan'dan gelen günlük objeyi analiz edip ReligiousDay listesine dönüştürür
+  /// API'nin hicri tarihini Diyanet takvimine çevirir; ayın gün sayısını da döner.
+  static ({int ay, int gun, int ayUzunlugu}) _diyanetHicri(Map<String, dynamic> hijri) {
+    int ay = int.parse(hijri['month']['number'].toString());
+    int gun = int.parse(hijri['day'].toString());
+    int ayUzunlugu = int.tryParse(hijri['month']['days']?.toString() ?? '') ?? 30;
+    final yil = hijri['year'].toString();
+
+    final fark = _diyanetFarki['$yil-$ay'] ?? 0;
+    if (fark != 0) {
+      gun += fark;
+      ayUzunlugu += fark;
+      if (gun < 1) {
+        // Diyanet'e göre hâlâ bir önceki ayın son günü
+        ay = ay == 1 ? 12 : ay - 1;
+        gun = 30;
+        ayUzunlugu = 30;
+      }
+    }
+    return (ay: ay, gun: gun, ayUzunlugu: ayUzunlugu);
+  }
+
+  /// Aladhan'dan gelen günlük objeyi analiz edip ReligiousDay listesine dönüştürür.
+  /// Tarihler Diyanet'in takvim kuralına göre hesaplanır (kandiller bir önceki akşam).
   static List<ReligiousDay> parseAladhanDay(Map<String, dynamic> dayData) {
-    List<ReligiousDay> result = [];
+    final String dateStrGr = dayData['date']['gregorian']['date']; // DD-MM-YYYY
+    final DateTime miladiTarih = DateFormat('dd-MM-yyyy').parse(dateStrGr);
+    final String formattedDateStr = DateFormat('yyyy-MM-dd').format(miladiTarih);
 
-    // Miladi Tarih
-    String dateStrGr = dayData['date']['gregorian']['date']; // DD-MM-YYYY
-    DateTime miladiTarih = DateFormat('dd-MM-yyyy').parse(dateStrGr);
-    String formattedDateStr = DateFormat('yyyy-MM-dd').format(miladiTarih); // Standart formatımız
+    final bugun = _diyanetHicri(dayData['date']['hijri']);
+    final _HicriGun yarin = bugun.gun >= bugun.ayUzunlugu
+        ? (ay: bugun.ay == 12 ? 1 : bugun.ay + 1, gun: 1)
+        : (ay: bugun.ay, gun: bugun.gun + 1);
 
-    // Hicri Tarih
-    var hijri = dayData['date']['hijri'];
-    int hicriAy = int.parse(hijri['month']['number'].toString());
-    int hicriGun = int.parse(hijri['day'].toString());
+    final isimler = <String>[];
 
-    // 1. API Tatillerini kontrol et
-    List<dynamic> holidays = hijri['holidays'];
-    for (var h in holidays) {
-      String enName = h.toString();
-      String? trName = _translateHoliday(enName);
-      if (trName != null) {
-        result.add(
-          ReligiousDay(
-            dateStr: formattedDateStr,
-            englishName: enName,
-            turkishName: trName,
-            description: _aciklamalar[trName],
-          ),
-        );
-      }
+    final gunduz = _gunduzGunleri[(ay: bugun.ay, gun: bugun.gun)];
+    if (gunduz != null) isimler.add(gunduz);
+
+    final gece = _geceler[yarin];
+    if (gece != null) isimler.add(gece);
+
+    // Regaib Kandili: Recep ayının ilk Cuma gecesi → o Cuma'dan önceki Perşembe
+    if (miladiTarih.weekday == DateTime.thursday && yarin.ay == 7 && yarin.gun <= 7) {
+      isimler.add('Regaib Kandili');
     }
 
-    // 2. Özel Türkiye/Osmanlı Kandillerini Hicri Tarihe göre manuel hesapla
-    String? yerelKandil = _checkLocalKandil(hicriAy, hicriGun, miladiTarih);
-    if (yerelKandil != null) {
-      bool alreadyAdded = result.any((r) => r.turkishName == yerelKandil);
-      if (!alreadyAdded) {
-        result.add(
-          ReligiousDay(
-            dateStr: formattedDateStr,
-            englishName: "Local Event",
-            turkishName: yerelKandil,
-            description: _aciklamalar[yerelKandil],
-          ),
-        );
-      }
-    }
-    
-    // 3. Ekstra: Ramazan Arefesini tespite yönelik ufak dokunuş
-    // Eğer hicriAy == 9 ise ve bugün API'den tatil dönmediyse ama tatil yarınsa (Aslında bunu API denestmeden bilemeyiz)
-    // Bu yüzden eğer API'den dönen isimler arasında "Ramazan Bayramı Arefesi" yoksa ve hicriGun 29 veya 30 ise Arefe sayabiliriz (kabaca).
-
-    return result;
+    return [
+      for (final ad in isimler)
+        ReligiousDay(
+          dateStr: formattedDateStr,
+          englishName: 'Hijri ${bugun.gun}/${bugun.ay}',
+          turkishName: ad,
+          description: _aciklamalar[ad],
+        ),
+    ];
   }
 }

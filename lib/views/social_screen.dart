@@ -1,3 +1,4 @@
+import 'widgets/profil_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
@@ -13,10 +14,12 @@ import '../models/story.dart';
 import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:share_plus/share_plus.dart';
 import '../core/utils/extensions.dart';
+part 'social/hikaye_goruntuleyici.dart';
+part 'social/dua_kartlari.dart';
+
 class SosyalSayfasi extends StatefulWidget {
   const SosyalSayfasi({super.key});
 
@@ -51,6 +54,8 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   List<String> _lastFriendsProfileList = [];
   Stream<List<UserProfile>>? _cachedFriendsProfilesStream;
 
+  bool _kardesSiralamasi = false; // Liderlik: false = genel, true = kardeşler (haftalık)
+
   bool _isSubmitting = false; // Paylaşım kontrolü
   String _lastSubmittedText = ""; // Mükerrer kayıt kontrolü
 
@@ -58,11 +63,10 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   @override
   void initState() {
     super.initState();
-    final currentUid = Provider.of<NamazProvider>(context, listen: false).currentUid;
     _leaderboardStream = _firebaseService.getLeaderboard(limit: 5);
     _fullLeaderboardStream = _firebaseService.getLeaderboard(limit: 50);
-    _fullPrayersStream = _firebaseService.getPrayers(limit: 200, excludeUid: currentUid);
-    _cachedDiscoverStream = _firebaseService.getPrayers(limit: 10, excludeUid: currentUid);
+    _fullPrayersStream = _firebaseService.getPrayers(limit: 200);
+    _cachedDiscoverStream = _firebaseService.getPrayers(limit: 10);
     _cachedMyPrayersStream = null; // build içinde UID geldikçe oluşacak
 
     // 🔥 Sosyal akış önbelleğini Firestore'dan veri geldikçe güncelle
@@ -142,6 +146,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               onSeeAll: () { FocusScope.of(context).unfocus(); _showFriendsModal(context, r, provider); }
             ),
             _buildFriendsPreview(context, r, provider),
+            _buildOrtakHedef(r, provider),
             
             // 2. LİDERLİK TABLOSU ÖN İZLEME
             _buildSectionHeader(
@@ -150,7 +155,20 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               buttonText: "Tümünü Gör",
               onSeeAll: () { FocusScope.of(context).unfocus(); _showFullLeaderboard(context, r, provider); }
             ),
-            _buildIstikametPreview(context, r, provider),
+            if (provider.currentUid != null)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+                child: Row(
+                  children: [
+                    _siralamaSecimi(r, "Genel", false),
+                    SizedBox(width: Responsive.w(8)),
+                    _siralamaSecimi(r, "Kardeşler • Bu Hafta", true),
+                  ],
+                ),
+              ),
+            _kardesSiralamasi
+                ? _buildKardesSiralamasi(r, provider, limit: 5)
+                : _buildIstikametPreview(context, r, provider),
 
             const SizedBox(height: 10),
 
@@ -294,6 +312,42 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   }
 
   // --- PROFİL KARTI (GİRİŞ PANELİ) ---
+  void _profilFotoSecenekleri(BuildContext context, AppThemeColors r, NamazProvider provider) {
+    final messenger = ScaffoldMessenger.of(context);
+    Future<void> calistir(Future<String?> Function() islem) async {
+      Navigator.pop(context);
+      final hata = await islem();
+      if (hata != null) messenger.showSnackBar(SnackBar(content: Text(hata)));
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: r.arkaPlanRengi,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildBottomSheetHandle(r),
+            ListTile(
+              leading: Icon(Icons.photo_library_rounded, color: r.anaRenk),
+              title: Text(provider.profilFoto == null ? "Profil Fotoğrafı Ekle" : "Profil Fotoğrafını Değiştir",
+                  style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.bold)),
+              onTap: () => calistir(provider.profilFotoSec),
+            ),
+            if (provider.profilFoto != null)
+              ListTile(
+                leading: Icon(Icons.delete_outline_rounded, color: r.kirmizi),
+                title: Text("Fotoğrafı Kaldır", style: TextStyle(color: r.kirmizi, fontWeight: FontWeight.bold)),
+                onTap: () => calistir(provider.profilFotoKaldir),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildOzetBar(BuildContext context, NamazProvider provider, AppThemeColors r, int bugunXp) {
     String unvan = provider.mevcutUnvan;
     String username = provider.currentUsername.isNotEmpty ? provider.currentUsername : unvan;
@@ -302,18 +356,15 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     // Seviye hesaplamaları
     int mevcutXp = provider.toplamXp;
     var anahtarlar = SeviyeServisi.unvanlar.keys.toList()..sort();
-    int baslangicXp = 0;
     int hedefXp = 1000;
     String hedefUnvan = "Salik";
 
     if (mevcutXp >= anahtarlar.last) {
-      baslangicXp = anahtarlar.last;
       hedefXp = anahtarlar.last;
       hedefUnvan = "Zirve";
     } else {
       for (int i = 0; i < anahtarlar.length - 1; i++) {
         if (mevcutXp >= anahtarlar[i] && mevcutXp < anahtarlar[i + 1]) {
-          baslangicXp = anahtarlar[i];
           hedefXp = anahtarlar[i + 1];
           hedefUnvan = SeviyeServisi.unvanlar[hedefXp]!;
           break;
@@ -355,12 +406,18 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   GestureDetector(
+                    // Hikaye varsa açılır, yoksa fotoğraf seçenekleri; basılı tutunca her zaman fotoğraf
                     onTap: () async {
                       if (hasActiveStory && provider.currentUid != null) {
                         _openStoryViewerWithContext(context, provider, provider.currentUid!, r);
+                      } else {
+                        _profilFotoSecenekleri(context, r, provider);
                       }
                     },
-                    child: Container(
+                    onLongPress: () => _profilFotoSecenekleri(context, r, provider),
+                    child: Stack(
+                      children: [
+                    Container(
                       padding: EdgeInsets.all(hasActiveStory ? 3 : 0),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
@@ -381,11 +438,28 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          basHarf,
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: Responsive.sp(26)),
+                        child: ProfilAvatar(
+                          photoUrl: provider.profilFoto ?? profile?.photoUrl,
+                          isim: basHarf,
+                          radius: Responsive.w(30),
+                          arkaPlan: Colors.transparent,
+                          yaziRengi: Colors.white,
                         ),
                       ),
+                    ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: GestureDetector(
+                            onTap: () => _profilFotoSecenekleri(context, r, provider),
+                            child: CircleAvatar(
+                              radius: Responsive.w(10),
+                              backgroundColor: r.kartRengi,
+                              child: Icon(Icons.camera_alt_rounded, size: Responsive.w(12), color: r.anaRenk),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   SizedBox(width: Responsive.w(16)),
@@ -504,6 +578,88 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   // 👥 0. ARKADAŞLARIM ÖN İZLEME (ÇEVRİMİÇİ)
   // ═══════════════════════════════════════════════
 
+  /// Arkadaş profilleri akışı; liste değişmedikçe aynı akış kullanılır (her rebuild'de yeniden sorgu atılmasın)
+  Stream<List<UserProfile>> _arkadasProfilleri(List<String> friends) {
+    final degisti = _lastFriendsProfileList.length != friends.length ||
+        !_lastFriendsProfileList.every((f) => friends.contains(f));
+    if (degisti || _cachedFriendsProfilesStream == null) {
+      _lastFriendsProfileList = List.from(friends);
+      _cachedFriendsProfilesStream = _firebaseService.getFriendsProfilesStream(friends).asBroadcastStream();
+    }
+    return _cachedFriendsProfilesStream!;
+  }
+
+  /// Ben + arkadaşlarım (profil ve arkadaş akışlarını birleştirir)
+  Widget _kardeslerleBirlikte(Widget Function(UserProfile ben, List<UserProfile> arkadaslar) builder) {
+    return StreamBuilder<UserProfile?>(
+      stream: _cachedUserProfileStream,
+      builder: (context, userSnap) {
+        final ben = userSnap.data;
+        if (ben == null) return const SizedBox();
+        if (ben.friends.isEmpty) return builder(ben, const []);
+        return StreamBuilder<List<UserProfile>>(
+          stream: _arkadasProfilleri(ben.friends),
+          builder: (context, snap) => snap.hasData ? builder(ben, snap.data!) : const SizedBox(),
+        );
+      },
+    );
+  }
+
+  /// Bu hafta ben + kardeşlerimin kıldığı toplam vakit / hedef (kişi başı 35)
+  Widget _buildOrtakHedef(AppThemeColors r, NamazProvider provider) {
+    if (provider.currentUid == null) return const SizedBox();
+    return _kardeslerleBirlikte((ben, arkadaslar) {
+      if (arkadaslar.isEmpty) return const SizedBox();
+      final ozet = provider.haftalikOzet;
+      final toplam = ozet.namaz + arkadaslar.fold<int>(0, (t, a) => t + a.buHaftaNamaz(ozet.hafta));
+      final hedef = 35 * (arkadaslar.length + 1);
+      final oran = (toplam / hedef).clamp(0.0, 1.0);
+      return Container(
+        margin: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(10)),
+        padding: EdgeInsets.all(Responsive.w(14)),
+        decoration: BoxDecoration(
+          color: r.kartRengi,
+          borderRadius: BorderRadius.circular(Responsive.w(16)),
+          border: Border.all(color: r.anaRenk.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.groups_rounded, color: r.anaRenk, size: Responsive.w(18)),
+                SizedBox(width: Responsive.w(8)),
+                Expanded(
+                  child: Text("Bu Hafta Birlikte",
+                      style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
+                ),
+                Text("$toplam / $hedef vakit",
+                    style: TextStyle(fontWeight: FontWeight.w900, color: r.anaRenk, fontSize: Responsive.sp(12))),
+              ],
+            ),
+            SizedBox(height: Responsive.h(8)),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: oran,
+                minHeight: Responsive.h(8),
+                backgroundColor: r.pasifRenk.withOpacity(0.15),
+                color: r.anaRenk,
+              ),
+            ),
+            SizedBox(height: Responsive.h(6)),
+            Text(
+              oran >= 1
+                  ? "Maşallah! ${arkadaslar.length + 1} kardeş bu haftanın tüm vakitlerini kıldı."
+                  : "Sen ve ${arkadaslar.length} kardeşin, bu haftanın tüm vakitlerini birlikte tamamlayın.",
+              style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
   Widget _buildFriendsPreview(BuildContext context, AppThemeColors r, NamazProvider provider) {
     if (provider.currentUid == null) return const SizedBox();
 
@@ -512,19 +668,18 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       builder: (context, userSnap) {
         if (!userSnap.hasData || userSnap.data == null) return const SizedBox();
         final friends = userSnap.data!.friends;
-        if (friends.isEmpty) return const SizedBox();
-
-        // Arkadaş profilleri stream'ini önbelleğe al
-        bool friendsChanged = _lastFriendsProfileList.length != friends.length || 
-                             !_lastFriendsProfileList.every((f) => friends.contains(f));
-        
-        if (friendsChanged || _cachedFriendsProfilesStream == null) {
-          _lastFriendsProfileList = List.from(friends);
-          _cachedFriendsProfilesStream = _firebaseService.getFriendsProfilesStream(friends);
+        if (friends.isEmpty) {
+          return _buildEmptyState(
+            r,
+            "Arkadaşlarım",
+            "Henüz bir kardeşin yok.\nArkadaşlarını ekle; birbirinizin namazlarını görün, birlikte hedef koyun.",
+            butonYazisi: "Arkadaş Ekle",
+            onButon: () => _showAddFriendModal(context, r, provider),
+          );
         }
 
         return StreamBuilder<List<UserProfile>>(
-          stream: _cachedFriendsProfilesStream,
+          stream: _arkadasProfilleri(friends),
           builder: (context, profilesSnap) {
             if (!profilesSnap.hasData) return const SizedBox();
             
@@ -599,16 +754,12 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                                     color: r.arkaPlanRengi,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: CircleAvatar(
+                                  child: ProfilAvatar(
+                                    photoUrl: friend.photoUrl,
+                                    isim: friend.displayName,
                                     radius: Responsive.w(22),
-                                    backgroundColor: isOnline ? r.anaRenk.withOpacity(0.1) : r.pasifRenk.withOpacity(0.1),
-                                    child: Text(
-                                      friend.displayName[0].toUpperCase(),
-                                      style: TextStyle(
-                                        color: isOnline ? r.anaRenk : r.pasifRenk, 
-                                        fontWeight: FontWeight.bold
-                                      ),
-                                    ),
+                                    arkaPlan: isOnline ? r.anaRenk.withOpacity(0.1) : r.pasifRenk.withOpacity(0.1),
+                                    yaziRengi: isOnline ? r.anaRenk : r.pasifRenk,
                                   ),
                                 ),
                               ),
@@ -694,6 +845,41 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     );
   }
 
+  Widget _siralamaSecimi(AppThemeColors r, String etiket, bool kardesler) {
+    return ChoiceChip(
+      label: Text(etiket),
+      selected: _kardesSiralamasi == kardesler,
+      onSelected: (_) => setState(() => _kardesSiralamasi = kardesler),
+      selectedColor: r.anaRenk.withOpacity(0.15),
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: Responsive.sp(12),
+        color: _kardesSiralamasi == kardesler ? r.anaRenk : r.pasifRenk,
+      ),
+      showCheckmark: false,
+    );
+  }
+
+  /// Ben + kardeşlerim, bu haftaki XP'ye göre
+  Widget _buildKardesSiralamasi(AppThemeColors r, NamazProvider provider, {int? limit, ScrollController? scrollController}) {
+    return _kardeslerleBirlikte((ben, arkadaslar) {
+      if (arkadaslar.isEmpty) {
+        return _buildEmptyState(r, "Kardeş Sıralaması", "Kardeşlerini ekle, bu hafta kimin daha gayretli olduğunu birlikte görün.");
+      }
+      final hafta = provider.haftalikOzet.hafta;
+      final xp = {for (final a in arkadaslar) a.uid: a.buHaftaXp(hafta), ben.uid: provider.haftalikOzet.xp};
+      final liste = [ben, ...arkadaslar]..sort((a, b) => xp[b.uid]!.compareTo(xp[a.uid]!));
+      final gosterilen = limit == null ? liste : liste.take(limit).toList();
+      final ogeler = [
+        for (int i = 0; i < gosterilen.length; i++)
+          _buildLeaderboardItem(r, i, gosterilen[i], provider.currentUid, xpEtiketi: "${xp[gosterilen[i].uid]} XP"),
+      ];
+      return scrollController == null
+          ? Column(children: ogeler)
+          : ListView(controller: scrollController, children: ogeler);
+    });
+  }
+
   void _showFullLeaderboard(BuildContext context, AppThemeColors r, NamazProvider provider) {
     showModalBottomSheet(
       context: context,
@@ -713,10 +899,12 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               _buildBottomSheetHandle(r),
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text("Liderlik Tablosu", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(18), color: r.yaziRengi)),
+                child: Text(_kardesSiralamasi ? "Kardeşler • Bu Hafta" : "Liderlik Tablosu", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(18), color: r.yaziRengi)),
               ),
               Expanded(
-                child: StreamBuilder<List<UserProfile>>(
+                child: _kardesSiralamasi
+                    ? _buildKardesSiralamasi(r, provider, scrollController: scrollController)
+                    : StreamBuilder<List<UserProfile>>(
                   stream: _fullLeaderboardStream,
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
@@ -741,7 +929,15 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     });
   }
 
-  Widget _buildLeaderboardItem(AppThemeColors r, int index, UserProfile user, String? currentUid) {
+  Widget _buildLeaderboardItem(AppThemeColors r, int index, UserProfile user, String? currentUid, {String? xpEtiketi}) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _kullaniciProfiliniGoster(context, r, user),
+      child: _leaderboardSatiri(r, index, user, currentUid, xpEtiketi: xpEtiketi),
+    );
+  }
+
+  Widget _leaderboardSatiri(AppThemeColors r, int index, UserProfile user, String? currentUid, {String? xpEtiketi}) {
     bool isCurrentUser = user.uid == currentUid;
     bool constitutesTopThree = index < 3;
     Color? bgColor = constitutesTopThree 
@@ -781,17 +977,12 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               ),
             ),
           ),
-          CircleAvatar(
+          ProfilAvatar(
+            photoUrl: user.photoUrl,
+            isim: user.displayName,
             radius: Responsive.w(16),
-            backgroundColor: isCurrentUser ? r.anaRenk.withOpacity(0.2) : r.pasifRenk.withOpacity(0.2),
-            child: Text(
-              user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : "?",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isCurrentUser ? r.anaRenk : r.yaziRengi.withOpacity(0.7),
-                fontSize: Responsive.sp(13),
-              ),
-            ),
+            arkaPlan: isCurrentUser ? r.anaRenk.withOpacity(0.2) : r.pasifRenk.withOpacity(0.2),
+            yaziRengi: isCurrentUser ? r.anaRenk : r.yaziRengi.withOpacity(0.7),
           ),
           SizedBox(width: Responsive.w(12)),
           Expanded(
@@ -820,7 +1011,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text("${user.totalXp} XP", style: TextStyle(fontWeight: FontWeight.w900, color: r.yaziRengi, fontSize: Responsive.sp(13))),
+              Text(xpEtiketi ?? "${user.totalXp} XP", style: TextStyle(fontWeight: FontWeight.w900, color: r.yaziRengi, fontSize: Responsive.sp(13))),
               if (user.streak > 0)
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -921,7 +1112,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           }
         }
         if (_selectedTab == 2 && _cachedDiscoverStream == null) {
-          _cachedDiscoverStream = _firebaseService.getPrayers(limit: 10, excludeUid: provider.currentUid);
+          _cachedDiscoverStream = _firebaseService.getPrayers(limit: 10);
         }
 
         // Aktif sekmenin stream'ini al
@@ -950,10 +1141,10 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
             if (currentPrayers.isEmpty) {
               String msg = "Henüz bir dua paylaşılmamış.";
               if (_selectedTab == 0) msg = "Henüz bir dua paylaşmadın.";
-              if (_selectedTab == 1) msg = "Arkadaşlarından henüz bir paylaşım yok.";
-              if (_selectedTab == 2) msg = "Şu an globalde yeni bir dua bulunmuyor.";
+              if (_selectedTab == 1) msg = "Arkadaşların bu hafta henüz dua paylaşmadı.";
+              if (_selectedTab == 2) msg = "Bu hafta henüz dua paylaşılmadı.\nHaftanın ilk duasını sen paylaş!";
 
-              return _buildEmptyState(r, "Dua Meclisi", msg);
+              return _buildEmptyState(r, "Dua Meclisi", msg, icon: Icons.volunteer_activism_outlined);
             }
 
             final prayers = currentPrayers;
@@ -978,7 +1169,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                         title: "Arkadaşlarının Duaları"
                       );
                     } else {
-                      _showDuaDuvari(context, r, customStream: _firebaseService.getPrayers(limit: 100, excludeUid: provider.currentUid)); 
+                      _showDuaDuvari(context, r, customStream: _firebaseService.getPrayers(limit: 100)); 
                     }
                   },
                   icon: Icon(Icons.arrow_forward_rounded, color: r.anaRenk, size: 18),
@@ -1088,6 +1279,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
     return GestureDetector(
       key: ValueKey(prayer.id),
+      onLongPress: () => duaSecenekleriniGoster(context, r, prayer, provider.currentUid),
       onTap: () {
         // Eğer Global sekmesindeysek tüm arşivi (cache) kullan
         List<PrayerPost> swipeList = allPrayers;
@@ -1526,6 +1718,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
                   // 🔥 XP KAZANDIRMA
                   await provider.xpEkle(SeviyeServisi.duaXp);
+                  await provider.duaPaylasildi();
 
                   _lastSubmittedText = text; // Başarılıysa kaydet
                   _duaController.clear();
@@ -1569,8 +1762,10 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
   // --- YARDIMCI WİDGET'LAR ---
 
-  Widget _buildEmptyState(AppThemeColors r, String title, String message) {
+  Widget _buildEmptyState(AppThemeColors r, String title, String message,
+      {IconData icon = Icons.people_outline_rounded, String? butonYazisi, VoidCallback? onButon}) {
     return Container(
+      width: double.infinity, // Diğer kartlar gibi tam genişlik
       margin: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(10)),
       padding: EdgeInsets.all(Responsive.w(24)),
       decoration: BoxDecoration(
@@ -1580,13 +1775,26 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       ),
       child: Column(
         children: [
-          Icon(Icons.people_outline_rounded, size: 40, color: r.pasifRenk.withOpacity(0.4)),
+          Icon(icon, size: 40, color: r.pasifRenk.withOpacity(0.4)),
           SizedBox(height: Responsive.h(12)),
           Text(
             message,
             textAlign: TextAlign.center,
             style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(13), height: 1.5),
           ),
+          if (butonYazisi != null && onButon != null) ...[
+            SizedBox(height: Responsive.h(14)),
+            ElevatedButton.icon(
+              onPressed: onButon,
+              icon: const Icon(Icons.person_add_alt_1_rounded, size: 18, color: Colors.white),
+              label: Text(butonYazisi, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: r.anaRenk,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1617,7 +1825,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       stream: _cachedNotificationsStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox();
-        final unreadCount = snapshot.data!.where((n) => n.status == 'pending').length;
+        final unreadCount = snapshot.data!.where((n) => n.status == 'pending' || n.status == 'unread').length;
         
         return Stack(
           alignment: Alignment.center,
@@ -1654,7 +1862,14 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        final pendingNotifs = notifications.where((n) => n.status == 'pending').toList();
+        final pendingNotifs = notifications
+            .where((n) => n.type == 'friend_request' ? n.status == 'pending' : true)
+            .toList();
+        // Açılınca bilgi bildirimleri okundu sayılır
+        _firebaseService.bildirimleriOkunduYap(
+          provider.currentUid!,
+          [for (final n in notifications) if (n.status == 'unread') n.id],
+        );
         return DraggableScrollableSheet(
           initialChildSize: 0.6,
           maxChildSize: 0.9,
@@ -1680,6 +1895,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                       itemCount: pendingNotifs.length,
                       itemBuilder: (context, index) {
                         final notif = pendingNotifs[index];
+                        if (notif.type != 'friend_request') return _bilgiBildirimi(context, r, provider, notif);
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: r.anaRenk.withOpacity(0.2),
@@ -1692,17 +1908,11 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.check_circle_rounded, color: Colors.green),
-                                onPressed: () {
-                                  FirebaseService().respondToFriendRequest(currentUid: provider.currentUid!, targetUid: notif.fromUid, accept: true);
-                                  Navigator.pop(context);
-                                },
+                                onPressed: () => _istegiCevapla(context, provider, notif, kabul: true),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent),
-                                onPressed: () {
-                                  FirebaseService().respondToFriendRequest(currentUid: provider.currentUid!, targetUid: notif.fromUid, accept: false);
-                                  Navigator.pop(context);
-                                },
+                                onPressed: () => _istegiCevapla(context, provider, notif, kabul: false),
                               ),
                             ],
                           ),
@@ -1718,6 +1928,48 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     );
   }
 
+  /// "İsteğin kabul edildi" ve "namazını kıldın mı?" bildirimleri
+  Widget _bilgiBildirimi(BuildContext context, AppThemeColors r, NamazProvider provider, AppNotification notif) {
+    final hatirlatma = notif.type == 'nudge';
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: r.anaRenk.withOpacity(0.2),
+        child: Icon(hatirlatma ? Icons.waving_hand_rounded : Icons.handshake_rounded, color: r.anaRenk),
+      ),
+      title: Text(
+        hatirlatma
+            ? "${notif.fromDisplayName} hatırlatıyor: ${notif.vakit ?? 'namazını'} kıldın mı? 🤲"
+            : "${notif.fromDisplayName} kardeşlik isteğini kabul etti.",
+        style: TextStyle(color: r.yaziRengi, fontWeight: notif.status == 'unread' ? FontWeight.bold : FontWeight.normal),
+      ),
+      subtitle: Text("@${notif.fromUsername} • ${notif.timestamp.zamanFarki}", style: TextStyle(color: r.pasifRenk, fontSize: 12)),
+      trailing: IconButton(
+        icon: Icon(Icons.close_rounded, color: r.pasifRenk),
+        onPressed: () {
+          _firebaseService.bildirimiSil(provider.currentUid!, notif.id);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  Future<void> _istegiCevapla(BuildContext context, NamazProvider provider, AppNotification notif, {required bool kabul}) async {
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.pop(context);
+    final hata = await _firebaseService.respondToFriendRequest(
+      currentUid: provider.currentUid!,
+      targetUid: notif.fromUid,
+      accept: kabul,
+      currentUsername: provider.currentHandle,
+      currentDisplayName: provider.currentUsername,
+    );
+    messenger.showSnackBar(SnackBar(
+      content: Text(hata ?? (kabul
+          ? "${notif.fromDisplayName} ile artık kardeşsiniz."
+          : "İstek reddedildi.")),
+    ));
+  }
+
   void _showAddFriendModal(BuildContext context, AppThemeColors r, NamazProvider provider) {
     if (provider.currentUid == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Giriş yapmanız gerekiyor.")));
@@ -1727,6 +1979,32 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     final TextEditingController searchController = TextEditingController();
     bool isSearching = false;
     String errorMessage = "";
+    final messenger = ScaffoldMessenger.of(context);
+
+    Future<void> istekGonder(String kullaniciAdi, StateSetter setState) async {
+      final hedef = kullaniciAdi.trim().replaceFirst('@', '');
+      if (hedef.isEmpty || isSearching) return;
+      setState(() { isSearching = true; errorMessage = ""; });
+
+      final err = await _firebaseService.sendFriendRequest(
+        targetUsername: hedef,
+        senderUid: provider.currentUid!,
+        senderUsername: provider.currentHandle,
+        senderDisplayName: provider.currentUsername,
+      );
+      if (!mounted) return;
+
+      if (err == null || err == FirebaseService.arkadasOlduMesaji) {
+        Navigator.of(this.context).pop();
+        messenger.showSnackBar(SnackBar(
+          content: Text(err == null
+              ? "Arkadaşlık isteği gönderildi!"
+              : "@$hedef sana zaten istek göndermişti, artık kardeşsiniz!"),
+        ));
+      } else {
+        setState(() { isSearching = false; errorMessage = err; });
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -1772,30 +2050,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      onPressed: isSearching ? null : () async {
-                        if (searchController.text.trim().isEmpty) return;
-                        if (searchController.text.trim().toLowerCase() == provider.currentHandle.toLowerCase()) {
-                          setState(() { errorMessage = "Kendinize istek gönderemezsiniz."; });
-                          return;
-                        }
-                        setState(() { isSearching = true; errorMessage = ""; });
-                        
-                        final err = await FirebaseService().sendFriendRequest(
-                          targetUsername: searchController.text.trim(),
-                          senderUid: provider.currentUid!,
-                          senderUsername: provider.currentHandle,
-                          senderDisplayName: provider.currentUsername,
-                        );
-                        
-                        setState(() { isSearching = false; });
-                        
-                        if (err != null) {
-                          setState(() { errorMessage = err; });
-                        } else {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Arkadaşlık isteği gönderildi!")));
-                        }
-                      },
+                      onPressed: isSearching ? null : () => istekGonder(searchController.text, setState),
                       child: isSearching 
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Text("İstek Gönder", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -1822,7 +2077,11 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                       final currentFriends = userSnap.data?.friends ?? [];
                       
                       return FutureBuilder<List<UserProfile>>(
-                        future: FirebaseService().getSuggestedFriends(provider.currentUid!, currentFriends),
+                        future: _firebaseService.getSuggestedFriends(
+                          provider.currentUid!,
+                          currentFriends,
+                          haric: userSnap.data?.gonderilenIstekler ?? const [],
+                        ),
                         builder: (context, suggestSnap) {
                           if (suggestSnap.connectionState == ConnectionState.waiting) {
                             return const Center(child: SizedBox(height: 100));
@@ -1852,13 +2111,12 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      CircleAvatar(
-                                        backgroundColor: r.anaRenk.withOpacity(0.2),
+                                      ProfilAvatar(
+                                        photoUrl: sUser.photoUrl,
+                                        isim: sUser.displayName,
                                         radius: 20,
-                                        child: Text(
-                                          sUser.displayName.isNotEmpty ? sUser.displayName[0].toUpperCase() : "?",
-                                          style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold),
-                                        ),
+                                        arkaPlan: r.anaRenk.withOpacity(0.2),
+                                        yaziRengi: r.anaRenk,
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
@@ -1879,16 +2137,14 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                                       SizedBox(
                                         height: 24,
                                         child: ElevatedButton(
-                                          onPressed: () {
-                                            searchController.text = sUser.username;
-                                          },
+                                          onPressed: isSearching ? null : () => istekGonder(sUser.username, setState),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: r.anaRenk.withOpacity(0.1),
                                             elevation: 0,
                                             padding: const EdgeInsets.symmetric(horizontal: 12),
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                           ),
-                                          child: Text("Seç", style: TextStyle(color: r.anaRenk, fontSize: 11, fontWeight: FontWeight.bold)),
+                                          child: Text("Ekle", style: TextStyle(color: r.anaRenk, fontSize: 11, fontWeight: FontWeight.bold)),
                                         ),
                                       ),
                                     ],
@@ -1996,11 +2252,8 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                           return bTime.compareTo(aTime);
                         });
 
-                        // Sadece ilk 10 arkadaşı al
-                        final limitedFriends = allFriendsSorted.take(10).toList();
-                        
-                        final onlineOnes = limitedFriends.where((f) => f.isOnline).toList();
-                        final offlineOnes = limitedFriends.where((f) => !f.isOnline).toList();
+                        final onlineOnes = allFriendsSorted.where((f) => f.isOnline).toList();
+                        final offlineOnes = allFriendsSorted.where((f) => !f.isOnline).toList();
 
                         return ListView(
                           controller: scrollController,
@@ -2047,8 +2300,146 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     );
   }
 
+  /// Kullanıcı profil kartı: unvan, XP, seri, bu haftaki gayret ve bugünkü vakitler
+  void _kullaniciProfiliniGoster(BuildContext context, AppThemeColors r, UserProfile user) {
+    final provider = context.read<NamazProvider>();
+    final hafta = provider.haftalikOzet.hafta;
+    final benim = user.uid == provider.currentUid;
+
+    Widget kutu(String deger, String etiket, IconData ikon) => Expanded(
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+            decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(14)),
+            child: Column(
+              children: [
+                Icon(ikon, color: r.anaRenk, size: Responsive.w(20)),
+                SizedBox(height: Responsive.h(4)),
+                Text(deger, style: TextStyle(fontWeight: FontWeight.w900, color: r.yaziRengi, fontSize: Responsive.sp(15))),
+                Text(etiket, style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10))),
+              ],
+            ),
+          ),
+        );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: r.arkaPlanRengi,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(Responsive.w(20), 0, Responsive.w(20), Responsive.h(20)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildBottomSheetHandle(r),
+              ProfilAvatar(
+                photoUrl: benim ? (provider.profilFoto ?? user.photoUrl) : user.photoUrl,
+                isim: user.displayName,
+                radius: Responsive.w(40),
+                arkaPlan: r.anaRenk.withOpacity(0.15),
+                yaziRengi: r.anaRenk,
+              ),
+              SizedBox(height: Responsive.h(10)),
+              Text(user.displayName,
+                  style: TextStyle(fontWeight: FontWeight.w900, color: r.yaziRengi, fontSize: Responsive.sp(18))),
+              Text("@${user.username} • ${user.unvan}",
+                  style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(12))),
+              if (!benim)
+                Text(user.isOnline ? "Çevrimiçi" : "Son görülme: ${user.lastActive?.zamanFarki ?? 'Belirsiz'}",
+                    style: TextStyle(color: r.pasifRenk.withOpacity(0.7), fontSize: Responsive.sp(11))),
+              SizedBox(height: Responsive.h(16)),
+              Row(
+                children: [
+                  kutu("${user.totalXp}", "Toplam XP", Icons.star_rounded),
+                  SizedBox(width: Responsive.w(8)),
+                  kutu("${user.streak}", "Gün Seri", Icons.local_fire_department_rounded),
+                  SizedBox(width: Responsive.w(8)),
+                  kutu("${user.friends.length}", "Kardeş", Icons.groups_rounded),
+                ],
+              ),
+              SizedBox(height: Responsive.h(8)),
+              Row(
+                children: [
+                  kutu("${user.buHaftaNamaz(hafta)}/35", "Bu Hafta Vakit", Icons.calendar_month_rounded),
+                  SizedBox(width: Responsive.w(8)),
+                  kutu("${user.buHaftaXp(hafta)}", "Bu Hafta XP", Icons.trending_up_rounded),
+                ],
+              ),
+              SizedBox(height: Responsive.h(14)),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text("Bugün", style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi)),
+              ),
+              SizedBox(height: Responsive.h(6)),
+              _bugunkuVakitler(r, user),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Arkadaşın bugün işaretlediği vakitler (5 nokta)
+  Widget _bugunkuVakitler(AppThemeColors r, UserProfile user) {
+    final provider = context.read<NamazProvider>();
+    final kilinan = user.bugunKilinanlar(provider.getSanalGun());
+    return Row(
+      children: [
+        for (final v in provider.vakitIsimleri)
+          Tooltip(
+            message: kilinan.contains(v) ? "$v kılındı" : v,
+            child: Container(
+              width: Responsive.w(8),
+              height: Responsive.w(8),
+              margin: EdgeInsets.only(right: Responsive.w(4)),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: kilinan.contains(v) ? r.anaRenk : r.pasifRenk.withOpacity(0.25),
+              ),
+            ),
+          ),
+        Text("${kilinan.length}/5 bugün", style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(9))),
+      ],
+    );
+  }
+
+  /// Arkadaş şu anki vakti henüz işaretlemediyse "hatırlat" butonu
+  Widget _hatirlatButonu(AppThemeColors r, UserProfile user) {
+    final provider = context.read<NamazProvider>();
+    final vakit = provider.aktifVakit;
+    if (!provider.vakitIsimleri.contains(vakit)) return const SizedBox();
+    if (user.bugunKilinanlar(provider.getSanalGun()).contains(vakit)) return const SizedBox();
+    return IconButton(
+      tooltip: "$vakit namazını hatırlat",
+      icon: Icon(Icons.waving_hand_rounded, color: r.anaRenk, size: 20),
+      onPressed: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        final hata = await _firebaseService.durtGonder(
+          fromUid: provider.currentUid!,
+          fromUsername: provider.currentHandle,
+          fromDisplayName: provider.currentUsername,
+          targetUid: user.uid,
+          vakit: vakit,
+          gun: provider.getSanalGun(),
+        );
+        messenger.showSnackBar(SnackBar(
+          content: Text(hata ?? "${user.displayName} kardeşine $vakit namazı hatırlatıldı."),
+        ));
+      },
+    );
+  }
+
   Widget _buildFriendItem(AppThemeColors r, UserProfile user, String? currentUid) {
     final lastSeen = user.lastActive != null ? user.lastActive!.zamanFarki : "Belirsiz";
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _kullaniciProfiliniGoster(context, r, user),
+      child: _arkadasSatiri(r, user, currentUid, lastSeen),
+    );
+  }
+
+  Widget _arkadasSatiri(AppThemeColors r, UserProfile user, String? currentUid, String lastSeen) {
     return Container(
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
       padding: EdgeInsets.all(Responsive.w(12)),
@@ -2061,10 +2452,12 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         children: [
           Stack(
             children: [
-              CircleAvatar(
+              ProfilAvatar(
+                photoUrl: user.photoUrl,
+                isim: user.displayName,
                 radius: Responsive.w(20),
-                backgroundColor: r.anaRenk.withOpacity(0.1),
-                child: Text(user.displayName[0].toUpperCase(), style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+                arkaPlan: r.anaRenk.withOpacity(0.1),
+                yaziRengi: r.anaRenk,
               ),
               if (user.isOnline)
                 Positioned(
@@ -2086,6 +2479,8 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                 Text(user.displayName, style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi, fontSize: Responsive.sp(14))),
                 Text("@${user.username}", style: TextStyle(color: r.anaRenk.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: Responsive.sp(11))),
                 Text(user.isOnline ? "Çevrimiçi" : "Son görülme: $lastSeen", style: TextStyle(color: r.pasifRenk.withOpacity(0.6), fontSize: Responsive.sp(10))),
+                SizedBox(height: Responsive.h(4)),
+                _bugunkuVakitler(r, user),
               ],
             ),
           ),
@@ -2096,12 +2491,17 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               Text(user.unvan, style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10))),
             ],
           ),
+          _hatirlatButonu(r, user),
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert_rounded, color: r.pasifRenk, size: 20),
             padding: EdgeInsets.zero,
-            onSelected: (value) {
+            onSelected: (value) async {
               if (value == 'delete') {
                 _showDeleteFriendDialog(context, r, user);
+              } else if (value == 'block' && currentUid != null) {
+                final messenger = ScaffoldMessenger.of(context);
+                final hata = await _firebaseService.kullaniciyiEngelle(currentUid, user.uid);
+                messenger.showSnackBar(SnackBar(content: Text(hata ?? "@${user.username} engellendi.")));
               }
             },
             itemBuilder: (context) => [
@@ -2112,6 +2512,16 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                     Icon(Icons.person_remove_rounded, color: r.kirmizi, size: 18),
                     const SizedBox(width: 8),
                     Text("Kardeşlikten Çıkar", style: TextStyle(color: r.kirmizi, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'block',
+                child: Row(
+                  children: [
+                    Icon(Icons.block_rounded, color: r.kirmizi, size: 18),
+                    const SizedBox(width: 8),
+                    Text("Engelle", style: TextStyle(color: r.kirmizi, fontWeight: FontWeight.bold, fontSize: 13)),
                   ],
                 ),
               ),
@@ -2171,646 +2581,3 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     }
   }
 }
-
-// ═══════════════════════════════════════════════
-// 📸 GELİŞMİŞ HİKAYE (STORY) GÖRÜNTÜLEYİCİ
-// ═══════════════════════════════════════════════
-
-void _showStoryViewer(BuildContext context, AppThemeColors r, List<UserStory> stories, int initialIndex) {
-  showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: "Story",
-    barrierColor: Colors.black.withOpacity(0.85),
-    transitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (context, anim1, anim2) {
-      return _StoryViewerContent(
-        stories: stories,
-        initialIndex: initialIndex,
-        r: r,
-      );
-    },
-  );
-}
-
-// ═══════════════════════════════════════════════
-// 👁 HİKAYEYİ GÖRENLER LİSTESİ (BOTTOM SHEET)
-// ═══════════════════════════════════════════════
-Future<void> _showStoryViewersList(BuildContext context, AppThemeColors r, UserStory story) async {
-  await showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: (context) {
-      return Container(
-        height: MediaQuery.of(context).size.height * 0.5,
-        decoration: BoxDecoration(
-          color: r.arkaPlanRengi,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: r.pasifRenk.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "${story.viewerProfiles.length} Görüntüleme",
-              style: TextStyle(
-                color: r.yaziRengi,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Divider(color: r.pasifRenk.withOpacity(0.2)),
-            Expanded(
-              child: story.viewerProfiles.isEmpty
-                  ? Center(
-                      child: Text(
-                        "Hikayeni henüz kimse görmedi.",
-                        style: TextStyle(color: r.yaziRengi.withOpacity(0.5)),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      itemCount: story.viewerProfiles.length,
-                      itemBuilder: (context, index) {
-                        final viewer = story.viewerProfiles[index];
-                        final name = viewer['displayName'] ?? "İsimsiz Kardeş";
-                        final time = viewer['viewedAt'] != null 
-                            ? (viewer['viewedAt'] as Timestamp).toDate().zamanFarki 
-                            : "";
-
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: r.anaRenk.withOpacity(0.1),
-                            child: Text(
-                              name.isNotEmpty ? name[0].toUpperCase() : "?",
-                              style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          title: Text(
-                            name, 
-                            style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            time,
-                            style: TextStyle(color: r.pasifRenk, fontSize: 12),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-// ═══════════════════════════════════════════════
-// DUA GRID KART (Dua Duvarı modal'ında kullanılır)
-// ═══════════════════════════════════════════════
-
-class _DuaGridCard extends StatelessWidget {
-  final PrayerPost prayer;
-  final AppThemeColors r;
-  final bool isFullView;
-  final String? currentUid;
-  final FirebaseService firebaseService;
-  final List<PrayerPost>? allPrayers;
-  final int? index;
-  final Function(List<PrayerPost>, int)? onReelTap;
-
-  const _DuaGridCard({
-    required this.prayer, 
-    required this.r, 
-    this.isFullView = false,
-    this.currentUid,
-    required this.firebaseService,
-    this.allPrayers,
-    this.index,
-    this.onReelTap,
-  });
-
-  void _showDuaOdakModu(BuildContext context) {
-    if (isFullView) return;
-
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: "Dua Detay",
-      barrierColor: Colors.black.withOpacity(0.8),
-      transitionDuration: const Duration(milliseconds: 400),
-      pageBuilder: (context, anim1, anim2) {
-        return Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-            child: Material(
-              color: Colors.transparent,
-              child: _DuaGridCard(
-                prayer: prayer, 
-                r: r, 
-                isFullView: true,
-                currentUid: currentUid,
-                firebaseService: firebaseService,
-              ),
-            ),
-          ),
-        );
-      },
-      transitionBuilder: (context, anim1, anim2, child) {
-        return FadeTransition(opacity: anim1, child: ScaleTransition(scale: anim1, child: child));
-      },
-    ).whenComplete(() {
-      FocusManager.instance.primaryFocus?.unfocus();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final benAminDedimMi = currentUid != null && 
-                           currentUid!.isNotEmpty && 
-                           prayer.aminBy.contains(currentUid);
-
-    return GestureDetector(
-      key: ValueKey("grid_${prayer.id}"),
-      onTap: () {
-        if (onReelTap != null && allPrayers != null && index != null) {
-          onReelTap!(allPrayers!, index!);
-        } else {
-          _showDuaOdakModu(context);
-        }
-      },
-      child: Container(
-        padding: EdgeInsets.all(Responsive.w(12)),
-        decoration: BoxDecoration(
-          color: r.kartRengi,
-          borderRadius: BorderRadius.circular(Responsive.w(15)),
-          border: Border.all(color: r.anaRenk.withOpacity(isFullView ? 0.3 : 0.1)),
-          boxShadow: isFullView ? [BoxShadow(color: r.anaRenk.withOpacity(0.2), blurRadius: 20)] : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: isFullView ? 12 : 8, 
-                  backgroundColor: r.anaRenk.withOpacity(0.1), 
-                  child: Text(
-                    prayer.senderName.isNotEmpty ? prayer.senderName[0].toUpperCase() : "?",
-                    style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: isFullView ? 12 : 8),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(prayer.senderName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(isFullView ? 14 : 10), color: r.yaziRengi), overflow: TextOverflow.ellipsis),
-                      if (prayer.senderUsername.isNotEmpty)
-                        Text("@${prayer.senderUsername}", style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(isFullView ? 11 : 8)), overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-                if (isFullView) 
-                  IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close_rounded, size: 20, color: r.yaziRengi.withOpacity(0.4)))
-                else
-                  Text(prayer.zamanFarki, style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(8))),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              "\"${prayer.text}\"",
-              maxLines: isFullView ? null : 2,
-              overflow: isFullView ? TextOverflow.visible : TextOverflow.ellipsis,
-              style: TextStyle(
-                color: r.yaziRengi.withOpacity(0.8),
-                fontSize: Responsive.sp(isFullView ? 16 : 11),
-                height: 1.4,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (prayer.aminCount > 0)
-                  Text(
-                    "${prayer.aminCount} Amîn",
-                    style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(isFullView ? 12 : 9), fontWeight: FontWeight.w600),
-                  ),
-                const Spacer(),
-                if (isFullView) ...[
-                  Text("Allah kabul etsin", style: TextStyle(color: r.anaRenk.withOpacity(0.6), fontSize: Responsive.sp(12), fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 8),
-                ],
-                AminParticleButton(
-                  key: ValueKey("grid_anim_${prayer.id}"),
-                  isAmind: benAminDedimMi,
-                  r: r,
-                  child: GestureDetector(
-                    onTap: () async {
-                      if (currentUid == null) return;
-                      HapticFeedback.lightImpact();
-                      await firebaseService.toggleAmin(prayerId: prayer.id, userUid: currentUid!);
-                    },
-                    child: Icon(
-                      benAminDedimMi ? Icons.favorite_rounded : Icons.favorite_border_rounded, 
-                      size: isFullView ? 20 : 16, 
-                      color: benAminDedimMi ? Colors.redAccent : r.anaRenk.withOpacity(0.7),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════
-// ETKİLEŞİMLİ AMİN BUTONU EFEKTİ
-// ═══════════════════════════════════════════════
-
-class AminParticleButton extends StatefulWidget {
-  final bool isAmind;
-  final Widget child;
-  final AppThemeColors r;
-
-  const AminParticleButton({
-    super.key,
-    required this.isAmind,
-    required this.child,
-    required this.r,
-  });
-
-  @override
-  State<AminParticleButton> createState() => _AminParticleButtonState();
-}
-
-class _AminParticleButtonState extends State<AminParticleButton> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _opacityAnimation;
-  late Animation<double> _starScaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
-    
-    _scaleAnimation = TweenSequence([
-      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 0.85), weight: 20),
-      TweenSequenceItem(tween: Tween<double>(begin: 0.85, end: 1.1).chain(CurveTween(curve: Curves.elasticOut)), weight: 80),
-    ]).animate(_controller);
-
-    _starScaleAnimation = Tween<double>(begin: 0.0, end: 2.2).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
-    ));
-
-    _opacityAnimation = TweenSequence([
-      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 1.0), weight: 20),
-      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 0.0).chain(CurveTween(curve: Curves.easeIn)), weight: 80),
-    ]).animate(_controller);
-  }
-
-  @override
-  void didUpdateWidget(AminParticleButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Eğer amîn durumuna geçilmişse parlamayı başlat
-    if (widget.isAmind && !oldWidget.isAmind) {
-      _controller.forward(from: 0.0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        // Parlayan (patlayan) dört köşeli yıldız efekti
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            if (_controller.value == 0 || _controller.value == 1) return const SizedBox.shrink();
-            return Transform.scale(
-              scale: _starScaleAnimation.value,
-              child: Opacity(
-                opacity: _opacityAnimation.value,
-                child: const Icon(Icons.favorite_rounded, color: Colors.redAccent, size: 28),
-              ),
-            );
-          },
-        ),
-        // Esneyen ana buton
-        ScaleTransition(
-          scale: _scaleAnimation,
-          child: widget.child,
-        ),
-      ],
-    );
-  }
-}
-
-
-class _StoryViewerContent extends StatefulWidget {
-  final List<UserStory> stories;
-  final int initialIndex;
-  final AppThemeColors r;
-
-  const _StoryViewerContent({
-    required this.stories,
-    required this.initialIndex,
-    required this.r,
-  });
-
-  @override
-  State<_StoryViewerContent> createState() => _StoryViewerContentState();
-}
-
-class _StoryViewerContentState extends State<_StoryViewerContent> with TickerProviderStateMixin {
-  late PageController _pageController;
-  late AnimationController _progressController;
-  int _currentIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
-    _progressController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 5),
-    );
-
-    _startStory();
-    
-    _progressController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        _nextStory();
-      }
-    });
-  }
-
-  void _startStory() {
-    _progressController.stop();
-    _progressController.reset();
-    _progressController.forward();
-  }
-
-  void _nextStory() {
-    if (_currentIndex < widget.stories.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      Navigator.pop(context);
-    }
-  }
-
-  void _previousStory() {
-    if (_currentIndex > 0) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _progressController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Dismissible(
-        key: const Key('story-viewer'),
-        direction: DismissDirection.down,
-        onDismissed: (_) => Navigator.pop(context),
-        child: PageView.builder(
-          controller: _pageController,
-          itemCount: widget.stories.length,
-          onPageChanged: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-            _startStory();
-          },
-        itemBuilder: (context, index) {
-          final story = widget.stories[index];
-          final isMe = story.uid == context.read<NamazProvider>().currentUid;
-
-          return Stack(
-            children: [
-              // 1. BULANIK ARKA PLAN
-              Positioned.fill(
-                child: Image.memory(
-                  base64Decode(story.imageUrl),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              Positioned.fill(
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                  child: Container(color: Colors.black.withOpacity(0.4)),
-                ),
-              ),
-
-              // 2. ANA İÇERİK
-              SafeArea(
-                child: Column(
-                  children: [
-                    // İlerleme Çubuğu ve Üst Bar
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: Column(
-                        children: [
-                          // 🔥 İlerleme Çubuğu - Her kullanıcının tek story'si olduğu için tek parça
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  height: 3,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                  child: AnimatedBuilder(
-                                    animation: _progressController,
-                                    builder: (context, child) {
-                                      return FractionallySizedBox(
-                                        alignment: Alignment.centerLeft,
-                                        widthFactor: _progressController.value,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(2),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: widget.r.anaRenk.withOpacity(0.5),
-                                child: Text(story.displayName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(story.displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
-                                    Text("@${story.username} • ${story.createdAt.zamanFarki}", style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis),
-                                  ],
-                                ),
-                              ),
-                              if (isMe)
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.white),
-                                  onPressed: () async {
-                                    _progressController.stop();
-                                    final confirmed = await showDialog<bool>(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        title: const Text("Hikayeyi Sil"),
-                                        content: const Text("Bu hikayeyi silmek istediğinize emin misiniz?"),
-                                        actions: [
-                                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Vazgeç")),
-                                          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Sil")),
-                                        ],
-                                      ),
-                                    );
-                                    if (confirmed == true) {
-                                      await FirebaseService().deleteStory(story.uid);
-                                      if (context.mounted) Navigator.pop(context);
-                                    } else {
-                                      _progressController.forward();
-                                    }
-                                  },
-                                ),
-                              IconButton(
-                                icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                                onPressed: () => Navigator.pop(context),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Hikaye Görseli
-                    Expanded(
-                      child: GestureDetector(
-                        onTapDown: (details) {
-                          final screenWidth = MediaQuery.of(context).size.width;
-                          if (details.globalPosition.dx < screenWidth / 3) {
-                            _previousStory();
-                          } else {
-                            _nextStory();
-                          }
-                        },
-                        onLongPressStart: (_) => _progressController.stop(),
-                        onLongPressEnd: (_) => _progressController.forward(),
-                        child: Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20)],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Image.memory(
-                              base64Decode(story.imageUrl),
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // İzleyenler Barı (Benim hikayemse)
-                    if (isMe)
-                      StreamBuilder<DocumentSnapshot>(
-                        stream: FirebaseFirestore.instance.collection('stories').doc(story.uid).snapshots(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox(height: 100);
-                          final currentStory = UserStory.fromFirestore(snapshot.data!);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 30),
-                            child: GestureDetector(
-                              onTap: () {
-                                _progressController.stop();
-                                _showStoryViewersList(context, widget.r, currentStory).then((_) {
-                                  _progressController.forward();
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.6),
-                                  borderRadius: BorderRadius.circular(30),
-                                  border: Border.all(color: Colors.white24),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.visibility_rounded, color: Colors.white, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text("${currentStory.viewers.length} Görüntüleme", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                      )
-                    else
-                      const SizedBox(height: 100),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    ),
-  );
-}
-}
-
-

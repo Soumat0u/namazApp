@@ -11,6 +11,7 @@ class PrayerPost {
   final List<String> aminBy;
   final DateTime timestamp;
   final bool isApproved;
+  final List<String> sikayetEdenler;
 
   PrayerPost({
     required this.id,
@@ -22,6 +23,7 @@ class PrayerPost {
     required this.aminBy,
     required this.timestamp,
     this.isApproved = true,
+    this.sikayetEdenler = const [],
   });
 
   /// Zaman farkını okunabilir formata çevirir (12dk, 3sa, 5g)
@@ -54,6 +56,7 @@ class PrayerPost {
       aminBy: List<String>.from(data['aminBy'] ?? []),
       timestamp: ts,
       isApproved: data['isApproved'] ?? true,
+      sikayetEdenler: List<String>.from(data['sikayetEdenler'] ?? []),
     );
   }
 

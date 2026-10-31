@@ -1,3 +1,4 @@
+import 'widgets/cinsiyet_secici.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
@@ -20,6 +21,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   final TextEditingController _usernameController = TextEditingController();
 
   bool _isLogin = true; // true=Giriş Yap, false=Kayıt Ol
+  String? _cinsiyet; // Kayıtta sorulur: 'kadin' | 'erkek'
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorText;
@@ -82,6 +84,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       setState(() => _errorText = 'Geçerli bir kullanıcı adı girin.');
       return;
     }
+    if (!_isLogin && _cinsiyet == null) {
+      setState(() => _errorText = 'Lütfen cinsiyetinizi seçin.');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -94,7 +100,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     if (_isLogin) {
       error = await provider.emailIleGirisYap(email: email, password: password);
     } else {
-      error = await provider.emailIleKayitOl(email: email, password: password, displayName: displayName, username: username);
+      error = await provider.emailIleKayitOl(email: email, password: password, displayName: displayName, username: username, cinsiyet: _cinsiyet);
     }
 
     if (error != null && mounted) {
@@ -183,12 +189,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                       }
                       setModalState(() { isSaving = true; modalError = null; });
                       
-                      // TODO: FirebaseAuth üzerinden displayName çekeceğiz. AuthScreen Provider biliyor.
-                      // Basitlik için default atayalım, Provider içinde halledilecek.
-                      final err = await provider.completeGoogleRegistration(
-                        username: un, 
-                        displayName: unController.text.trim().isEmpty ? "Google Kullanıcı" : raw, // temporary fallback
-                      );
+                      // Görünen ad Google hesabından alınır (Provider içinde)
+                      final err = await provider.completeGoogleRegistration(username: un);
                       
                       if (err != null) {
                         setModalState(() { isSaving = false; modalError = err; });
@@ -294,6 +296,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         hint: "Kullanıcı Adı (@bosluksuz)",
                         icon: Icons.alternate_email_rounded,
                         r: r,
+                      ),
+                      SizedBox(height: Responsive.h(12)),
+                      CinsiyetSecici(
+                        secili: _cinsiyet,
+                        onSecildi: (c) => setState(() => _cinsiyet = c),
                       ),
                       SizedBox(height: Responsive.h(12)),
                     ],

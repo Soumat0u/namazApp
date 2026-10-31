@@ -93,15 +93,6 @@ class AraclarSayfasi extends StatelessWidget {
     );
   }
 
-  void _showYakinda(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Bu özellik çok yakında eklenecektir!"),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
   Widget _buildAracCard({
     required BuildContext context,
     required IconData icon,

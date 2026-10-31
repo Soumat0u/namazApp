@@ -30,7 +30,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
   double? _qiblaFixedAngle;    // Kabe'nin Kuzeye göre sabit açısı (Hesaplanana kadar null)
   double _smoothOffset = 0;    // Kıble'nin cihaza göre anlık fark açısı (yumuşatılmış)
   bool _isAccuracyLow = false; // Sensör doğruluğu düşük mü?
-  int? _lastAccuracy;          // En son gelen doğruluk verisi (Takip için)
+  bool? _oncekiDusukMu;        // Bir önceki doğruluk durumu (kalibrasyon bildirimi için)
+  static const double _kabulEdilenHataPayi = 20; // derece; Android'de yalnızca "yüksek" (15) geçer
 
   @override
   void initState() {
@@ -73,7 +74,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
   Future<void> _checkVibrationSupport() async {
     bool? hasVibrator = await Vibration.hasVibrator();
     if (mounted) {
-      setState(() => _canVibrate = hasVibrator ?? false);
+      setState(() => _canVibrate = hasVibrator);
     }
   }
 
@@ -91,32 +92,32 @@ class _QiblaScreenState extends State<QiblaScreen> {
       });
     });
 
-    // 2. Pusula doğruluğunu (accuracy) FlutterCompass üzerinden takip et
+    // 2. Pusula doğruluğunu (accuracy) FlutterCompass üzerinden takip et.
+    // accuracy derece cinsinden hata payıdır, küçük değer daha iyidir
+    // (Android: 15 = yüksek, 30 = orta, 45 = düşük; bilinmiyorsa null).
     _compassSub = FlutterCompass.events?.listen((event) {
-      if (mounted) {
-        // Android'de sensör doğruluğu verisi (0: Unreliable, 1: Low, 2: Medium, 3: High)
-        int currentAccuracy = event.accuracy?.toInt() ?? 3;
+      if (!mounted) return;
+      final hataPayi = event.accuracy;
+      final dusuk = hataPayi != null && hataPayi > _kabulEdilenHataPayi;
+      if (dusuk == _isAccuracyLow && _oncekiDusukMu != null) return; // Değişiklik yoksa yeniden çizme
 
-        setState(() {
-          // Doğruluk 3'ten (High) düşükse uyarı bandını aktif et
-          _isAccuracyLow = currentAccuracy < 3;
-
-          // Kalibrasyon düşükten (0,1,2) -> yüksek (3) seviyesine çıktıysa bildirim ver
-          if (_lastAccuracy != null && _lastAccuracy! < 3 && currentAccuracy == 3) {
-            if (_canVibrate) {
-              Vibration.vibrate(duration: 200);
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Pusula Kalibre Edildi'),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+      setState(() {
+        // Kalibrasyon düşükten yükseğe çıktıysa bildirim ver
+        if (_oncekiDusukMu == true && !dusuk) {
+          if (_canVibrate) {
+            Vibration.vibrate(duration: 200);
           }
-          _lastAccuracy = currentAccuracy;
-        });
-      }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pusula Kalibre Edildi'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        _isAccuracyLow = dusuk;
+        _oncekiDusukMu = dusuk;
+      });
     });
 
     // 3. Sadece cihazın pusula dönüşünü sürekli dinle
@@ -284,7 +285,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                       
                       // Diske 'çakılı' Kabe Oku
                       Transform.rotate(
-                        angle: ((qiblaFixedAngle ?? 0) * (pi / 180)),
+                        angle: (qiblaFixedAngle * (pi / 180)),
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
