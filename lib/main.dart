@@ -267,7 +267,7 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani>
           ),
           // Her sekme ayrı düğme: dokununca yalnızca basılan düğme hafifçe aydınlanır
           child: Padding(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(4),
             child: Row(
               children: [
                 for (final (i, ikon, ad) in const [
@@ -284,14 +284,14 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani>
                         highlightColor: tema.anaRenk.withOpacity(0.06),
                         onTap: () => setState(() => _seciliSayfaIndex = i),
                         child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: Responsive.h(7)),
+                          padding: EdgeInsets.symmetric(vertical: Responsive.h(4)),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(ikon,
-                                  size: Responsive.w(23),
+                                  size: Responsive.w(22),
                                   color: _seciliSayfaIndex == i ? tema.anaRenk : tema.pasifRenk),
-                              SizedBox(height: Responsive.h(3)),
+                              SizedBox(height: Responsive.h(1)),
                               Text(
                                 ad,
                                 style: TextStyle(
