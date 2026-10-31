@@ -17,13 +17,13 @@ Namaz vakitleri, kıble, Kur'an-ı Kerim, dualar, tesbihat, zikirmatik, kaza ve 
 | Veri | Neden |
 |---|---|
 | E-posta adresi (ya da Google / Apple hesabı kimliği) | Giriş yapabilmeniz için |
-| Görünen ad ve kullanıcı adı | Kardeşlerinizin sizi bulabilmesi ve tanıyabilmesi için |
+| Görünen ad ve kullanıcı adı | Arkadaşlarınızın sizi bulabilmesi ve tanıyabilmesi için |
 | Profil fotoğrafı (isteğe bağlı) | Profilinizde gösterilmesi için |
 | Cinsiyet | Kaza takibindeki kadınlara özel bölümün gösterilmesi için |
-| Puan, seri, rozetler ve haftalık namaz özeti | Sıralama ve kardeşlerinizle karşılaştırma için |
-| Kardeş listesi, istekler ve hatırlatmalar | Sosyal özellikler için |
+| Puan, seri, rozetler ve haftalık namaz özeti | Sıralama ve arkadaşlarınızla karşılaştırma için |
+| Arkadaş listesi, istekler ve hatırlatmalar | Sosyal özellikler için |
 | Paylaştığınız dualar, hikayeler ve ortak hatimler | Sizin seçtiğiniz kişilere ya da herkese gösterilmesi için |
-| Bildirim kimliği (FCM token) | Kardeşlik isteği, hatırlatma ve "amîn" bildirimlerini telefonunuza iletmek için |
+| Bildirim kimliği (FCM token) | Arkadaşlık isteği, hatırlatma ve "amîn" bildirimlerini telefonunuza iletmek için |
 
 Bu veriler Google Firebase sunucularında (Firestore, Authentication, Cloud Messaging) saklanır.
 
@@ -39,7 +39,7 @@ Tilavet sesleri ve kelime zamanlamaları **quran.com** servislerinden indirilir.
 
 - Verilerinizi **satmıyoruz** ve reklam amacıyla kullanmıyoruz.
 - Profiliniz (ad, kullanıcı adı, fotoğraf, puan, seri), giriş yapmış diğer kullanıcılar tarafından görülebilir.
-- Global bölüme paylaştığınız dualar giriş yapmış tüm kullanıcılara, kardeşlerinize paylaştıklarınız yalnızca onlara görünür.
+- Global bölüme paylaştığınız dualar giriş yapmış tüm kullanıcılara, arkadaşlarınıza paylaştıklarınız yalnızca onlara görünür.
 - Yukarıda sayılan hizmet sağlayıcılar dışında üçüncü kişilerle veri paylaşılmaz; yasal zorunluluklar saklıdır.
 
 ## 4. Güvenlik ve moderasyon
@@ -50,7 +50,7 @@ Her kullanıcı yalnızca kendi verisini değiştirebilir; bu kural sunucu taraf
 
 **Ayarlar → Hesap → Hesabımı Sil** ile hesabınızı istediğiniz an kalıcı olarak silebilirsiniz. Bu işlem şunları siler:
 - profil, kullanıcı adı ve fotoğraf,
-- kardeşlik bağları ve bildirimler,
+- arkadaşlık bağları ve bildirimler,
 - paylaşılan dualar ve hikayeler,
 - kurduğunuz ortak hatimler (üye olduklarınızdan çıkarılırsınız),
 - telefondaki tüm uygulama kayıtları.

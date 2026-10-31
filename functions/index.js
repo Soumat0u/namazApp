@@ -13,15 +13,15 @@ const BOLGE = 'europe-west1';
 
 /** Bildirim türüne göre başlık/metin ve uygulamada açılacak sekme */
 function icerik(veri) {
-  const ad = veri.fromDisplayName || veri.fromUsername || 'Bir kardeşin';
+  const ad = veri.fromDisplayName || veri.fromUsername || 'Bir arkadaşın';
   switch (veri.type) {
     case 'friend_request':
-      return { title: '🤝 Yeni kardeşlik isteği', body: `${ad} seni kardeşliğine davet ediyor.`, sekme: 'sosyal' };
+      return { title: '🤝 Yeni arkadaşlık isteği', body: `${ad} seni arkadaşlığına davet ediyor.`, sekme: 'sosyal' };
     case 'friend_accepted':
-      return { title: '🤝 İsteğin kabul edildi', body: `${ad} ile artık kardeşsiniz.`, sekme: 'sosyal' };
+      return { title: '🤝 İsteğin kabul edildi', body: `${ad} ile artık arkadaşsınız.`, sekme: 'sosyal' };
     case 'nudge':
       return {
-        title: '👋 Kardeşin hatırlatıyor',
+        title: '👋 Arkadaşın hatırlatıyor',
         body: `${ad}: ${veri.vakit || 'Namazını'} kıldın mı? Kıldıysan işaretlemeyi unutma.`,
         sekme: 'ana',
       };
@@ -89,7 +89,7 @@ exports.aminBildirimi = onDocumentWritten(
     const sayi = (sonra.aminBy || []).length;
     await gonder(sonra.senderUid, {
       title: '🤲 Duana amîn dendi',
-      body: sayi === 1 ? 'Bir kardeşin duana amîn dedi.' : `${sayi} kardeşin duana amîn dedi.`,
+      body: sayi === 1 ? 'Bir arkadaşın duana amîn dedi.' : `${sayi} arkadaşın duana amîn dedi.`,
       sekme: 'sosyal',
     });
   },

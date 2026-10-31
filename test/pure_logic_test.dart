@@ -72,12 +72,12 @@ void main() {
 
   group('ContentModeration', () {
     const masumDualar = [
-      "Allah'ım hasta olan kardeşlerimize şifa ver", // 'lan' ⊂ olan
+      "Allah'ım hasta olan arkadaşlarımıza şifa ver", // 'lan' ⊂ olan
       'Rabbim çocuklarımızı hayırlı evlat eyle', // 'oc' ⊂ çocuk
       'Hocamıza hayırlı uzun ömür nasip et', // 'oc' ⊂ hoca
       'Allahım bizi doğru yola götür', // 'göt' ⊂ götür
       'Sınavı kazanma imkanı ver Rabbim', // 'mk' ⊂ imkan
-      'Kemal kardeşime acil şifalar diliyorum', // 'mal' ⊂ kemal
+      'Kemal arkadaşıma acil şifalar diliyorum', // 'mal' ⊂ kemal
       'Yaptığım planları hayırlı eyle Rabbim', // 'lan' ⊂ plan
       'Normal doğum nasip etsin Allah', // 'mal' ⊂ normal
       'Rabbimiz, kâfirler topluluğuna karşı bize yardım et', // Bakara 286
@@ -87,7 +87,7 @@ void main() {
     }
 
     const uygunsuzlar = [
-      'siktir git buradan kardeşim',
+      'siktir git buradan arkadaşım',
       'bunlar hep salaklar ya',
       'amk bu ne biçim iş böyle',
       'ULAN ne oluyor burada böyle',

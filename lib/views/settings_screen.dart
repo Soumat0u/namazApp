@@ -38,7 +38,7 @@ class AyarlarSayfasi extends StatelessWidget {
               Text(
                 "Bu işlem geri alınamaz. Şunlar kalıcı olarak silinir:\n\n"
                 "• Profilin, kullanıcı adın ve fotoğrafın\n"
-                "• Kardeşlik bağların ve bildirimlerin\n"
+                "• Arkadaşlık bağların ve bildirimlerin\n"
                 "• Paylaştığın dualar ve hikayelerin\n"
                 "• Kurduğun ortak hatimler\n"
                 "• Bu telefondaki namaz, kaza ve oruç kayıtların",

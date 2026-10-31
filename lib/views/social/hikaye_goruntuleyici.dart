@@ -71,7 +71,7 @@ Future<void> _showStoryViewersList(BuildContext context, AppThemeColors r, UserS
                       itemCount: story.viewerProfiles.length,
                       itemBuilder: (context, index) {
                         final viewer = story.viewerProfiles[index];
-                        final name = viewer['displayName'] ?? "İsimsiz Kardeş";
+                        final name = viewer['displayName'] ?? "İsimsiz Arkadaş";
                         final time = viewer['viewedAt'] != null 
                             ? (viewer['viewedAt'] as Timestamp).toDate().zamanFarki 
                             : "";

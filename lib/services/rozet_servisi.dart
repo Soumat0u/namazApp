@@ -53,7 +53,7 @@ class RozetServisi {
       r('kaza_100', 'Borç Eriten', '100 kaza namazı kıl', Icons.task_alt_rounded, kilinanKaza, 100),
       r('zikir_1000', 'Zâkir', 'Toplam 1000 zikir', Icons.radio_button_checked_rounded, toplamZikir, 1000),
       r('ilk_dua', 'Dua Eden', 'Meclis\'te ilk duanı paylaş', Icons.volunteer_activism_rounded, duaPaylasimi, 1),
-      r('ilk_kardes', 'Kardeşlik', 'İlk arkadaşını ekle', Icons.handshake_rounded, arkadasSayisi, 1),
+      r('ilk_kardes', 'Arkadaşlık', 'İlk arkadaşını ekle', Icons.handshake_rounded, arkadasSayisi, 1),
       r('kardes_5', 'Cemaat', '5 arkadaş edin', Icons.groups_rounded, arkadasSayisi, 5),
     ];
   }

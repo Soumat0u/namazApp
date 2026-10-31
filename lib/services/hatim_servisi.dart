@@ -40,7 +40,7 @@ class OrtakHatim {
   }
 }
 
-/// Kardeşlerle ortak hatim: her üye boş bir cüzü üstlenir ve okuyunca işaretler
+/// Arkadaşlarla ortak hatim: her üye boş bir cüzü üstlenir ve okuyunca işaretler
 class HatimServisi {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -73,7 +73,7 @@ class HatimServisi {
       return await _db.runTransaction((tx) async {
         final snap = await tx.get(ref);
         final mevcut = (snap.data()?['cuzler'] as Map<String, dynamic>?)?['$cuz'];
-        if (mevcut != null) return 'Bu cüzü az önce başka bir kardeşin aldı.';
+        if (mevcut != null) return 'Bu cüzü az önce başka bir arkadaşın aldı.';
         tx.update(ref, {'cuzler.$cuz': {'uid': uid, 'ad': ad, 'bitti': false}});
         return null;
       });

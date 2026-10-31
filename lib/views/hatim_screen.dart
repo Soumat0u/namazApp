@@ -31,7 +31,7 @@ class HatimScreen extends StatelessWidget {
             labelColor: r.anaRenk,
             unselectedLabelColor: r.pasifRenk,
             indicatorColor: r.anaRenk,
-            tabs: const [Tab(text: "Kişisel"), Tab(text: "Kardeşlerle")],
+            tabs: const [Tab(text: "Kişisel"), Tab(text: "Arkadaşlarla")],
           ),
         ),
         body: const TabBarView(children: [_KisiselHatim(), _OrtakHatimler()]),
@@ -210,7 +210,7 @@ class _OrtakHatimler extends StatelessWidget {
               child: Padding(
                 padding: EdgeInsets.all(Responsive.w(32)),
                 child: Text(
-                  "Kardeşlerinle birlikte hatim başlat. Herkes bir cüz üstlenir, birlikte tamamlarsınız.",
+                  "Arkadaşlarınla birlikte hatim başlat. Herkes bir cüz üstlenir, birlikte tamamlarsınız.",
                   textAlign: TextAlign.center,
                   style: TextStyle(color: r.pasifRenk),
                 ),
@@ -250,7 +250,7 @@ class _OrtakHatimler extends StatelessWidget {
   Future<void> _hatimOlustur(BuildContext context, String uid) async {
     final r = context.renklerOku; // Düğme olayında: dinlemeden oku
     final messenger = ScaffoldMessenger.of(context);
-    final adController = TextEditingController(text: "Kardeşler Hatmi");
+    final adController = TextEditingController(text: "Arkadaşlar Hatmi");
     final secili = <String>{};
     final profil = await FirebaseService().getUserProfileFuture(uid);
     final arkadaslar = profil == null || profil.friends.isEmpty
@@ -284,7 +284,7 @@ class _OrtakHatimler extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Text("Davet edilecek kardeşler", style: TextStyle(color: r.pasifRenk)),
+              Text("Davet edilecek arkadaşlar", style: TextStyle(color: r.pasifRenk)),
               if (arkadaslar.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -315,7 +315,7 @@ class _OrtakHatimler extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: () async {
-                  final ad = adController.text.trim().isEmpty ? "Kardeşler Hatmi" : adController.text.trim();
+                  final ad = adController.text.trim().isEmpty ? "Arkadaşlar Hatmi" : adController.text.trim();
                   Navigator.pop(sheet);
                   final hata = await HatimServisi().olustur(uid: uid, ad: ad, davetliler: secili.toList());
                   messenger.showSnackBar(SnackBar(content: Text(hata ?? "Hatim başlatıldı. Cüzünü seçmeyi unutma!")));
@@ -479,7 +479,7 @@ class _OrtakHatimDetay extends StatelessWidget {
       );
     } else {
       messenger.showSnackBar(SnackBar(
-        content: Text("$cuz. cüz ${d.ad} kardeşimizde${d.bitti ? ', okundu' : ''}."),
+        content: Text("$cuz. cüz ${d.ad} arkadaşımızda${d.bitti ? ', okundu' : ''}."),
       ));
     }
   }

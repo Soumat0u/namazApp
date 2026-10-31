@@ -161,7 +161,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 Text("Kullanıcı Adı Seç", style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.bold, fontSize: 18)),
                 const SizedBox(height: 8),
                 Text(
-                  "Meclisimizde seçtiğiniz Google ismiyle bir kardeşimiz zaten mevcut. Lütfen kendinize has bir kullanıcı adı belirleyin.",
+                  "Meclisimizde seçtiğiniz Google ismiyle bir kullanıcı zaten mevcut. Lütfen kendinize has bir kullanıcı adı belirleyin.",
                   style: TextStyle(color: r.yaziRengi.withOpacity(0.6), fontSize: 13),
                   textAlign: TextAlign.center,
                 ),

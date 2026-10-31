@@ -51,7 +51,7 @@ class NotificationService {
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           'sosyal_channel',
-          'Kardeşlerim',
+          'Arkadaşlarım',
           channelDescription: 'Arkadaşlık istekleri, hatırlatmalar ve amîn bildirimleri',
           importance: Importance.high,
           priority: Priority.high,

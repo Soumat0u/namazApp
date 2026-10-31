@@ -228,7 +228,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
       iconGradient: [r.anaRenk, r.anaRenk.withOpacity(0.6)],
       title: "Takva Yolu'na\nHoş Geldin!",
       description:
-          "Sadece namaz vakitleri değil; gönül kardeşlerinle buluştuğun dijital dünyaya adım attın.",
+          "Sadece namaz vakitleri değil; gönül arkadaşlarınla buluştuğun dijital dünyaya adım attın.",
       decorationWidget: _buildFloatingParticles(r),
     );
   }
@@ -842,7 +842,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Bir Kardeşin", style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w700, fontSize: Responsive.sp(13))),
+                  Text("Bir Arkadaşın", style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w700, fontSize: Responsive.sp(13))),
                   Text("2 dk önce", style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10))),
                 ],
               ),

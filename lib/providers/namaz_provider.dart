@@ -556,7 +556,7 @@ class NamazProvider extends ChangeNotifier {
       } else {
         final googleName = (user.displayName != null && user.displayName!.isNotEmpty)
             ? user.displayName!
-            : (apple ? 'Kardeş' : 'Google Kullanıcı');
+            : (apple ? 'Arkadaş' : 'Google Kullanıcı');
         String base = googleName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
         if (base.isEmpty) base = 'kullanici';
 

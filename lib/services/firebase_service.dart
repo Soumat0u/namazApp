@@ -562,7 +562,7 @@ class FirebaseService {
 
       final senderProfile = await _firestore.collection('users').doc(senderUid).get();
       final myFriends = List<String>.from(senderProfile.data()?['friends'] ?? []);
-      if (myFriends.contains(targetUid)) return 'Bu kardeşimizle zaten arkadaşsınız.';
+      if (myFriends.contains(targetUid)) return 'Bu kişiyle zaten arkadaşsınız.';
 
       // Karşı taraf bize zaten istek göndermişse: ikinci bir istek yerine kabul et
       final gelenIstek = await _firestore
@@ -581,7 +581,7 @@ class FirebaseService {
       final notificationRef = _firestore.collection('users').doc(targetUid).collection('notifications').doc(senderUid);
       final mevcut = await notificationRef.get();
       if (mevcut.exists && mevcut.data()?['status'] == 'pending') {
-        return 'Bu kardeşimize zaten istek gönderdin, cevabı bekleniyor.';
+        return 'Bu kişiye zaten istek gönderdin, cevabı bekleniyor.';
       }
 
       await notificationRef.set({
@@ -662,7 +662,7 @@ class FirebaseService {
       final ref = _firestore.collection('users').doc(targetUid).collection('notifications').doc('${fromUid}_durt');
       final mevcut = await ref.get();
       if (mevcut.exists && mevcut.data()?['gun'] == gun) {
-        return 'Bu kardeşine bugün zaten hatırlattın.';
+        return 'Bu arkadaşına bugün zaten hatırlattın.';
       }
       await ref.set({
         'type': 'nudge',
@@ -979,7 +979,7 @@ class FirebaseService {
     });
   }
 
-  /// Sadece arkadaşların yayınladığı dualar (Gönül Kardeşliği)
+  /// Sadece arkadaşların yayınladığı dualar (Gönül Arkadaşlığı)
   Stream<List<PrayerPost>> getFriendsPrayers(List<String> friendUids, {int limit = 30}) {
     if (friendUids.isEmpty) {
       return Stream.value(<PrayerPost>[]);

@@ -54,7 +54,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   List<String> _lastFriendsProfileList = [];
   Stream<List<UserProfile>>? _cachedFriendsProfilesStream;
 
-  bool _kardesSiralamasi = false; // Liderlik: false = genel, true = kardeşler (haftalık)
+  bool _kardesSiralamasi = false; // Liderlik: false = genel, true = arkadaşlar (haftalık)
 
   bool _isSubmitting = false; // Paylaşım kontrolü
   String _lastSubmittedText = ""; // Mükerrer kayıt kontrolü
@@ -162,7 +162,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   children: [
                     _siralamaSecimi(r, "Genel", false),
                     SizedBox(width: Responsive.w(8)),
-                    _siralamaSecimi(r, "Kardeşler • Bu Hafta", true),
+                    _siralamaSecimi(r, "Arkadaşlar • Bu Hafta", true),
                   ],
                 ),
               ),
@@ -605,7 +605,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     );
   }
 
-  /// Bu hafta ben + kardeşlerimin kıldığı toplam vakit / hedef (kişi başı 35)
+  /// Bu hafta ben + arkadaşlarımın kıldığı toplam vakit / hedef (kişi başı 35)
   Widget _buildOrtakHedef(AppThemeColors r, NamazProvider provider) {
     if (provider.currentUid == null) return const SizedBox();
     return _kardeslerleBirlikte((ben, arkadaslar) {
@@ -650,8 +650,8 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
             SizedBox(height: Responsive.h(6)),
             Text(
               oran >= 1
-                  ? "Maşallah! ${arkadaslar.length + 1} kardeş bu haftanın tüm vakitlerini kıldı."
-                  : "Sen ve ${arkadaslar.length} kardeşin, bu haftanın tüm vakitlerini birlikte tamamlayın.",
+                  ? "Maşallah! ${arkadaslar.length + 1} arkadaş bu haftanın tüm vakitlerini kıldı."
+                  : "Sen ve ${arkadaslar.length} arkadaşın, bu haftanın tüm vakitlerini birlikte tamamlayın.",
               style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
             ),
           ],
@@ -672,7 +672,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           return _buildEmptyState(
             r,
             "Arkadaşlarım",
-            "Henüz bir kardeşin yok.\nArkadaşlarını ekle; birbirinizin namazlarını görün, birlikte hedef koyun.",
+            "Henüz bir arkadaşın yok.\nArkadaşlarını ekle; birbirinizin namazlarını görün, birlikte hedef koyun.",
             butonYazisi: "Arkadaş Ekle",
             onButon: () => _showAddFriendModal(context, r, provider),
           );
@@ -860,11 +860,11 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     );
   }
 
-  /// Ben + kardeşlerim, bu haftaki XP'ye göre
+  /// Ben + arkadaşlarım, bu haftaki XP'ye göre
   Widget _buildKardesSiralamasi(AppThemeColors r, NamazProvider provider, {int? limit, ScrollController? scrollController}) {
     return _kardeslerleBirlikte((ben, arkadaslar) {
       if (arkadaslar.isEmpty) {
-        return _buildEmptyState(r, "Kardeş Sıralaması", "Kardeşlerini ekle, bu hafta kimin daha gayretli olduğunu birlikte görün.");
+        return _buildEmptyState(r, "Arkadaş Sıralaması", "Arkadaşlarını ekle, bu hafta kimin daha gayretli olduğunu birlikte görün.");
       }
       final hafta = provider.haftalikOzet.hafta;
       final xp = {for (final a in arkadaslar) a.uid: a.buHaftaXp(hafta), ben.uid: provider.haftalikOzet.xp};
@@ -899,7 +899,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               _buildBottomSheetHandle(r),
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(_kardesSiralamasi ? "Kardeşler • Bu Hafta" : "Liderlik Tablosu", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(18), color: r.yaziRengi)),
+                child: Text(_kardesSiralamasi ? "Arkadaşlar • Bu Hafta" : "Liderlik Tablosu", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(18), color: r.yaziRengi)),
               ),
               Expanded(
                 child: _kardesSiralamasi
@@ -1058,7 +1058,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         
         final friends = userSnap.data?.friends ?? [];
 
-        // Arkadaşı olmayanlar için boş Kardeşlik ekranı uyarısı ve Ekleme Butonu
+        // Arkadaşı olmayanlar için boş Arkadaşlık ekranı uyarısı ve Ekleme Butonu
         if (_selectedTab == 1 && friends.isEmpty) {
           return Container(
             margin: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(10)),
@@ -1901,7 +1901,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                             backgroundColor: r.anaRenk.withOpacity(0.2),
                             child: Icon(Icons.person, color: r.anaRenk),
                           ),
-                          title: Text("${notif.fromDisplayName} seni kardeşliğine davet ediyor.", style: TextStyle(color: r.yaziRengi)),
+                          title: Text("${notif.fromDisplayName} seni arkadaşlığına davet ediyor.", style: TextStyle(color: r.yaziRengi)),
                           subtitle: Text("@${notif.fromUsername}", style: TextStyle(color: r.pasifRenk, fontSize: 12)),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1939,7 +1939,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       title: Text(
         hatirlatma
             ? "${notif.fromDisplayName} hatırlatıyor: ${notif.vakit ?? 'namazını'} kıldın mı? 🤲"
-            : "${notif.fromDisplayName} kardeşlik isteğini kabul etti.",
+            : "${notif.fromDisplayName} arkadaşlık isteğini kabul etti.",
         style: TextStyle(color: r.yaziRengi, fontWeight: notif.status == 'unread' ? FontWeight.bold : FontWeight.normal),
       ),
       subtitle: Text("@${notif.fromUsername} • ${notif.timestamp.zamanFarki}", style: TextStyle(color: r.pasifRenk, fontSize: 12)),
@@ -1965,7 +1965,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     );
     messenger.showSnackBar(SnackBar(
       content: Text(hata ?? (kabul
-          ? "${notif.fromDisplayName} ile artık kardeşsiniz."
+          ? "${notif.fromDisplayName} ile artık arkadaşsınız."
           : "İstek reddedildi.")),
     ));
   }
@@ -1999,7 +1999,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         messenger.showSnackBar(SnackBar(
           content: Text(err == null
               ? "Arkadaşlık isteği gönderildi!"
-              : "@$hedef sana zaten istek göndermişti, artık kardeşsiniz!"),
+              : "@$hedef sana zaten istek göndermişti, artık arkadaşsınız!"),
         ));
       } else {
         setState(() { isSearching = false; errorMessage = err; });
@@ -2061,7 +2061,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   Divider(color: r.pasifRenk.withOpacity(0.1)),
                   const SizedBox(height: 12),
                   
-                  // Önerilen Kardeşler
+                  // Önerilen Arkadaşlar
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text("Sana Önerilenler", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(14), color: r.pasifRenk)),
@@ -2174,7 +2174,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text("Arkadaşlıktan Çıkar", style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.bold)),
         content: Text(
-          "${user.displayName} (@${user.username}) isimli kardeşimizi arkadaşlarınızdan çıkarmak istediğinize emin misiniz?",
+          "${user.displayName} (@${user.username}) isimli kişiyi arkadaşlarınızdan çıkarmak istediğinize emin misiniz?",
           style: TextStyle(color: r.yaziRengi.withOpacity(0.7)),
         ),
         actions: [
@@ -2225,7 +2225,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               _buildBottomSheetHandle(r),
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text("Mümin Kardeşlerim", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(18), color: r.yaziRengi)),
+                child: Text("Mümin Arkadaşlarım", style: TextStyle(fontWeight: FontWeight.bold, fontSize: Responsive.sp(18), color: r.yaziRengi)),
               ),
               Expanded(
                 child: StreamBuilder<UserProfile?>(
@@ -2234,7 +2234,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                     if (!snapshot.hasData || snapshot.data == null) return const Center(child: CircularProgressIndicator());
                     
                     final friendsList = snapshot.data!.friends;
-                    if (friendsList.isEmpty) return Center(child: Text("Henüz bir kardeşiniz ekli değil.\nDua halkasına arkadaşlarınızı davet edin!", textAlign: TextAlign.center, style: TextStyle(color: r.pasifRenk)));
+                    if (friendsList.isEmpty) return Center(child: Text("Henüz bir arkadaşınız ekli değil.\nDua halkasına arkadaşlarınızı davet edin!", textAlign: TextAlign.center, style: TextStyle(color: r.pasifRenk)));
 
                     return StreamBuilder<List<UserProfile>>(
                       stream: _firebaseService.getFriendsProfilesStream(friendsList),
@@ -2355,7 +2355,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   SizedBox(width: Responsive.w(8)),
                   kutu("${user.streak}", "Gün Seri", Icons.local_fire_department_rounded),
                   SizedBox(width: Responsive.w(8)),
-                  kutu("${user.friends.length}", "Kardeş", Icons.groups_rounded),
+                  kutu("${user.friends.length}", "Arkadaş", Icons.groups_rounded),
                 ],
               ),
               SizedBox(height: Responsive.h(8)),
@@ -2424,7 +2424,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           gun: provider.getSanalGun(),
         );
         messenger.showSnackBar(SnackBar(
-          content: Text(hata ?? "${user.displayName} kardeşine $vakit namazı hatırlatıldı."),
+          content: Text(hata ?? "${user.displayName} arkadaşına $vakit namazı hatırlatıldı."),
         ));
       },
     );
@@ -2511,7 +2511,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   children: [
                     Icon(Icons.person_remove_rounded, color: r.kirmizi, size: 18),
                     const SizedBox(width: 8),
-                    Text("Kardeşlikten Çıkar", style: TextStyle(color: r.kirmizi, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text("Arkadaşlıktan Çıkar", style: TextStyle(color: r.kirmizi, fontWeight: FontWeight.bold, fontSize: 13)),
                   ],
                 ),
               ),
