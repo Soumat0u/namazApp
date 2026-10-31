@@ -452,9 +452,18 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
               ),
             ],
           ),
-          SizedBox(height: Responsive.h(20)),
+          SizedBox(height: Responsive.h(16)),
+          // Grafik yüksekliği en uzun sütuna göre: boş haftada kart gereksiz yer kaplamaz
+          if (!gunlukSayilar.any((c) => c > 0) && !kazaSayilar.any((k) => k > 0))
+            Padding(
+              padding: EdgeInsets.only(bottom: Responsive.h(10)),
+              child: Text(
+                "Bu hafta henüz namaz işaretlenmedi.",
+                style: TextStyle(fontSize: Responsive.sp(12), color: r.yaziRengi.withOpacity(0.5)),
+              ),
+            ),
           SizedBox(
-            height: Responsive.h(200),
+            height: Responsive.h(_grafikYuksekligi(gunlukSayilar, kazaSayilar) + 30),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
@@ -606,6 +615,16 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
         ],
       ),
     );
+  }
+
+  /// Haftalık grafikte en uzun sütunun yüksekliği (sütunlarla aynı ölçek: 5 vakit = 120)
+  double _grafikYuksekligi(List<int> gunluk, List<int> kaza) {
+    double enUzun = 6;
+    for (int i = 0; i < gunluk.length; i++) {
+      final h = (gunluk[i] / 5) * 120.0 + (kaza[i] == 0 ? 0.0 : (kaza[i] / 20) * 120.0 + 2);
+      if (h > enUzun) enUzun = h;
+    }
+    return enUzun.clamp(6.0, 122.0) + 4;
   }
 
   @override
