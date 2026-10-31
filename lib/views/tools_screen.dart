@@ -9,6 +9,7 @@ import 'kaza_screen.dart';
 import 'tesbihat_screen.dart';
 import 'dua_kitapligi_screen.dart';
 import 'hatim_screen.dart';
+import 'oruc_screen.dart';
 
 
 class AraclarSayfasi extends StatelessWidget {
@@ -86,6 +87,13 @@ class AraclarSayfasi extends StatelessWidget {
               title: "Hatim Takibi",
               color: Colors.brown,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HatimScreen())),
+            ),
+            _buildAracCard(
+              context: context,
+              icon: Icons.nightlight_round,
+              title: "Oruç Takibi",
+              color: Colors.deepPurple,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrucScreen())),
             ),
             _buildAracCard(
               context: context,

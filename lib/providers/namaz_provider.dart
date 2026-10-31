@@ -289,13 +289,11 @@ class NamazProvider extends ChangeNotifier {
 
     await konumVeApiIstegi(kullaniciTetikledi: false);
 
-    // Açılışta bu ayın dini günlerini getir
+    // Açılışta bu ay ve sonraki 2 ayın dini günlerini getir (banner + geri sayım)
     final simdi = DateTime.now();
-    await seciliAyDiniGunleriGetir(simdi.year, simdi.month);
-    // Eğer bugün ayın son günüyse, yarın için uyarı göstermek adına sonraki ayı da çek
-    final yarin = simdi.add(const Duration(days: 1));
-    if (simdi.month != yarin.month) {
-      await seciliAyDiniGunleriGetir(yarin.year, yarin.month);
+    for (int i = 0; i < 3; i++) {
+      final ay = DateTime(simdi.year, simdi.month + i);
+      await seciliAyDiniGunleriGetir(ay.year, ay.month);
     }
   }
 
@@ -1000,6 +998,10 @@ class NamazProvider extends ChangeNotifier {
     seciliSehir = prefs.getString('secili_sehir') ?? "";
     _cinsiyet = prefs.getString('cinsiyet');
     duaPaylasimSayisi = prefs.getInt('dua_paylasim_sayisi') ?? 0;
+    orucModu = prefs.getBool('oruc_modu') ?? false;
+    orucGunleri = (prefs.getStringList('oruc_gunleri') ?? []).toSet();
+    kazaOrucBorcu = prefs.getInt('kaza_oruc_borcu') ?? 0;
+    kilinanKazaOrucu = prefs.getInt('kilinan_kaza_orucu') ?? 0;
 
     String? cachedVakitlerString = prefs.getString('cached_vakitler');
     if (cachedVakitlerString != null) {
@@ -1745,8 +1747,8 @@ class NamazProvider extends ChangeNotifier {
         );
       }
 
-      // Manevi Rehber bildirimleri
-      await _notificationService.scheduleManeviRehberNotifications();
+      // Manevi Rehber bildirimleri (oruç modunda sahur/iftara yer açmak için azaltılır; iOS 64 sınırı)
+      await _notificationService.scheduleManeviRehberNotifications(adet: orucModu ? 4 : 14);
 
       // Haftalık özet: bu pazar 20:00 (geçtiyse gelecek pazar). Metin son açılıştaki verilerle güncellenir.
       final ozet = haftalikOzet;
@@ -1774,6 +1776,52 @@ class NamazProvider extends ChangeNotifier {
       DateTime gun(int g) => DateTime(bugun.year, bugun.month, bugun.day + g);
       Map<String, String>? gununVakitleri(int g) =>
           _vakitTakvimi[_gunFormati.format(gun(g))] ?? (g == 0 ? vakitler : null);
+
+      // 🕌 Cuma: önümüzdeki Cuma, öğleden 1 saat önce (ID 810)
+      for (int g = 0; g < _bildirimGunSayisi; g++) {
+        final v = gununVakitleri(g);
+        if (gun(g).weekday != DateTime.friday || v?['Öğle'] == null) continue;
+        final zaman = _saatiTariheUygula(gun(g), v!['Öğle']!).subtract(const Duration(hours: 1));
+        if (!zaman.isAfter(simdi)) continue;
+        await _notificationService.scheduleNotification(
+          id: 810,
+          title: '🕌 Hayırlı Cumalar',
+          body: 'Cuma namazına hazırlan. Kehf suresini okumayı ve bol salavat getirmeyi unutma.',
+          scheduledDate: zaman,
+          sound: bildirimSesi,
+          ozelSesYolu: ozelSesYolu,
+        );
+        break;
+      }
+
+      // 🌙 Oruç modu: 5 gün sahur (imsaktan 45 dk önce) ve iftar (ID 600+)
+      if (orucModu) {
+        for (int g = 0; g < 5; g++) {
+          final o = orucVakitleri(gun(g));
+          if (o == null) continue;
+          final sahur = o.imsak.subtract(const Duration(minutes: 45));
+          if (sahur.isAfter(simdi)) {
+            await _notificationService.scheduleNotification(
+              id: 600 + g * 2,
+              title: '🌙 Sahur vakti',
+              body: 'İmsaka 45 dakika kaldı (${DateFormat('HH:mm').format(o.imsak)}). Niyet etmeyi unutma.',
+              scheduledDate: sahur,
+              sound: bildirimSesi,
+              ozelSesYolu: ozelSesYolu,
+            );
+          }
+          if (o.iftar.isAfter(simdi)) {
+            await _notificationService.scheduleNotification(
+              id: 601 + g * 2,
+              title: '🍽️ İftar vakti',
+              body: 'Allah orucunu kabul etsin. Orucunu uygulamada işaretlemeyi unutma.',
+              scheduledDate: o.iftar,
+              sound: bildirimSesi,
+              ozelSesYolu: ozelSesYolu,
+            );
+          }
+        }
+      }
 
       // Vakit girdi bildirimleri (ID: gün*10 + vakit)
       for (int g = 0; g < _bildirimGunSayisi; g++) {
@@ -1948,6 +1996,73 @@ class NamazProvider extends ChangeNotifier {
     notifyListeners();
   }
   
+  /// Bugünden sonraki ilk dini gün ve kalan gün sayısı
+  ({ReligiousDay gun, int kalan})? get siradakiDiniGun {
+    final bugun = _gunFormati.format(DateTime.now());
+    final sirali = tumDiniGunler.keys.where((k) => k.compareTo(bugun) > 0).toList()..sort();
+    if (sirali.isEmpty) return null;
+    return (gun: tumDiniGunler[sirali.first]!, kalan: _gunFarki(bugun, sirali.first));
+  }
+
+  // ══════════════════════════════════════════
+  // 🌙 ORUÇ TAKİBİ
+  // ══════════════════════════════════════════
+
+  static const int orucXp = 30;
+  bool orucModu = false; // Açıkken sahur ve iftar bildirimleri kurulur
+  Set<String> orucGunleri = {}; // Tutulan oruçlar ("yyyy-MM-dd")
+  int kazaOrucBorcu = 0;
+  int kilinanKazaOrucu = 0;
+
+  bool get bugunOrucTutuldu => orucGunleri.contains(_gunFormati.format(DateTime.now()));
+
+  /// İmsak (sahur sonu) = Sabah vakti, iftar = Akşam vakti. Yarınki imsak takvimden alınır.
+  ({DateTime imsak, DateTime iftar})? orucVakitleri(DateTime gun) {
+    final v = _vakitTakvimi[_gunFormati.format(gun)] ??
+        (_gunFormati.format(gun) == _gunFormati.format(DateTime.now()) ? vakitler : null);
+    if (v == null || v['Sabah'] == null || v['Akşam'] == null) return null;
+    return (imsak: _saatiTariheUygula(gun, v['Sabah']!), iftar: _saatiTariheUygula(gun, v['Akşam']!));
+  }
+
+  Future<void> _orucKaydet() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('oruc_modu', orucModu);
+    await prefs.setStringList('oruc_gunleri', orucGunleri.toList());
+    await prefs.setInt('kaza_oruc_borcu', kazaOrucBorcu);
+    await prefs.setInt('kilinan_kaza_orucu', kilinanKazaOrucu);
+  }
+
+  Future<void> orucModuDegistir(bool acik) async {
+    orucModu = acik;
+    await _orucKaydet();
+    await _bildirimleriGuncelle();
+    notifyListeners();
+  }
+
+  Future<void> bugunOrucDegistir(bool tuttu) async {
+    final bugun = _gunFormati.format(DateTime.now());
+    if (tuttu == orucGunleri.contains(bugun)) return;
+    tuttu ? orucGunleri.add(bugun) : orucGunleri.remove(bugun);
+    await _xpGuncelle(tuttu ? orucXp : -orucXp);
+    await _orucKaydet();
+    notifyListeners();
+  }
+
+  Future<void> kazaOrucBorcuAyarla(int borc) async {
+    kazaOrucBorcu = max(0, borc);
+    await _orucKaydet();
+    notifyListeners();
+  }
+
+  /// Bir kaza orucu tutuldu: borçtan düşer, bugünü de tutulmuş sayar
+  Future<void> kazaOrucuTuttum() async {
+    if (kazaOrucBorcu <= 0) return;
+    kazaOrucBorcu--;
+    kilinanKazaOrucu++;
+    await _orucKaydet();
+    await bugunOrucDegistir(true);
+  }
+
   // --- DİNİ GÜNLER (ALADHAN API) ---
   Future<void> seciliAyDiniGunleriGetir(int year, int month) async {
     String cacheKey = "$year-$month";

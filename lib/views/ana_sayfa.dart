@@ -155,6 +155,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
               SizedBox(height: Responsive.h(16)),
 
               _buildDiniGunBanner(context, provider),
+              _buildCumaVeGeriSayim(context, provider),
 
               if (provider.vakitler == null && !provider.isLoading)
                 _buildKonumGerekliKarti(context, provider),
@@ -299,6 +300,58 @@ class _AnaSayfaState extends State<AnaSayfa> {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Cuma günü Kehf hatırlatması ve sıradaki dini güne geri sayım (yarın/bugün ise üstteki banner gösterir)
+  Widget _buildCumaVeGeriSayim(BuildContext context, NamazProvider provider) {
+    final r = context.renkler;
+    final cuma = DateTime.now().weekday == DateTime.friday;
+    final siradaki = provider.siradakiDiniGun;
+    final geriSayim = siradaki != null && siradaki.kalan > 1 ? siradaki : null;
+    if (!cuma && geriSayim == null) return const SizedBox.shrink();
+
+    Widget satir(IconData ikon, String metin, {Widget? sag}) => Row(
+          children: [
+            Icon(ikon, color: r.anaRenk, size: Responsive.w(20)),
+            SizedBox(width: Responsive.w(10)),
+            Expanded(
+              child: Text(metin,
+                  style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w600, fontSize: Responsive.sp(13))),
+            ),
+            if (sag != null) sag,
+          ],
+        );
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(12)),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(10)),
+        decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(Responsive.w(16))),
+        child: Column(
+          children: [
+            if (cuma)
+              satir(
+                Icons.mosque_rounded,
+                "Hayırlı Cumalar! Kehf suresini okudun mu?",
+                sag: TextButton(
+                  onPressed: () => _GununAyetiCard(provider: provider)._sureyiGoster(context, 18, 1, r),
+                  child: Text("Oku", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            if (cuma && geriSayim != null) Divider(color: r.pasifRenk.withOpacity(0.15), height: Responsive.h(12)),
+            if (geriSayim != null)
+              satir(
+                Icons.nightlight_round,
+                "${geriSayim.gun.turkishName}: ${geriSayim.kalan} gün kaldı",
+                sag: Text(
+                  DateFormat('d MMMM', 'tr_TR').format(DateTime.parse(geriSayim.gun.dateStr)),
+                  style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
+                ),
+              ),
           ],
         ),
       ),

@@ -376,6 +376,32 @@ void main() {
       p.dispose();
     });
 
+    test('Oruç modu: sahur ve iftar bildirimleri kurulur, iOS 64 sınırı aşılmaz', () async {
+      final bildirim = FakeNotificationService();
+      final p = await _baslat(
+        prefs: {'cached_vakitler': json.encode(_gecmisVakitler), 'lastResetDate': _gun(DateTime.now())},
+        namaz: FakeNamazServisi(_gecmisVakitler, takvim: _gelecekTakvim()),
+        bildirim: bildirim,
+      );
+      await p.orucModuDegistir(true);
+      final yarin = DateTime(_bugun().year, _bugun().month, _bugun().day + 1);
+      // Yarın (g=1): sahur 05:00 - 45 dk, iftar 18:00
+      expect(bildirim.planli[602], DateTime(yarin.year, yarin.month, yarin.day, 4, 15));
+      expect(bildirim.planli[603], DateTime(yarin.year, yarin.month, yarin.day, 18));
+      expect(bildirim.planli.length + 4, lessThanOrEqualTo(64), reason: '+4 manevi bildirim');
+      p.dispose();
+    });
+
+    test('Kaza orucu tutulunca borç düşer ve bugün oruçlu sayılır', () async {
+      final p = await _baslat(prefs: {}, namaz: FakeNamazServisi(_gecmisVakitler));
+      await p.kazaOrucBorcuAyarla(3);
+      await p.kazaOrucuTuttum();
+      expect(p.kazaOrucBorcu, 2);
+      expect(p.bugunOrucTutuldu, isTrue);
+      expect(p.toplamXp, NamazProvider.orucXp);
+      p.dispose();
+    });
+
     test('Kaza hatırlatıcısı bir namaz işaretlenince silinmez', () async {
       final bildirim = FakeNotificationService();
       final p = await _baslat(
