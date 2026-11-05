@@ -21,6 +21,7 @@ import 'views/ana_sayfa.dart';
 import 'views/statistics_screen.dart';
 import 'views/social_screen.dart';
 import 'views/auth_screen.dart';
+import 'views/kuran_screen.dart';
 import 'views/onboarding_screen.dart';
 
 void main() async {
@@ -177,12 +178,21 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani>
     WidgetsBinding.instance.addPostFrameCallback((_) => _bildirimdenSekmeAc());
   }
 
-  /// Bildirime dokunulduysa ilgili sekmeye geç ('ana' → 0, 'sosyal' → 2)
+  /// Bildirime dokunulduysa ilgili yere git: 'ana' → 0. sekme, 'sosyal' → 2. sekme,
+  /// `ayet:<sure>:<ayet>` → Kur'an'da o ayet
   void _bildirimdenSekmeAc() {
     final sekme = NotificationService.acilacakSekme.value;
     if (sekme == null || !mounted) return;
     NotificationService.acilacakSekme.value = null;
     Navigator.of(context).popUntil((route) => route.isFirst);
+    final ayet = RegExp(r'^ayet:(\d+):(\d+)$').firstMatch(sekme);
+    if (ayet != null) {
+      setState(() => _seciliSayfaIndex = 0);
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => KuranSureScreen(sure: int.parse(ayet.group(1)!), baslangicAyet: int.parse(ayet.group(2)!)),
+      ));
+      return;
+    }
     setState(() => _seciliSayfaIndex = sekme == 'sosyal' ? 2 : 0);
   }
 

@@ -159,6 +159,21 @@ class NotificationService {
     await _notificationsPlugin.cancelAll();
   }
 
+  /// Bildirimdeki ayetin "(Sure, ayet)" kaynağından sure ve ayet numarası; hadisse null
+  static (int, int)? ayetKonumu(String metin) {
+    final m = RegExp(r"\(([^,()]+), (\d+)(?:-\d+)?\)\s*$").firstMatch(metin);
+    if (m == null) return null;
+    final sure = _sureNo[m.group(1)!.trim()];
+    return sure == null ? null : (sure, int.parse(m.group(2)!));
+  }
+
+  /// quotes.dart'taki ayetlerde geçen sure adları
+  static const _sureNo = {
+    'Fâtiha': 1, 'Bakara': 2, 'Âl-i İmrân': 3, 'Nisâ': 4, 'Mâide': 5, 'Hûd': 11, "Ra'd": 13,
+    'İbrahim': 14, 'Hicr': 15, 'Tâhâ': 20, 'Hac': 22, 'Mü’minûn': 23, 'Ankebût': 29, 'Zümer': 39,
+    'Necm': 53, 'Mearic': 70, 'Alak': 96, 'Kevser': 108,
+  };
+
   /// Her 5 saatte bir rastgele ayet veya hadis bildirimi planlar (gece 23:00-08:00 arası atlanır).
   /// iOS en fazla 64 bekleyen bildirim tuttuğu için vakit bildirimlerine yer bırakacak kadar planlanır.
   /// Not: Çağıran taraf (NamazProvider) öncesinde cancelAll() yapar.
@@ -176,8 +191,8 @@ class NotificationService {
     for (int i = 0; i < zamanlar.length; i++) {
       final scheduledTime = zamanlar[i];
       final quote = allQuotes[i % allQuotes.length];
-      final bool isAyet = quote.contains('(') && quote.contains(')');
-      final title = isAyet ? "📖 Bir Ayet" : "💬 Bir Hadis";
+      final konum = ayetKonumu(quote);
+      final title = konum != null ? "Bir Ayet" : "Bir Hadis";
       await _notificationsPlugin.zonedSchedule(
         id: 500 + i,
         title: title,
@@ -194,6 +209,8 @@ class NotificationService {
           iOS: DarwinNotificationDetails(),
         ),
         androidScheduleMode: await _zamanlamaKipi(),
+        // Ayete dokununca Kur'an'da o ayet açılır
+        payload: konum != null ? 'ayet:${konum.$1}:${konum.$2}' : 'ana',
       );
     }
   }
@@ -216,7 +233,7 @@ class NotificationService {
 
     await _notificationsPlugin.zonedSchedule(
       id: 700,
-      title: "⏳ Kaza Namazı Vakti",
+      title: "Kaza Namazı Vakti",
       body: "Bugünkü kaza namazı hedefinizi kılmayı unutmayın.",
       scheduledDate: tz.TZDateTime.from(scheduled, tz.local),
       notificationDetails: NotificationDetails(

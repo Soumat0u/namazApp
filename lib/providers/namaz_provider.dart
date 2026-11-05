@@ -1851,7 +1851,7 @@ class NamazProvider extends ChangeNotifier {
       if (yeniHafta) pazar = pazar.add(const Duration(days: 7));
       await _notificationService.scheduleNotification(
         id: 800,
-        title: '📊 Haftalık Özetin',
+        title: 'Haftalık Özetin',
         body: yeniHafta
             ? 'Yeni haftaya başla! Bu hafta 35 vaktin hepsini kılmayı hedefle.'
             : 'Bu hafta ${ozet.namaz}/35 vakit kıldın, ${ozet.xp} XP kazandın'
@@ -1878,7 +1878,7 @@ class NamazProvider extends ChangeNotifier {
         if (!zaman.isAfter(simdi)) continue;
         await _notificationService.scheduleNotification(
           id: 810,
-          title: '🕌 Hayırlı Cumalar',
+          title: 'Hayırlı Cumalar',
           body: 'Cuma namazına hazırlan. Kehf suresini okumayı ve bol salavat getirmeyi unutma.',
           scheduledDate: zaman,
           sound: bildirimSesi,
@@ -1896,7 +1896,7 @@ class NamazProvider extends ChangeNotifier {
           if (sahur.isAfter(simdi)) {
             await _notificationService.scheduleNotification(
               id: 600 + g * 2,
-              title: '🌙 Sahur vakti',
+              title: 'Sahur vakti',
               body: 'İmsaka 45 dakika kaldı (${DateFormat('HH:mm').format(o.imsak)}). Niyet etmeyi unutma.',
               scheduledDate: sahur,
               sound: bildirimSesi,
@@ -1906,7 +1906,7 @@ class NamazProvider extends ChangeNotifier {
           if (o.iftar.isAfter(simdi)) {
             await _notificationService.scheduleNotification(
               id: 601 + g * 2,
-              title: '🍽️ İftar vakti',
+              title: 'İftar vakti',
               body: 'Allah orucunu kabul etsin. Orucunu uygulamada işaretlemeyi unutma.',
               scheduledDate: o.iftar,
               sound: bildirimSesi,
@@ -1973,7 +1973,7 @@ class NamazProvider extends ChangeNotifier {
               vakitIsimleri.where((x) => x != vakitAdi).every((x) => kildiMi[x] ?? false);
           await _notificationService.scheduleNotification(
             id: 100 + (g + 1) * 10 + i,
-            title: seriTehlikede ? '🔥 $streakCount günlük serin bozulmak üzere' : '⏳ $vakitAdi vakti çıkıyor',
+            title: seriTehlikede ? '$streakCount günlük serin bozulmak üzere' : '$vakitAdi vakti çıkıyor',
             body: seriTehlikede
                 ? 'Bugün sadece $vakitAdi kaldı. Kıldıysan şimdi işaretle; vakit çıkınca işaretlenemez.'
                 : '$vakitAdi vaktinin çıkmasına 20 dakika kaldı. Kıldıysan şimdi işaretle; vakit çıkınca işaretlenemez.',
