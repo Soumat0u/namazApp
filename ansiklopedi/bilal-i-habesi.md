@@ -11,7 +11,7 @@ kunye:
   Vefat: 640 civarı, Şam
 baglantilar: [hz-ebubekir, sumeyye, siyer-medine]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Mekke'de Ümeyye b. Halef'in kölesiydi. İlk Müslümanlardan oldu. Efendisi, dininden dönmesi için onu kızgın kumların üzerine yatırıp göğsüne ağır taşlar koyarak işkence ederdi. O ise her seferinde **"Ehad, Ehad"** (Allah birdir, birdir) diyerek direndi. **Hz. Ebû Bekir** onu satın alıp azat etti.
 

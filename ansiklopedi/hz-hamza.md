@@ -12,7 +12,7 @@ kunye:
   Kabri: Uhud, Medine
 baglantilar: [onemli-savaslar, siyer-mekke, siyer-medine]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Peygamberimizin amcası ve aynı zamanda süt kardeşidir; yaşları birbirine yakındı. Güçlü ve cesur bir avcıydı.
 

@@ -13,7 +13,7 @@ kunye:
 ozel_gun: ["1-1", "9-17", "9-20"]
 baglantilar: [siyer-mekke, onemli-savaslar, hz-ebubekir, ebu-eyyub-el-ensari, veda-hutbesi, halid-bin-velid, selman-i-farisi]
 kaynak: "Kur'an-ı Kerim (Tevbe 9/40, Mâide 5/3); Diyanet İşleri Başkanlığı, Hz. Muhammed'in (s.a.s.) Hayatı; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 ## Hicret
 

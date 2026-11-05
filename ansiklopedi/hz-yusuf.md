@@ -3,13 +3,13 @@ id: hz-yusuf
 kategori: peygamberler
 baslik: Hz. Yûsuf
 ozet: Kuyuya atılan, köle olarak satılan, iftiraya uğrayıp zindana düşen ama sonunda Mısır'ın yöneticisi olan peygamber. Kur'an'da "en güzel kıssa".
-sira: 7
+sira: 10
 kunye:
   Babası: Hz. Ya'kûb
   Kur'an'da: Yûsuf suresi (12)
 baglantilar: [peygamberler-genel, hz-ibrahim]
 kaynak: "Kur'an-ı Kerim (Yûsuf suresi 12/1-101)"
-durum: taslak
+durum: onaylandi
 ---
 Kıssası, Kur'an'da adını taşıyan surede baştan sona anlatılır ve **"kıssaların en güzeli"** diye tanıtılır (Yûsuf 12/3).
 

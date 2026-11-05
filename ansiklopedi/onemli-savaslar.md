@@ -3,11 +3,11 @@ id: onemli-savaslar
 kategori: tarih
 baslik: Peygamberimiz Dönemindeki Önemli Savaşlar
 ozet: Bedir, Uhud, Hendek, Hudeybiye ve Mekke'nin fethi; sebepleri, sonuçları ve dersleri.
-sira: 2
+sira: 3
 ozel_gun: ["9-17", "9-20"]
 baglantilar: [siyer-medine, hz-hamza, islam-tarihi-ozet, halid-bin-velid, selman-i-farisi, musab-bin-umeyr]
 kaynak: "Kur'an-ı Kerim (Âl-i İmrân 3/123, Fetih 48/1); Diyanet İşleri Başkanlığı, Hz. Muhammed'in (s.a.s.) Hayatı; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 ## Bedir Savaşı (624, hicrî 2, 17 Ramazan)
 

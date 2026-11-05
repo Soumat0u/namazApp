@@ -6,7 +6,7 @@ ozet: İlmihal kitaplarında bir Müslümanın bilmesi gereken temel farzların 
 sira: 3
 baglantilar: [imanin-sartlari, islamin-sartlari]
 kaynak: "Diyanet İşleri Başkanlığı, İlmihal I; geleneksel ilmihal kitapları"
-durum: taslak
+durum: onaylandi
 ---
 Geleneksel ilmihal kitaplarında temel farzlar "32 farz" adıyla bir arada öğretilir. Bunlar ayrı ayrı bilinen listelerin toplamıdır:
 

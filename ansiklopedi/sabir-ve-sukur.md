@@ -6,7 +6,7 @@ ozet: Sıkıntıya karşı sabır, nimete karşı şükür; müminin her hâlini
 sira: 6
 baglantilar: [temel-kavramlar, tevekkul, hz-eyyub]
 kaynak: "Kur'an-ı Kerim (Bakara 2/153-157, İbrâhîm 14/7, Zümer 39/10); Müslim"
-durum: taslak
+durum: onaylandi
 ---
 ## Sabır
 

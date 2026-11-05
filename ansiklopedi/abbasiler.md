@@ -3,14 +3,14 @@ id: abbasiler
 kategori: tarih
 baslik: Abbâsîler
 ozet: Merkezi Bağdat olan, İslam medeniyetinin ilimde ve kültürde zirveye ulaştığı halifelik.
-sira: 4
+sira: 5
 kunye:
   Dönem: 750-1258
   Merkez: Bağdat
   Sonu: 1258, Moğol istilası
 baglantilar: [islam-tarihi-ozet, emeviler, selcuklular, mezhepler]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Peygamberimizin amcası Abbas'ın soyundan gelen hanedandır. Emevîleri yıkarak halifeliği ele geçirdiler. Halife Mansûr 762'de **Bağdat**'ı kurdu; şehir kısa sürede dünyanın en büyük ilim ve ticaret merkezlerinden biri oldu.
 

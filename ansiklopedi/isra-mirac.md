@@ -10,7 +10,7 @@ kunye:
 ozel_gun: ["7-27"]
 baglantilar: [siyer-mekke, hz-ebubekir, melekler-dort-buyuk]
 kaynak: "Kur'an-ı Kerim (İsrâ 17/1, Necm 53/13-18); Buhârî ve Müslim"
-durum: taslak
+durum: onaylandi
 ---
 **İsrâ**, Peygamberimizin bir gece Mekke'deki Mescid-i Haram'dan Kudüs'teki Mescid-i Aksâ'ya götürülmesidir:
 

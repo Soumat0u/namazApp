@@ -3,13 +3,13 @@ id: hz-nuh
 kategori: peygamberler
 baslik: Hz. Nûh
 ozet: Kavmini yüzyıllarca tevhide çağıran, gemi ve tufan kıssasıyla bilinen ülü'l-azm peygamber.
-sira: 3
+sira: 4
 kunye:
   Özelliği: Ülü'l-azm peygamberlerden
   Kur'an'da: Hûd 11/25-49, Nûh suresi (71), Ankebût 29/14
 baglantilar: [peygamberler-genel, hz-adem]
 kaynak: "Kur'an-ı Kerim (Ankebût 29/14, Hûd 11/36-48, Nûh 71/1-28)"
-durum: taslak
+durum: onaylandi
 ---
 Hz. Nûh, putlara tapan kavmini Allah'ın birliğine çağırmak için gönderildi. Kur'an'a göre kavmi arasında **dokuz yüz elli yıl** kaldı (Ankebût 29/14). Gece gündüz, gizli ve açık her yolla onları davet etti (Nûh 71/5-9); ama çok azı iman etti.
 

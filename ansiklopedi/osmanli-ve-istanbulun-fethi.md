@@ -3,7 +3,7 @@ id: osmanli-ve-istanbulun-fethi
 kategori: tarih
 baslik: Osmanlı Devleti ve İstanbul'un Fethi
 ozet: Küçük bir beylikten üç kıtaya yayılan, halifeliği yaklaşık dört asır taşıyan Osmanlı Devleti ve 1453'te İstanbul'un fethi.
-sira: 7
+sira: 10
 kunye:
   Dönem: 1299-1922
   Kurucusu: Osman Bey
@@ -11,7 +11,7 @@ kunye:
   Halifelik: 1517-1924
 baglantilar: [selcuklular, ebu-eyyub-el-ensari, islam-tarihi-ozet]
 kaynak: "Ahmed b. Hanbel, Müsned; Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Anadolu Selçuklularının dağılmasından sonra Söğüt ve çevresinde **Osman Bey**'in kurduğu beylik, kısa sürede büyüdü. Orhan Bey döneminde **Bursa** başkent oldu; Rumeli'ye geçildi ve Balkanlarda ilerlenildi.
 

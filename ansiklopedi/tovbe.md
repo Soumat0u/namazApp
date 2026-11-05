@@ -6,7 +6,7 @@ ozet: İşlenen günahtan pişman olup Allah'a yönelmek; şartları ve Allah'ı
 sira: 7
 baglantilar: [temel-kavramlar, hz-adem, hz-yunus]
 kaynak: "Kur'an-ı Kerim (Zümer 39/53, Tahrîm 66/8, Bakara 2/222); Diyanet İşleri Başkanlığı yayınları"
-durum: taslak
+durum: onaylandi
 ---
 **Tövbe**, sözlükte "dönmek" demektir. Dinî anlamda, işlenen bir günahtan dolayı pişman olup Allah'a yönelmek ve bağışlanma dilemektir. İnsan hata yapabilir; önemli olan hatasında ısrar etmeyip Rabbine dönmektir. İlk insan [[hz-adem|Hz. Âdem]]'in kıssası da bir tövbe kıssasıdır.
 

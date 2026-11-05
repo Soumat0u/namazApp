@@ -10,7 +10,7 @@ kunye:
   Vefat: 642, Humus
 baglantilar: [onemli-savaslar, hz-ebubekir, hz-omer]
 kaynak: "Buhârî; Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Kureyş'in önde gelen savaşçılarındandı. Uhud Savaşı'nda müşrik süvarilerinin komutanıydı; okçuların yerini terk ettiğini görünce Müslümanları arkadan kuşatan oydu.
 

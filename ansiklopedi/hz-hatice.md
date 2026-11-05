@@ -12,7 +12,7 @@ kunye:
   Kabri: Cennetü'l-Muallâ, Mekke
 baglantilar: [peygamberimizin-ailesi, siyer-mekke, hz-fatima]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Mekke'nin saygın ve varlıklı tüccarlarından biriydi. İffeti ve temizliği nedeniyle **"Tâhire"** diye anılırdı. Ticaret kervanını yöneten Hz. Muhammed'in dürüstlüğünü ve güzel ahlakını görünce onunla evlenmek istedi. Bu evlilik yaklaşık 25 yıl sürdü ve Peygamberimiz o hayattayken başka biriyle evlenmedi.
 

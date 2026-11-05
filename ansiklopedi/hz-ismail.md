@@ -3,14 +3,14 @@ id: hz-ismail
 kategori: peygamberler
 baslik: Hz. İsmâil
 ozet: Hz. İbrâhîm'in oğlu; babasıyla Kâbe'yi inşa etti. Peygamberimiz onun soyundandır.
-sira: 6
+sira: 8
 kunye:
   Babası: Hz. İbrâhîm
   Annesi: Hz. Hâcer
   Kur'an'da: Bakara 2/127-129, Meryem 19/54-55, Sâffât 37/101-107
 baglantilar: [hz-ibrahim, peygamberler-genel]
 kaynak: "Kur'an-ı Kerim (Bakara 2/127-129, Meryem 19/54-55, Sâffât 37/101-107); Buhârî"
-durum: taslak
+durum: onaylandi
 ---
 Hz. İbrâhîm'in Hâcer'den olan oğludur. Küçükken annesiyle birlikte, Allah'ın emriyle o zaman ıssız olan Mekke vadisine bırakıldı. Hâcer'in su ararken Safâ ile Merve tepeleri arasında koşması ve ardından **zemzem** suyunun çıkması hadislerde anlatılır (Buhârî); hacdaki **sa'y** bu koşuyu hatırlatır.
 

@@ -13,7 +13,7 @@ kunye:
   Kabri: Mescid-i Nebevî, Peygamberimizin yanında
 baglantilar: [hulefa-i-rasidin, hz-ebubekir, hz-osman]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Başlangıçta İslam'a karşı sert biriydi. 616 yılında kız kardeşinin evinde okunan Tâhâ suresinin ayetlerinden etkilenerek Müslüman oldu. Onun Müslüman olmasından sonra Müslümanlar Kâbe'de açıkça namaz kılmaya başladı. Hakkı batıldan ayırdığı için **"Fârûk"** lakabıyla anılır.
 

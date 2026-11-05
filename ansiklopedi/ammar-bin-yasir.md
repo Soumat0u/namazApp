@@ -9,7 +9,7 @@ kunye:
   Vefat: 657, Sıffîn (şehit)
 baglantilar: [sumeyye, hz-ali, siyer-medine]
 kaynak: "Kur'an-ı Kerim (Nahl 16/106); Diyanet İşleri Başkanlığı yayınları; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Annesi [[sumeyye|Sümeyye]] ve babası Yâsir ile birlikte ilk Müslümanlardandır. Kimsesiz oldukları için ailece ağır işkencelere uğradılar; annesi ve babası işkence altında şehit oldu.
 

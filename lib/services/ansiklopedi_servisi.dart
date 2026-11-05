@@ -23,11 +23,13 @@ class Kategori {
 
 const kategoriler = [
   Kategori('temel', 'Temel Bilgiler', 'İmanın ve İslam\'ın şartları', Icons.verified_rounded, Color(0xFF2E7D32)),
+  Kategori('ibadetler', 'İbadetler', 'Namaz, oruç, zekât, hac ve kurban', Icons.mosque_rounded, Color(0xFF1565C0)),
   Kategori('peygamberimiz', 'Peygamberimiz', 'Hayatı, ahlakı ve ailesi', Icons.brightness_7_rounded, Color(0xFFEF6C00)),
   Kategori('peygamberler', 'Peygamberler', 'Kur\'an\'da adı geçen peygamberler', Icons.auto_stories_rounded, Color(0xFF6D4C41)),
   Kategori('melekler', 'Melekler', 'Meleklere iman ve görevleri', Icons.flare_rounded, Color(0xFF0288D1)),
   Kategori('halifeler', 'Dört Halife', 'Hulefâ-yi Râşidîn', Icons.account_balance_rounded, Color(0xFF5E35B1)),
   Kategori('sahabe', 'Sahabe', 'Peygamberimizin dostları', Icons.groups_rounded, Color(0xFF00897B)),
+  Kategori('alimler', 'Âlimler', 'Mezhep imamları, muhaddisler ve kelamcılar', Icons.menu_book_rounded, Color(0xFF455A64)),
   Kategori('kavramlar', 'Kavramlar', 'Temel dinî kavramlar', Icons.lightbulb_rounded, Color(0xFFF9A825)),
   Kategori('tarih', 'İslam Tarihi', 'Dönemler ve önemli olaylar', Icons.history_edu_rounded, Color(0xFFAD1457)),
 ];

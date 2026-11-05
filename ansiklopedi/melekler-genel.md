@@ -6,7 +6,7 @@ ozet: Meleklerin yaratılışı, özellikleri ve görevlerine göre başlıca me
 sira: 1
 baglantilar: [melekler-dort-buyuk, imanin-sartlari]
 kaynak: "Kur'an-ı Kerim (Tahrîm 66/6, İnfitâr 82/10-12, Kâf 50/17-18, Hâkka 69/17, Zuhruf 43/77); Müslim; Diyanet İşleri Başkanlığı, İlmihal I"
-durum: taslak
+durum: onaylandi
 ---
 Meleklere iman, [[imanin-sartlari|imanın şartlarından]] biridir. Melekler, Allah'ın nurdan yarattığı (Müslim), gözle görülmeyen, yemeyen, içmeyen, erkeklik ve dişilik gibi özellikleri olmayan varlıklardır. Allah'ın emirlerine asla karşı gelmez, kendilerine verilen görevi eksiksiz yaparlar:
 

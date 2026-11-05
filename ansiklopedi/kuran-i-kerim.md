@@ -11,7 +11,7 @@ kunye:
   İlk inen: Alak suresinin ilk 5 ayeti
 baglantilar: [imanin-sartlari, hadis-ve-sunnet, hz-ebubekir, hz-osman, siyer-mekke]
 kaynak: "Kur'an-ı Kerim (Alak 96/1-5, Kadr 97/1, Hicr 15/9, Bakara 2/185); Diyanet İşleri Başkanlığı yayınları"
-durum: taslak
+durum: onaylandi
 ---
 Kur'an-ı Kerim, Allah'ın kelamıdır; Cebrâil aracılığıyla Hz. Muhammed'e Arapça olarak indirilmiştir. İnişi 610 yılında Ramazan ayında, **Kadir Gecesi**'nde başlamış (Bakara 2/185, Kadr 97/1) ve yaklaşık 23 yıl boyunca, olaylara ve ihtiyaçlara göre parça parça sürmüştür.
 

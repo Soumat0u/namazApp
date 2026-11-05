@@ -6,7 +6,7 @@ ozet: Allah'a derin saygıyla, O'nun razı olmayacağı şeylerden sakınmak; Ku
 sira: 3
 baglantilar: [temel-kavramlar, ihlas, veda-hutbesi]
 kaynak: "Kur'an-ı Kerim (Hucurât 49/13, Bakara 2/2-5, Bakara 2/183, Talâk 65/2-3)"
-durum: taslak
+durum: onaylandi
 ---
 **Takva**, sözlükte "korunmak, sakınmak" demektir. Dinî anlamda, Allah'ın emirlerine uyup yasaklarından kaçınarak O'nun hoşnutsuzluğundan korunmaktır. Takva sahibi kimseye **muttaki** denir.
 

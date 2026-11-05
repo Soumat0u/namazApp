@@ -10,7 +10,7 @@ kunye:
 ozel_gun: ["12-9"]
 baglantilar: [siyer-medine, kuran-i-kerim]
 kaynak: "Müslim (Hac); Buhârî; Ahmed b. Hanbel, Müsned; Kur'an-ı Kerim (Mâide 5/3)"
-durum: taslak
+durum: onaylandi
 ---
 632 yılında Peygamberimiz hayatının tek haccını yaptı. Bu hacca, bir daha Müslümanlarla bir araya gelemeyeceğini hissettirdiği için **Veda Haccı** denir. Arafat'ta, devesinin üzerinde yaptığı konuşma hadis kaynaklarında (başta Müslim) aktarılmıştır. Öne çıkan mesajları:
 

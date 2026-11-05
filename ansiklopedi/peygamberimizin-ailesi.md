@@ -6,7 +6,7 @@ ozet: Peygamberimizin anne-babası, eşleri (müminlerin anneleri), çocukları 
 sira: 4
 baglantilar: [hz-hatice, hz-fatima, hz-ali, siyer-mekke, hz-aise, hz-hasan-huseyin]
 kaynak: "Kur'an-ı Kerim (Ahzâb 33/6); Diyanet İşleri Başkanlığı, Hz. Muhammed'in (s.a.s.) Hayatı; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 ## Anne ve babası
 

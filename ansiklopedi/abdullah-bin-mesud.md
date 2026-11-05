@@ -9,7 +9,7 @@ kunye:
   Vefat: 653 civarı, Medine
 baglantilar: [kuran-i-kerim, mezhepler, hz-omer]
 kaynak: "Buhârî ve Müslim; Diyanet İşleri Başkanlığı yayınları"
-durum: taslak
+durum: onaylandi
 ---
 Mekke'de Ukbe b. Ebû Muayt'ın sürüsünü güden fakir bir çobanken Müslüman oldu. İlk Müslümanlardandır. Kureyşlilerin önünde, Kâbe'nin yanında Kur'an'ı yüksek sesle okuyan ilk sahabi olduğu ve bu yüzden dövüldüğü rivayet edilir.
 

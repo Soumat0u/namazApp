@@ -13,7 +13,7 @@ kunye:
   Eşi: Hz. Fâtıma
 baglantilar: [hulefa-i-rasidin, hz-fatima, peygamberimizin-ailesi, siyer-mekke]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Peygamberimizin amcası Ebû Tâlib'in oğludur. Küçük yaşta Peygamberimizin yanında büyüdü ve çocuklar arasında ilk Müslüman olan oldu. Peygamberimizin kızı [[hz-fatima|Hz. Fâtıma]] ile evlendi; Hz. Hasan ve Hz. Hüseyin onun çocuklarıdır.
 

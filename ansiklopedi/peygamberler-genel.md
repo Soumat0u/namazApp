@@ -6,7 +6,7 @@ ozet: Kur'an'da adı geçen 25 peygamber, ülü'l-azm peygamberler ve peygamberl
 sira: 1
 baglantilar: [imanin-sartlari, siyer-mekke, hz-adem, hz-ibrahim, hz-musa, hz-isa]
 kaynak: "Kur'an-ı Kerim (Nisâ 4/164, Ahzâb 33/40, Ahkâf 46/35); Diyanet İşleri Başkanlığı, İlmihal I"
-durum: taslak
+durum: onaylandi
 ---
 Allah, insanlara doğru yolu göstermek için tarih boyunca pek çok peygamber göndermiştir. Kur'an bunların bir kısmını haber verir, bir kısmını anlatmaz (Nisâ 4/164). Peygamberlerin sayısını yalnızca Allah bilir; ilki **Hz. Âdem**, sonuncusu **Hz. Muhammed**'dir (Ahzâb 33/40).
 

@@ -3,7 +3,7 @@ id: hz-isa
 kategori: peygamberler
 baslik: Hz. Îsâ
 ozet: Babasız olarak Hz. Meryem'den doğan, beşikte konuşan, mucizeleri ve İncil verilen ülü'l-azm peygamber.
-sira: 13
+sira: 20
 kunye:
   Annesi: Hz. Meryem
   Lakabı: Mesih
@@ -12,7 +12,7 @@ kunye:
   Kur'an'da: Âl-i İmrân 3/45-59, Meryem 19/16-36, Mâide 5/110-118
 baglantilar: [hz-zekeriyya-yahya, peygamberler-genel, imanin-sartlari]
 kaynak: "Kur'an-ı Kerim (Âl-i İmrân 3/45-59, Meryem 19/16-34, Nisâ 4/157-158, Saf 61/6)"
-durum: taslak
+durum: onaylandi
 ---
 ## Doğumu
 

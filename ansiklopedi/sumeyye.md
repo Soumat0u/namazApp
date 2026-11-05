@@ -11,7 +11,7 @@ kunye:
   Vefat: 615 civarı, Mekke (şehit)
 baglantilar: [bilal-i-habesi, siyer-mekke]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Mekke'de eşi Yâsir ve oğlu Ammâr ile birlikte ilk Müslümanlar arasında yer aldı. Kimsesiz ve korunmasız oldukları için müşriklerin en ağır işkencelerine maruz kaldılar. Peygamberimiz, işkence gören bu aileye uğradığında onlara **"Sabredin ey Yâsir ailesi! Sizin varacağınız yer cennettir"** diyerek teselli ederdi.
 

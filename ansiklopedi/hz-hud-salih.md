@@ -3,14 +3,14 @@ id: hz-hud-salih
 kategori: peygamberler
 baslik: Hz. Hûd ve Hz. Sâlih
 ozet: Güçlü ve kibirli Âd ile Semûd kavimlerine gönderilen iki peygamber ve bu kavimlerin helaki.
-sira: 4
+sira: 5
 kunye:
   Hz. Hûd: Âd kavmine
   Hz. Sâlih: Semûd kavmine
   Kur'an'da: Hûd 11/50-68, Şuarâ 26/123-159, Hâkka 69/4-8
 baglantilar: [peygamberler-genel, hz-nuh]
 kaynak: "Kur'an-ı Kerim (Hûd 11/50-68, Şuarâ 26/123-159, Hâkka 69/6-7, Fecr 89/6-9)"
-durum: taslak
+durum: onaylandi
 ---
 ## Hz. Hûd ve Âd kavmi
 

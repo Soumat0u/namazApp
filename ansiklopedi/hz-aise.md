@@ -11,7 +11,7 @@ kunye:
   Kabri: Cennetü'l-Bakî, Medine
 baglantilar: [hz-ebubekir, peygamberimizin-ailesi, hadis-ve-sunnet]
 kaynak: "Kur'an-ı Kerim (Nûr 24/11-20, Ahzâb 33/6); Buhârî ve Müslim; Diyanet İşleri Başkanlığı yayınları"
-durum: taslak
+durum: onaylandi
 ---
 Hz. Ebû Bekir'in kızıdır; Müslüman bir ailede doğup büyüdü. Hicretten sonra Medine'de Peygamberimizle evlendi. Peygamberimizin son hastalığında onun odasında kalmasını istedi; Peygamberimiz Hz. Âişe'nin odasında vefat etti ve oraya defnedildi.
 

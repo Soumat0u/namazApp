@@ -6,7 +6,7 @@ ozet: Elden gelen bütün çabayı gösterdikten sonra sonucu Allah'a bırakmak 
 sira: 5
 baglantilar: [temel-kavramlar, sabir-ve-sukur]
 kaynak: "Kur'an-ı Kerim (Talâk 65/3, Âl-i İmrân 3/159); Tirmizî"
-durum: taslak
+durum: onaylandi
 ---
 **Tevekkül**, Allah'a güvenip dayanmak demektir. Ama tevekkül, çalışmayı bırakıp beklemek değildir; gereken bütün sebeplere başvurduktan, yapılması gerekeni yaptıktan sonra sonucu Allah'a bırakmaktır.
 

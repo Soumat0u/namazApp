@@ -13,7 +13,7 @@ kunye:
   Kabri: Cennetü'l-Bakî, Medine
 baglantilar: [hulefa-i-rasidin, hz-omer, hz-ali, peygamberimizin-ailesi]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Hz. Ebû Bekir'in daveti ile ilk Müslüman olanlardandır. Mekke'nin zengin tüccarlarındandı. Peygamberimizin kızları Rukiyye ile, onun vefatından sonra da Ümmü Gülsüm ile evlendiği için **"Zinnûreyn"** (iki nur sahibi) lakabıyla anılır.
 

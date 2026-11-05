@@ -13,6 +13,21 @@ import '../providers/theme_provider.dart';
 /// uygulama içinden seçilir
 enum ZikirGeriBildirim { titresim, ses, ikisi, kapali }
 
+/// Zikir çekerken çalan tık sesi seçenekleri (assets/sounds/...)
+enum ZikirSesi {
+  klasik('Klasik', 'sounds/tik.wav', Icons.touch_app_rounded),
+  tesbih('Tesbih Tanesi', 'sounds/zikir/tesbih.wav', Icons.circle_outlined),
+  ahsap('Ahşap', 'sounds/zikir/ahsap.wav', Icons.forest_rounded),
+  damla('Damla', 'sounds/zikir/damla.wav', Icons.water_drop_outlined),
+  yumusak('Yumuşak', 'sounds/zikir/yumusak.wav', Icons.blur_on_rounded),
+  zil('Zil', 'sounds/zikir/zil.wav', Icons.notifications_none_rounded);
+
+  final String ad;
+  final String dosya;
+  final IconData ikon;
+  const ZikirSesi(this.ad, this.dosya, this.ikon);
+}
+
 class ZikirmatikScreen extends StatefulWidget {
   const ZikirmatikScreen({super.key});
 
@@ -22,11 +37,13 @@ class ZikirmatikScreen extends StatefulWidget {
 
 class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProviderStateMixin {
   static const _modAnahtari = 'zikirGeriBildirim';
+  static const _sesAnahtari = 'zikirSesi';
 
   final AudioPlayer _tikPlayer = AudioPlayer();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _canVibrate = false;
   ZikirGeriBildirim _mod = ZikirGeriBildirim.titresim;
+  ZikirSesi _ses = ZikirSesi.klasik;
 
   bool _basili = false;
   // Her dokunuşta: dışa yayılan halka ve sayının hafifçe büyüyüp yerine oturması
@@ -57,12 +74,15 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
       await _tikPlayer.setPlayerMode(PlayerMode.lowLatency);
       await _tikPlayer.setAudioContext(karisik);
       await _tikPlayer.setReleaseMode(ReleaseMode.stop);
-      await _tikPlayer.setSource(AssetSource('sounds/tik.wav'));
       await _audioPlayer.setAudioContext(karisik);
     } catch (_) {}
     final titresim = await Vibration.hasVibrator();
     final prefs = await SharedPreferences.getInstance();
     final kayitli = prefs.getInt(_modAnahtari);
+    _ses = ZikirSesi.values.asNameMap()[prefs.getString(_sesAnahtari)] ?? ZikirSesi.klasik;
+    try {
+      await _tikPlayer.setSource(AssetSource(_ses.dosya));
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _canVibrate = titresim;
@@ -70,6 +90,66 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
         _mod = ZikirGeriBildirim.values[kayitli];
       }
     });
+  }
+
+  Future<void> _sesSec(ZikirSesi ses) async {
+    setState(() => _ses = ses);
+    try {
+      await _tikPlayer.setSource(AssetSource(ses.dosya));
+      await _tikPlayer.resume(); // Seçilen sesi hemen dinlet
+    } catch (_) {}
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_sesAnahtari, ses.name);
+  }
+
+  void _sesSeciciGoster(AppThemeData tema) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: tema.arkaPlanRengi,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, yenile) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(16), Responsive.w(16), Responsive.h(16)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: tema.pasifRenk.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                SizedBox(height: Responsive.h(14)),
+                Text("Zikir Sesi",
+                    style: TextStyle(
+                        fontSize: Responsive.sp(17), fontWeight: FontWeight.bold, color: tema.yaziRengi)),
+                SizedBox(height: Responsive.h(4)),
+                Text("Dinlemek için dokun",
+                    style: TextStyle(fontSize: Responsive.sp(12), color: tema.pasifRenk)),
+                SizedBox(height: Responsive.h(10)),
+                for (final ses in ZikirSesi.values)
+                  ListTile(
+                    leading: Icon(ses.ikon, color: _ses == ses ? tema.anaRenk : tema.pasifRenk),
+                    title: Text(ses.ad,
+                        style: TextStyle(
+                            color: tema.yaziRengi,
+                            fontWeight: _ses == ses ? FontWeight.w800 : FontWeight.w500)),
+                    trailing: _ses == ses ? Icon(Icons.check_circle_rounded, color: tema.anaRenk) : null,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    onTap: () {
+                      _sesSec(ses);
+                      yenile(() {});
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _modSec(ZikirGeriBildirim mod) async {
@@ -492,53 +572,92 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
     );
   }
 
-  /// Uygulama içi geri bildirim seçimi: telefonun sessiz/titreşim modundan bağımsız
+  /// Uygulama içi geri bildirim: altta ortadaki tek düğme. Her dokunuşta sıradaki moda geçer
+  /// (Titreşim → Ses → İkisi → Kapalı). Telefonun sessiz/titreşim modundan bağımsızdır.
+  void _sonrakiMod() {
+    final modlar = ZikirGeriBildirim.values
+        .where((m) => _canVibrate || (m != ZikirGeriBildirim.titresim && m != ZikirGeriBildirim.ikisi))
+        .toList();
+    final i = modlar.indexOf(_mod);
+    _modSec(modlar[(i + 1) % modlar.length]);
+  }
+
   Widget _modSecici(AppThemeData tema) {
-    Widget secenek(ZikirGeriBildirim mod, IconData ikon, String ad) {
-      final secili = _mod == mod;
-      return Expanded(
-        child: GestureDetector(
-          onTap: () => _modSec(mod),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: EdgeInsets.symmetric(vertical: Responsive.h(9)),
-            decoration: BoxDecoration(
-              color: secili ? tema.anaRenk : Colors.transparent,
-              borderRadius: BorderRadius.circular(Responsive.w(14)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(ikon, size: Responsive.w(20), color: secili ? Colors.white : tema.pasifRenk),
-                SizedBox(height: Responsive.h(2)),
-                Text(ad,
-                    style: TextStyle(
-                        fontSize: Responsive.sp(11),
-                        fontWeight: FontWeight.w700,
-                        color: secili ? Colors.white : tema.pasifRenk)),
-              ],
+    final (IconData ikon, String ad) = switch (_mod) {
+      ZikirGeriBildirim.titresim => (Icons.vibration_rounded, "Titreşim"),
+      ZikirGeriBildirim.ses => (Icons.volume_up_rounded, "Ses"),
+      ZikirGeriBildirim.ikisi => (Icons.graphic_eq_rounded, "Ses + Titreşim"),
+      ZikirGeriBildirim.kapali => (Icons.volume_off_rounded, "Sessiz"),
+    };
+    final kapali = _mod == ZikirGeriBildirim.kapali;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          button: true,
+          label: "Geri bildirim modu: $ad. Değiştirmek için dokun, ses seçmek için basılı tut",
+          child: GestureDetector(
+            onTap: _sonrakiMod,
+            onLongPress: () => _sesSeciciGoster(tema),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: Responsive.w(52),
+              height: Responsive.w(52),
+              decoration: BoxDecoration(
+                color: kapali ? tema.kartRengi : tema.anaRenk,
+                shape: BoxShape.circle,
+                border: Border.all(color: tema.anaRenk.withOpacity(kapali ? 0.35 : 0)),
+                boxShadow: kapali
+                    ? null
+                    : [BoxShadow(color: tema.anaRenk.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))],
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                child: Icon(ikon,
+                    key: ValueKey(_mod), size: Responsive.w(24), color: kapali ? tema.pasifRenk : Colors.white),
+              ),
             ),
           ),
         ),
-      );
-    }
-
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: Responsive.w(24)),
-      padding: EdgeInsets.all(Responsive.w(4)),
-      decoration: BoxDecoration(
-        color: tema.kartRengi,
-        borderRadius: BorderRadius.circular(Responsive.w(18)),
-        border: Border.all(color: tema.anaRenk.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          secenek(ZikirGeriBildirim.titresim, Icons.vibration_rounded, "Titreşim"),
-          secenek(ZikirGeriBildirim.ses, Icons.volume_up_rounded, "Ses"),
-          secenek(ZikirGeriBildirim.ikisi, Icons.graphic_eq_rounded, "İkisi"),
-          secenek(ZikirGeriBildirim.kapali, Icons.do_not_disturb_on_outlined, "Kapalı"),
-        ],
-      ),
+        SizedBox(height: Responsive.h(6)),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: Text(ad,
+              key: ValueKey(ad),
+              style: TextStyle(fontSize: Responsive.sp(11), fontWeight: FontWeight.w700, color: tema.pasifRenk)),
+        ),
+        // Ses açıkken hangi sesin çaldığı; dokununca ses seçici açılır
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          child: !_sesAcik
+              ? const SizedBox(width: 0)
+              : GestureDetector(
+                  onTap: () => _sesSeciciGoster(tema),
+                  child: Padding(
+                    padding: EdgeInsets.only(top: Responsive.h(4)),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(4)),
+                      decoration: BoxDecoration(
+                        color: tema.anaRenk.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(Responsive.w(12)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.music_note_rounded, size: Responsive.w(14), color: tema.anaRenk),
+                          SizedBox(width: Responsive.w(4)),
+                          Text(_ses.ad,
+                              style: TextStyle(
+                                  fontSize: Responsive.sp(11), fontWeight: FontWeight.w700, color: tema.anaRenk)),
+                          Icon(Icons.expand_more_rounded, size: Responsive.w(16), color: tema.anaRenk),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 

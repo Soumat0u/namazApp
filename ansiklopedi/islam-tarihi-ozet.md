@@ -6,7 +6,7 @@ ozet: Asr-ı saadetten Osmanlı'ya, İslam tarihinin başlıca dönemleri ve dev
 sira: 1
 baglantilar: [siyer-mekke, siyer-medine, hulefa-i-rasidin, onemli-savaslar, emeviler, abbasiler, endulus, selcuklular, osmanli-ve-istanbulun-fethi]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 ## Asr-ı Saadet (610-632)
 

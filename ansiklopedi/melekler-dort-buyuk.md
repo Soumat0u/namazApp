@@ -6,7 +6,7 @@ ozet: Cebrâil, Mîkâil, İsrâfil ve Azrâil'in görevleri.
 sira: 2
 baglantilar: [melekler-genel, siyer-mekke]
 kaynak: "Kur'an-ı Kerim (Bakara 2/97-98, Şuarâ 26/193, Zümer 39/68, Secde 32/11); Diyanet İşleri Başkanlığı, İlmihal I"
-durum: taslak
+durum: onaylandi
 ---
 ## Cebrâil
 

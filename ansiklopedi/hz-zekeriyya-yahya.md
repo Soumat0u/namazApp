@@ -3,14 +3,14 @@ id: hz-zekeriyya-yahya
 kategori: peygamberler
 baslik: Hz. Zekeriyyâ ve Hz. Yahyâ
 ozet: Hz. Meryem'i himayesine alan Zekeriyyâ ile ileri yaşında duası kabul edilerek doğan oğlu Yahyâ.
-sira: 12
+sira: 19
 kunye:
   Hz. Zekeriyyâ: Hz. Meryem'in koruyucusu
   Hz. Yahyâ: Hz. Zekeriyyâ'nın oğlu
   Kur'an'da: Âl-i İmrân 3/37-41, Meryem 19/1-15
 baglantilar: [hz-isa, peygamberler-genel]
 kaynak: "Kur'an-ı Kerim (Âl-i İmrân 3/37-41, Meryem 19/2-15, Enbiyâ 21/89-90)"
-durum: taslak
+durum: onaylandi
 ---
 ## Hz. Zekeriyyâ
 

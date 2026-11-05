@@ -13,7 +13,7 @@ kunye:
 ozel_gun: ["3-12", "7-27", "9-27"]
 baglantilar: [siyer-medine, hz-hatice, peygamberimizin-ailesi, melekler-dort-buyuk, isra-mirac]
 kaynak: "Kur'an-ı Kerim (Alak 96/1-5, İsrâ 17/1); Diyanet İşleri Başkanlığı, Hz. Muhammed'in (s.a.s.) Hayatı; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 ## Doğumu ve çocukluğu
 

@@ -9,7 +9,7 @@ kunye:
   Vefat: 656 civarı, Medâin
 baglantilar: [onemli-savaslar, hz-omer]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 İran'da Mecûsî bir ailede doğdu. Gençliğinde hakikat arayışına çıktı; Hristiyanlığı tanıdı, farklı din adamlarının yanında yıllarca kaldı. Son hocası ona, Arap topraklarında hurmalıkları olan bir şehre hicret edecek bir peygamberin geleceğini söyledi.
 

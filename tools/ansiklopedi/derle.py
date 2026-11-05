@@ -17,7 +17,7 @@ import yaml
 
 KOK = Path(__file__).resolve().parents[2]
 KAYNAK = KOK / "ansiklopedi"
-KATEGORILER = ["temel", "peygamberimiz", "peygamberler", "melekler", "halifeler", "sahabe", "kavramlar", "tarih"]
+KATEGORILER = ["temel", "ibadetler", "peygamberimiz", "peygamberler", "melekler", "halifeler", "sahabe", "alimler", "kavramlar", "tarih"]
 ZORUNLU = ["id", "kategori", "baslik", "ozet", "durum"]
 
 

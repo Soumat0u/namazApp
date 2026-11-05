@@ -6,7 +6,7 @@ ozet: İnanç (itikadi) ve ibadet-hukuk (fıkhi) alanındaki Ehl-i sünnet mezhe
 sira: 6
 baglantilar: [hadis-ve-sunnet, abbasiler, abdullah-bin-mesud]
 kaynak: "Diyanet İşleri Başkanlığı yayınları"
-durum: taslak
+durum: onaylandi
 ---
 Mezhep, Kur'an ve sünneti anlama ve yorumlamada âlimlerin ortaya koyduğu sistemli yoldur. Mezhepler ayrı dinler değildir; aynı temel kaynaklara dayanan, ayrıntılardaki yorum farklılıklarıdır. Bu farklılıklar bir zenginlik ve kolaylık olarak görülmüştür.
 

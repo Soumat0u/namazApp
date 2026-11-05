@@ -5,7 +5,7 @@ Her madde bir Markdown dosyasıdır. Başındaki `---` arasındaki alanlar:
 | Alan | Anlamı |
 |---|---|
 | `id` | Benzersiz kimlik (dosya adıyla aynı) |
-| `kategori` | temel, peygamberimiz, peygamberler, melekler, halifeler, sahabe, kavramlar, tarih |
+| `kategori` | temel, ibadetler, peygamberimiz, peygamberler, melekler, halifeler, sahabe, alimler, kavramlar, tarih |
 | `baslik`, `ozet` | Listede ve kartlarda görünen başlık ve 1-2 cümlelik özet |
 | `sira` | Kategori içindeki sıra |
 | `kunye` | Künye kutusu (anahtar: değer) |

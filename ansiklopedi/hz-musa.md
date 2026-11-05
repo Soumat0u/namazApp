@@ -3,7 +3,7 @@ id: hz-musa
 kategori: peygamberler
 baslik: Hz. Mûsâ
 ozet: Firavun'un zulmüne karşı İsrâiloğullarını kurtaran, Allah ile konuşan ve Tevrat verilen ülü'l-azm peygamber. Kur'an'da adı en çok geçen peygamber.
-sira: 9
+sira: 13
 kunye:
   Lakabı: Kelîmullah (Allah ile konuşan)
   Kardeşi: Hz. Hârûn
@@ -12,7 +12,7 @@ kunye:
   Kur'an'da: Tâhâ 20, Kasas 28, A'râf 7/103-162, Şuarâ 26/10-68
 baglantilar: [peygamberler-genel, imanin-sartlari]
 kaynak: "Kur'an-ı Kerim (Kasas 28/7-29, Tâhâ 20/9-79, Nisâ 4/164, Şuarâ 26/61-66)"
-durum: taslak
+durum: onaylandi
 ---
 Hz. Mûsâ, İsrâiloğullarının Mısır'da Firavun'un ağır baskısı altında yaşadığı bir dönemde doğdu. Firavun, İsrâiloğullarının erkek çocuklarını öldürtüyordu. Allah, Mûsâ'nın annesine onu bir sandığa koyup nehre bırakmasını ilham etti; sandığı Firavun'un ailesi buldu ve Mûsâ sarayda büyüdü (Kasas 28/7-13).
 

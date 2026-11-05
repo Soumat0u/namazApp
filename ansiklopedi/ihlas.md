@@ -6,7 +6,7 @@ ozet: İbadetleri ve iyilikleri yalnızca Allah rızası için, gösterişten uz
 sira: 4
 baglantilar: [temel-kavramlar, tevhid, takva]
 kaynak: "Kur'an-ı Kerim (Beyyine 98/5, Kehf 18/110); Buhârî (Bed'ü'l-vahy, 1)"
-durum: taslak
+durum: onaylandi
 ---
 **İhlas**, sözlükte "saf ve katışıksız olmak" demektir. Dinî anlamda, yapılan her işi yalnızca Allah'ın rızasını kazanmak için yapmak; insanların övgüsünü, dünyalık bir çıkarı gözetmemektir. İhlasın zıddı, gösteriş anlamına gelen **riya**dır.
 

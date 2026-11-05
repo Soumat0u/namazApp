@@ -6,7 +6,7 @@ ozet: Allah'ın zatında, sıfatlarında ve fiillerinde bir ve tek olduğuna ina
 sira: 2
 baglantilar: [temel-kavramlar, imanin-sartlari, ihlas]
 kaynak: "Kur'an-ı Kerim (İhlâs 112/1-4, Bakara 2/255, Şûrâ 42/11, Nisâ 4/48)"
-durum: taslak
+durum: onaylandi
 ---
 **Tevhid**, sözlükte "birlemek" demektir. Dinî anlamda, Allah'ın bir ve tek olduğuna, hiçbir ortağı ve benzeri bulunmadığına inanmaktır. Bütün peygamberler insanları önce tevhide çağırmıştır.
 

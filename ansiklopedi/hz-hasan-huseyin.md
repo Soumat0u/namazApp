@@ -11,7 +11,7 @@ kunye:
 ozel_gun: ["1-10"]
 baglantilar: [hz-fatima, hz-ali, peygamberimizin-ailesi, emeviler]
 kaynak: "Tirmizî; Buhârî; Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Hz. Ali ile Hz. Fâtıma'nın oğullarıdır; Peygamberimizin soyu onlarla devam etmiştir. Peygamberimiz onları çok sever, namaz kılarken sırtına çıktıklarında secdeyi uzatır, onları kucağına alıp öperdi. Onlar hakkında **"Hasan ve Hüseyin cennet gençlerinin efendileridir"** buyurduğu rivayet edilir (Tirmizî).
 

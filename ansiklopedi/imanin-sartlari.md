@@ -6,7 +6,7 @@ ozet: Bir Müslümanın inanması gereken altı temel esas. Âmentü duasında b
 sira: 1
 baglantilar: [islamin-sartlari, otuz-iki-farz, melekler-genel]
 kaynak: "Kur'an-ı Kerim (Bakara 2/285, Nisâ 4/136); Diyanet İşleri Başkanlığı, İlmihal I"
-durum: taslak
+durum: onaylandi
 ---
 İman, Hz. Muhammed'in (s.a.s.) Allah'tan getirdiği kesin olarak bilinen esasları kalp ile tasdik etmektir. Kur'an'da bu esaslar birlikte anılır:
 

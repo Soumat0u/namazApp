@@ -9,7 +9,7 @@ kunye:
   Merkez: Medine (Hz. Ali döneminde Kûfe)
 baglantilar: [hz-ebubekir, hz-omer, hz-osman, hz-ali, islam-tarihi-ozet]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Peygamberimizin vefatından sonra Müslümanları yöneten ilk dört halifeye **Hulefâ-yi Râşidîn** (doğru yolda olan halifeler) denir. Bu dönem yaklaşık otuz yıl sürmüştür. Dördü de [[asere-i-mubessere|Aşere-i Mübeşşere]]'dendir.
 

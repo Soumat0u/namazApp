@@ -6,7 +6,7 @@ ozet: Kur'an'ın "en güzel örnek" olarak tanıttığı Peygamberimizin merhame
 sira: 3
 baglantilar: [siyer-mekke, peygamberimizin-ailesi]
 kaynak: "Kur'an-ı Kerim (Kalem 68/4, Ahzâb 33/21, Enbiyâ 21/107, Tevbe 9/128, Âl-i İmrân 3/159); Müslim; Diyanet İşleri Başkanlığı yayınları"
-durum: taslak
+durum: onaylandi
 ---
 Kur'an, Peygamberimizi şöyle tanıtır:
 

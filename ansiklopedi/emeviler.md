@@ -3,14 +3,14 @@ id: emeviler
 kategori: tarih
 baslik: Emevîler
 ozet: Merkezi Şam olan ilk İslam hanedanı; fetihlerin Endülüs'ten Orta Asya'ya ulaştığı dönem.
-sira: 3
+sira: 4
 kunye:
   Dönem: 661-750
   Merkez: Şam
   Kurucusu: Muâviye b. Ebû Süfyân
 baglantilar: [islam-tarihi-ozet, abbasiler, endulus, hz-hasan-huseyin, ebu-eyyub-el-ensari]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Dört Halife döneminin ardından Muâviye b. Ebû Süfyân'ın halife olmasıyla başlayan hanedandır. Bu dönemde halifelik, seçimle değil babadan oğula geçmeye başladı.
 

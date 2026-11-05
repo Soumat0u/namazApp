@@ -3,14 +3,14 @@ id: endulus
 kategori: tarih
 baslik: Endülüs
 ozet: Müslümanların yaklaşık sekiz asır hüküm sürdüğü, ilim ve sanatta parlak bir medeniyet kurduğu İspanya ve Portekiz toprakları.
-sira: 5
+sira: 6
 kunye:
   Dönem: 711-1492
   Merkezler: Kurtuba, İşbiliye, Gırnata
   Sonu: 1492, Gırnata'nın düşüşü
 baglantilar: [emeviler, islam-tarihi-ozet]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Müslümanlar 711'de **Târık b. Ziyâd** komutasında İber Yarımadası'na geçti; Cebelitârık (Târık'ın dağı) adını ondan alır. Kısa sürede yarımadanın büyük bölümü fethedildi.
 

@@ -9,7 +9,7 @@ kunye:
   Vefat: 625, Uhud (şehit)
 baglantilar: [siyer-mekke, onemli-savaslar, hz-hamza]
 kaynak: "Buhârî; Diyanet İşleri Başkanlığı yayınları; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Mekke'nin zengin ve şık giyimiyle tanınan gençlerindendi. Gizlice Müslüman oldu; ailesi bunu öğrenince onu evde hapsetti. Fırsat bulunca Habeşistan'a hicret etti. Bolluk içinde yaşarken her şeyini imanı uğruna bıraktı.
 

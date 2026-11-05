@@ -6,7 +6,7 @@ ozet: Peygamberimizin söz, fiil ve onaylarının dindeki yeri; hadislerin topla
 sira: 5
 baglantilar: [kuran-i-kerim, ebu-hureyre, hz-aise, mezhepler]
 kaynak: "Kur'an-ı Kerim (Haşr 59/7, Ahzâb 33/21, Nisâ 4/80); Diyanet İşleri Başkanlığı yayınları"
-durum: taslak
+durum: onaylandi
 ---
 ## Sünnet ve hadis
 

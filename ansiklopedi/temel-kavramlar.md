@@ -6,7 +6,7 @@ ozet: Tevhid, takva, ihlas, tevekkül, sabır, şükür gibi sıkça duyulan kav
 sira: 1
 baglantilar: [imanin-sartlari, islamin-sartlari, tevhid, takva, ihlas, tevekkul, sabir-ve-sukur, tovbe]
 kaynak: "Diyanet İşleri Başkanlığı, Dinî Kavramlar Sözlüğü; Kur'an-ı Kerim (Talâk 65/3, Bakara 2/153, İbrâhîm 14/7)"
-durum: taslak
+durum: onaylandi
 ---
 ## İnanç
 

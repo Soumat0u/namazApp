@@ -6,7 +6,7 @@ ozet: İslam'ın üzerine kurulduğu beş temel ibadet ve esas.
 sira: 2
 baglantilar: [imanin-sartlari, otuz-iki-farz]
 kaynak: "Buhârî ve Müslim'in rivayet ettiği hadis; Kur'an-ı Kerim (Bakara 2/183, Âl-i İmrân 3/97, Tevbe 9/103); Diyanet İşleri Başkanlığı, İlmihal I"
-durum: taslak
+durum: onaylandi
 ---
 Peygamber Efendimiz (s.a.s.), İslam'ın beş temel üzerine kurulduğunu bildirmiştir: Allah'tan başka ilah olmadığına ve Muhammed'in Allah'ın elçisi olduğuna şahitlik etmek, namaz kılmak, zekât vermek, hac yapmak ve Ramazan orucunu tutmak (Buhârî ve Müslim).
 

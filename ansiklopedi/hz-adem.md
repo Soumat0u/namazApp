@@ -9,7 +9,7 @@ kunye:
   Kur'an'da: Bakara 2/30-39, A'râf 7/11-25, Tâhâ 20/115-123
 baglantilar: [peygamberler-genel, tovbe, melekler-genel]
 kaynak: "Kur'an-ı Kerim (Bakara 2/30-37, A'râf 7/11-23, Mâide 5/27-31)"
-durum: taslak
+durum: onaylandi
 ---
 Allah, Hz. Âdem'i topraktan yarattı ve ona ruh verdi. Meleklere, yeryüzünde bir halife yaratacağını bildirdi (Bakara 2/30). Âdem'e bütün isimleri öğretti; melekler bilmedikleri bu isimleri Âdem'in bildiğini görünce Allah'ın hikmetini kabul ettiler (Bakara 2/31-33).
 

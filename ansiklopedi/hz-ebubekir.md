@@ -13,7 +13,7 @@ kunye:
   Kabri: Mescid-i Nebevî, Peygamberimizin yanında
 baglantilar: [hulefa-i-rasidin, hz-omer, siyer-medine, bilal-i-habesi]
 kaynak: "Kur'an-ı Kerim (Tevbe 9/40); Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Peygamberimizin gençlik yıllarından beri yakın dostuydu. Yetişkin erkekler arasında ilk Müslüman olan odur. Mîrac olayını duyduğunda tereddütsüz tasdik ettiği için **"Sıddîk"** (son derece doğru ve sadık) lakabıyla anılır.
 

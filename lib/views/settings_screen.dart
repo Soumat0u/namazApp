@@ -10,6 +10,7 @@ import '../providers/theme_provider.dart';
 import 'widgets/sayfa_arka_plani.dart';
 import 'widgets/sehir_secici.dart';
 import 'widgets/destek_ol.dart';
+import 'widgets/ayar_pencereleri.dart';
 
 class AyarlarSayfasi extends StatelessWidget {
   const AyarlarSayfasi({super.key});
@@ -224,13 +225,7 @@ class AyarlarSayfasi extends StatelessWidget {
                 size: Responsive.w(14),
                 color: r.pasifRenk,
               ),
-              onTap: () {
-                Bildirim.snackBar(
-                  const SnackBar(
-                    content: Text("Şu an sadece Diyanet metodu aktiftir."),
-                  ),
-                );
-              },
+              onTap: () => hesaplamaBilgisiGoster(context, r),
             ),
           ]),
           SizedBox(height: Responsive.h(16)),
@@ -299,7 +294,7 @@ class AyarlarSayfasi extends StatelessWidget {
               r,
               title: "Bize Ulaşın",
               icon: Icons.mail_outline,
-              onTap: () {},
+              onTap: bizeUlasin,
             ),
             const Divider(height: 1),
             _buildActionTile(

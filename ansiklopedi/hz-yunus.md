@@ -3,13 +3,13 @@ id: hz-yunus
 kategori: peygamberler
 baslik: Hz. Yûnus
 ozet: Kavmini terk ettikten sonra balığın karnında Allah'a yalvaran ve duası kabul edilen peygamber.
-sira: 11
+sira: 18
 kunye:
   Lakabı: Zünnûn (balık sahibi)
   Kur'an'da: Yûnus 10/98, Enbiyâ 21/87-88, Sâffât 37/139-148
 baglantilar: [peygamberler-genel, tovbe]
 kaynak: "Kur'an-ı Kerim (Yûnus 10/98, Enbiyâ 21/87-88, Sâffât 37/139-148)"
-durum: taslak
+durum: onaylandi
 ---
 Hz. Yûnus, kavmini uzun süre Allah'a çağırdı. Onların inkârda direndiğini görünce Allah'tan izin gelmeden öfkeyle aralarından ayrıldı ve dolu bir gemiye bindi (Sâffât 37/139-140). Yolda atılan kurada adı çıktı ve denize bırakıldı; onu büyük bir balık yuttu.
 

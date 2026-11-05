@@ -10,7 +10,7 @@ kunye:
   Vefat: 678 civarı, Medine
 baglantilar: [hadis-ve-sunnet, siyer-medine]
 kaynak: "Buhârî; Diyanet İşleri Başkanlığı yayınları"
-durum: taslak
+durum: onaylandi
 ---
 Yemen'deki Devs kabilesindendir. Hayber'in fethedildiği yıl Medine'ye gelerek Müslüman oldu. Kedileri çok sevdiği ve yanında küçük bir kedi taşıdığı için **"Ebû Hüreyre"** (kedicik babası) diye anıldığı rivayet edilir.
 

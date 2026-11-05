@@ -3,14 +3,14 @@ id: selcuklular
 kategori: tarih
 baslik: Selçuklular
 ozet: Halifeliği koruyan Büyük Selçuklular ve Malazgirt'ten sonra Anadolu'yu Türk-İslam yurdu yapan Anadolu Selçukluları.
-sira: 6
+sira: 7
 kunye:
   Büyük Selçuklular: 1040-1157
   Anadolu Selçukluları: 1077-1308
   Malazgirt Zaferi: 1071
 baglantilar: [abbasiler, osmanli-ve-istanbulun-fethi, islam-tarihi-ozet]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 ## Büyük Selçuklular
 

@@ -13,7 +13,7 @@ kunye:
   Kabri: Cennetü'l-Bakî, Medine
 baglantilar: [hz-ali, hz-hatice, peygamberimizin-ailesi]
 kaynak: "Buhârî; Diyanet İşleri Başkanlığı yayınları; siyer kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Peygamberimizin Hz. Hatice'den olan en küçük kızıdır. Mekke'de, babasının çektiği sıkıntılara küçük yaşından itibaren tanık oldu; bir keresinde Kâbe'de namaz kılan babasının sırtına müşriklerin koyduğu pisliği kendi elleriyle temizledi (Buhârî).
 

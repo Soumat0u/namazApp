@@ -3,14 +3,14 @@ id: hz-davud-suleyman
 kategori: peygamberler
 baslik: Hz. Dâvûd ve Hz. Süleymân
 ozet: Hem peygamber hem hükümdar olan baba ve oğul. Dâvûd'a Zebûr verildi; Süleymân rüzgâra, cinlere ve kuşlara hükmetti.
-sira: 10
+sira: 15
 kunye:
   Hz. Dâvûd: Zebûr verildi
   Hz. Süleymân: Hz. Dâvûd'un oğlu
   Kur'an'da: Sebe 34/10-14, Neml 27/15-44, Sâd 38/17-40
 baglantilar: [peygamberler-genel, hz-musa]
 kaynak: "Kur'an-ı Kerim (Bakara 2/251, Nisâ 4/163, Sebe 34/10-14, Neml 27/16-44)"
-durum: taslak
+durum: onaylandi
 ---
 ## Hz. Dâvûd
 

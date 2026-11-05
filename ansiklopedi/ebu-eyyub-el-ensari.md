@@ -11,7 +11,7 @@ kunye:
   Kabri: Eyüp, İstanbul
 baglantilar: [siyer-medine, islam-tarihi-ozet]
 kaynak: "Diyanet İşleri Başkanlığı yayınları; İslam tarihi kaynakları"
-durum: taslak
+durum: onaylandi
 ---
 Medineli Müslümanlardan (Ensar) olup Akabe biatine katıldı. Peygamberimiz Medine'ye geldiğinde herkes onu evinde ağırlamak istedi. Peygamberimiz devesini serbest bıraktı ve devenin çöktüğü yerin yakınındaki **Ebû Eyyûb'un evinde** misafir oldu. Mescid-i Nebevî ve odalar tamamlanana kadar aylarca orada kaldı.
 
