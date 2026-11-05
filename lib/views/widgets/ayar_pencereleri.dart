@@ -6,7 +6,7 @@ import '../../core/utils/bildirim.dart';
 import '../../core/utils/responsive.dart';
 
 /// "Bize Ulaşın" e-postasının gideceği adres
-const String iletisimEposta = '';
+const String iletisimEposta = 'takvayolum@hotmail.com';
 
 /// Kullanıcının e-posta uygulamasında, konusu ve sürüm bilgisi dolu bir taslak açar
 Future<void> bizeUlasin() async {
