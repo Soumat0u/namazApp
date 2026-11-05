@@ -145,7 +145,7 @@ class _DuaKitapligiScreenState extends State<DuaKitapligiScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              dua.kaynak ?? "Okuyan: telefonun Arapça sesi",
+                              dua.kaynak ?? (dua.ses != null ? "Ses: ElevenLabs (yapay zekâ)" : "Okuyan: telefonun Arapça sesi"),
                               style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
                             ),
                             ?_ezberEtiketi(r, dua),
@@ -337,7 +337,10 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
           Text(
             dua.kurandan
                 ? "Kaynak: ${dua.kaynak} • Okuyan: Mişârî Râşid el-Afâsî"
-                : "Bu dua telefonun Arapça yazıdan-sese motoruyla okunur; telaffuz bir hafızın okuyuşu kadar doğru olmayabilir.",
+                : dua.ses != null
+                    // ElevenLabs ücretsiz planı kaynak gösterilmesini şart koşar
+                    ? "Ses: yapay zekâ ile üretildi (ElevenLabs, elevenlabs.io); bir hafızın okuyuşu kadar kusursuz olmayabilir."
+                    : "Bu dua telefonun Arapça yazıdan-sese motoruyla okunur; telaffuz bir hafızın okuyuşu kadar doğru olmayabilir.",
             style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
           ),
         ],
