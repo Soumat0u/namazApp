@@ -144,10 +144,11 @@ class _DuaKitapligiScreenState extends State<DuaKitapligiScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              dua.kaynak ?? (dua.ses != null ? "Ses: ElevenLabs (yapay zekâ)" : "Okuyan: telefonun Arapça sesi"),
-                              style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
-                            ),
+                            if (dua.kaynak != null)
+                              Text(
+                                dua.kaynak!,
+                                style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
+                              ),
                             ?_ezberEtiketi(r, dua),
                           ],
                         ),
@@ -327,24 +328,88 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
       body: ListView(
         padding: EdgeInsets.all(Responsive.w(16)),
         children: [
-          bolum("Arapça", arapca(), sag: _OynatDugmesi(oynatici: _oynatici, onPressed: _oynatici.calDuraklat)),
+          bolum(
+            "Arapça",
+            arapca(),
+            sag: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: "Ses hakkında",
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.help_outline_rounded, color: r.pasifRenk, size: Responsive.w(20)),
+                  onPressed: () => _sesBilgisiGoster(context, dua, r),
+                ),
+                _OynatDugmesi(oynatici: _oynatici, onPressed: _oynatici.calDuraklat),
+              ],
+            ),
+          ),
           bolum(
               "Okunuşu",
               Text(dua.okunus,
                   style: TextStyle(
                       fontSize: Responsive.sp(15), height: 1.6, fontStyle: FontStyle.italic, color: r.yaziRengi))),
           bolum("Anlamı", Text(dua.meal, style: TextStyle(fontSize: Responsive.sp(14), height: 1.6, color: r.yaziRengi))),
-          Text(
-            dua.kurandan
-                ? "Kaynak: ${dua.kaynak} • Okuyan: Mişârî Râşid el-Afâsî"
-                : dua.ses != null
-                    // ElevenLabs ücretsiz planı kaynak gösterilmesini şart koşar
-                    ? "Ses: yapay zekâ ile üretildi (ElevenLabs, elevenlabs.io); bir hafızın okuyuşu kadar kusursuz olmayabilir."
-                    : "Bu dua telefonun Arapça yazıdan-sese motoruyla okunur; telaffuz bir hafızın okuyuşu kadar doğru olmayabilir.",
-            style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
-          ),
         ],
       ),
     );
   }
+}
+
+/// "?" düğmesiyle açılan kutu: duanın sesi nereden geliyor.
+/// ElevenLabs ücretsiz planı kaynak gösterilmesini şart koşar; not burada duruyor.
+void _sesBilgisiGoster(BuildContext context, Dua dua, AppThemeColors r) {
+  final (String baslik, String metin) = dua.kurandan
+      ? (
+          "Okuyan: Mişârî Râşid el-Afâsî",
+          "Bu dua Kur'an-ı Kerim'den (${dua.kaynak}). Tilaveti ve kelime kelime takip zamanlamaları Quran.com'dan alınmıştır."
+        )
+      : dua.ses != null
+          ? (
+              "Yapay zekâ ile üretilmiş ses",
+              "Bu duanın sesi ElevenLabs (elevenlabs.io) ile yapay zekâ kullanılarak üretilmiştir. "
+                  "Telaffuz bir hafızın okuyuşu kadar kusursuz olmayabilir. Duayı öğrenirken okunuş ve Arapça metne de bakmanı tavsiye ederiz."
+            )
+          : (
+              "Telefonun Arapça sesi",
+              "Bu dua telefonunun Arapça yazıdan-sese motoruyla okunur. Telaffuz bir hafızın okuyuşu kadar doğru olmayabilir."
+            );
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: r.kartRengi,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(Responsive.w(20), Responsive.h(20), Responsive.w(20), Responsive.h(8)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(dua.kurandan ? Icons.menu_book_rounded : Icons.graphic_eq_rounded,
+                    color: r.anaRenk, size: Responsive.w(22)),
+                SizedBox(width: Responsive.w(10)),
+                Expanded(
+                  child: Text(baslik,
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: Responsive.sp(15), color: r.yaziRengi)),
+                ),
+              ],
+            ),
+            SizedBox(height: Responsive.h(12)),
+            Text(metin,
+                style: TextStyle(fontSize: Responsive.sp(13), height: 1.5, color: r.yaziRengi.withOpacity(0.8))),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text("Tamam", style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
