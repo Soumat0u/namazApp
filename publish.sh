@@ -4,8 +4,12 @@
 # safak-lenovo:~/.local/share/notlar/apk/namaz/ altına koyar. Uygulama bir
 # sonraki açılışta "Yeni sürüm hazır" çubuğunu gösterir (lib/services/updater.dart).
 #
-#   ./publish.sh            # aynı sürüm adı, sonraki build numarası
-#   ./publish.sh 1.1.0      # yeni sürüm adıyla
+#   ./publish.sh            # küçük düzeltme: 1.5.0 → 1.5.1
+#   ./publish.sh minor      # yeni özellik:   1.5.1 → 1.6.0
+#   ./publish.sh major      # büyük değişiklik: 1.6.0 → 2.0.0
+#   ./publish.sh 1.7.0      # sürüm adını elle ver
+#
+# Build numarası (+N) her yayında kendiliğinden artar; Android güncellemeyi ona bakarak tanır.
 #
 # Sürümler ~/.android/debug.keystore ile imzalanır: Android bir güncellemeyi
 # yalnızca aynı anahtarla imzalanmışsa kabul eder, o dosyayı koruyun.
@@ -19,7 +23,14 @@ TOKEN_FILE=~/.config/notlar/token
 line=$(grep -E '^version: ' pubspec.yaml)
 name=${line#version: }; name=${name%+*}
 code=${line##*+}
-name=${1:-$name}
+IFS=. read -r maj min pat <<<"$name"
+case "${1:-patch}" in
+  patch) name="$maj.$min.$((pat + 1))" ;;
+  minor) name="$maj.$((min + 1)).0" ;;
+  major) name="$((maj + 1)).0.0" ;;
+  [0-9]*.[0-9]*.[0-9]*) name=$1 ;;
+  *) echo "kullanım: ./publish.sh [patch|minor|major|x.y.z]" >&2; exit 1 ;;
+esac
 code=$((code + 1))
 sed -i -E "s/^version: .*/version: $name+$code/" pubspec.yaml
 echo "sürüm $name ($code) derleniyor"
