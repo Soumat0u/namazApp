@@ -35,9 +35,9 @@ code=$((code + 1))
 sed -i -E "s/^version: .*/version: $name+$code/" pubspec.yaml
 echo "sürüm $name ($code) derleniyor"
 
-JAVA_HOME=${JAVA_HOME:-$HOME/.local/jdk} flutter build apk --release --target-platform android-arm64 \
+JAVA_HOME=${JAVA_HOME:-$HOME/.local/jdk} flutter build apk --release --flavor deneme --target-platform android-arm64 \
   --dart-define=UPDATE_TOKEN="$(cat "$TOKEN_FILE")"
-apk=build/app/outputs/flutter-apk/app-release.apk
+apk=build/app/outputs/flutter-apk/app-deneme-release.apk
 
 # Önce APK, sonra onu gösteren sürüm bilgisi; ikisi de tek hamlede değişir
 ssh "$HOST" "mkdir -p $DEST"

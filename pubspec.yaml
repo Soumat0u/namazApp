@@ -1,7 +1,7 @@
 name: namaz_app
 description: "Takva Yolum - Namaz ve Maneviyat Takip Uygulaması"
 publish_to: "none"
-version: 1.6.5+43
+version: 1.6.6+44
 
 environment:
   sdk: ^3.10.4

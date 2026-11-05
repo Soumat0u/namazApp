@@ -90,7 +90,7 @@ class _CamilerScreenState extends State<CamilerScreen> {
             'limit': '50',
             'accept-language': 'tr',
           }),
-          headers: {'User-Agent': 'TakvaYolum/1.0 (com.example.namaz_app)'},
+          headers: {'User-Agent': 'TakvaYolum/1.0 (com.takvayolum.app)'},
         ).timeout(const Duration(seconds: 15));
         if (cevap.statusCode != 200) {
           hata = 'Cami bilgisi alınamadı (${cevap.statusCode}).';
@@ -167,7 +167,7 @@ class _CamilerScreenState extends State<CamilerScreen> {
                         children: [
                           TileLayer(
                             urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.example.namaz_app',
+                            userAgentPackageName: 'com.takvayolum.app',
                           ),
                           MarkerLayer(markers: [
                             Marker(

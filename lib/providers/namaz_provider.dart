@@ -23,6 +23,7 @@ import '../core/utils/extensions.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:image_picker/image_picker.dart';
+import '../core/surum.dart';
 import 'package:home_widget/home_widget.dart';
 
 class NamazProvider extends ChangeNotifier {
@@ -1024,7 +1025,7 @@ class NamazProvider extends ChangeNotifier {
     kilinanKazaOrucu = prefs.getInt('kilinan_kaza_orucu') ?? 0;
     kazaOrucGunleri = (prefs.getStringList('kaza_oruc_gunleri') ?? []).toSet();
     teravihGunleri = (prefs.getStringList('teravih_gunleri') ?? []).toSet();
-    ramazanOnizleme = prefs.getBool('ramazan_onizleme') ?? false;
+    ramazanOnizleme = denemeSurumu && (prefs.getBool('ramazan_onizleme') ?? false); // Test aracı
     try {
       final h = json.decode(prefs.getString('hicri_takvim') ?? '{}') as Map<String, dynamic>;
       hicriGunler = {for (final e in h.entries) e.key: (ay: (e.value[0] as num).toInt(), gun: (e.value[1] as num).toInt())};

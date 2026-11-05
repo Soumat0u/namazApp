@@ -22,16 +22,30 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.namaz_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+
+    // İki sürüm: "deneme" geliştiricinin telefonundaki test sürümü (kablosuz güncelleme, test araçları),
+    // "yayin" Play Store'a giden kullanıcı sürümü. Paket adları farklı: telefonda yan yana durabilirler.
+    //   flutter build apk --flavor deneme      (./publish.sh)
+    //   flutter build appbundle --flavor yayin
+    flavorDimensions += "surum"
+    productFlavors {
+        create("deneme") {
+            dimension = "surum"
+            applicationId = "com.example.namaz_app"
+            manifestPlaceholders["uygulamaAdi"] = "Takva Yolum Test"
+        }
+        create("yayin") {
+            dimension = "surum"
+            applicationId = "com.takvayolum.app"
+            manifestPlaceholders["uygulamaAdi"] = "Takva Yolum"
+        }
+    }
 
     buildTypes {
         release {

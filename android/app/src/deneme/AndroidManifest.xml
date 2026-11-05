@@ -1,0 +1,16 @@
+<!-- Yalnızca test sürümü: kablosuz güncelleme (lib/services/updater.dart).
+     Play Store kendini mağaza dışından güncelleyen uygulamaları kabul etmez; bu izin yayın sürümünde yok. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <!-- İndirilen güncelleme, sistem yükleyicisine verilir -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
+        </provider>
+    </application>
+</manifest>

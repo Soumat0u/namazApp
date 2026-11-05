@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import '../core/surum.dart';
 import 'package:path_provider/path_provider.dart';
 
 enum UpdateStep { idle, downloading, needsPermission, installing, failed }
@@ -39,7 +40,8 @@ class Updater extends ChangeNotifier {
 
   /// Sunucuya en son derlemeyi sorar (`force` yoksa birkaç dakikada bir).
   Future<void> check({bool force = false}) async {
-    if (!Platform.isAndroid || _token.isEmpty) return;
+    // Kablosuz güncelleme yalnızca test sürümünde; Play sürümü mağazadan güncellenir
+    if (!Platform.isAndroid || _token.isEmpty || !denemeSurumu) return;
     if (!force && _checked != null && DateTime.now().difference(_checked!) < _checkEvery) return;
     _checked = DateTime.now();
     try {

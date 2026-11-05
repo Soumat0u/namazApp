@@ -10,6 +10,7 @@ import '../providers/theme_provider.dart';
 import 'widgets/sayfa_arka_plani.dart';
 import 'widgets/sehir_secici.dart';
 import 'widgets/destek_ol.dart';
+import '../core/surum.dart';
 import 'widgets/ayar_pencereleri.dart';
 
 class AyarlarSayfasi extends StatelessWidget {
@@ -178,34 +179,38 @@ class AyarlarSayfasi extends StatelessWidget {
             ),
           ]),
           SizedBox(height: Responsive.h(16)),
-          _buildSectionHeader(r, "Ramazan"),
-          _buildSettingsCard(r, [
-            // Yalnızca Ramazan'da (ya da Ramazan dışında açık kalmışsa, kapatılabilsin diye)
-            if (provider.ramazanda || provider.orucModu) ...[
-              _buildSwitchTile(
+          if (provider.ramazanda || provider.orucModu || denemeSurumu) ...[
+            _buildSectionHeader(r, "Ramazan"),
+            _buildSettingsCard(r, [
+              // Yalnızca Ramazan'da (ya da Ramazan dışında açık kalmışsa, kapatılabilsin diye)
+              if (provider.ramazanda || provider.orucModu) ...[
+                _buildSwitchTile(
+                  r,
+                  title: "Sahur ve iftar bildirimleri",
+                  subtitle: provider.bildirimlerAcik
+                      ? "İmsaktan 45 dakika önce sahur, akşam vaktinde iftar bildirimi"
+                      : "Önce yukarıdan bildirimleri açın",
+                  icon: Icons.notifications_active_outlined,
+                  value: provider.orucModu,
+                  onChanged: provider.bildirimlerAcik ? provider.orucModuDegistir : (_) {},
+                ),
+                if (denemeSurumu) const Divider(height: 1),
+              ],
+              // Test aracı: yalnızca test sürümünde
+              if (denemeSurumu)
+                _buildSwitchTile(
                 r,
-                title: "Sahur ve iftar bildirimleri",
-                subtitle: provider.bildirimlerAcik
-                    ? "İmsaktan 45 dakika önce sahur, akşam vaktinde iftar bildirimi"
-                    : "Önce yukarıdan bildirimleri açın",
-                icon: Icons.notifications_active_outlined,
-                value: provider.orucModu,
-                onChanged: provider.bildirimlerAcik ? provider.orucModuDegistir : (_) {},
+                title: "Ramazan görünümünü önizle",
+                subtitle: provider.hicriGunler.values.any((h) => h.ay == 9) && !provider.ramazanOnizleme
+                    ? "Ramazan'da ana sayfa kendiliğinden değişir"
+                    : "Ramazan dışında ana sayfadaki Ramazan kartını dener (örnek: 12. gün)",
+                icon: Icons.nightlight_round,
+                value: provider.ramazanOnizleme,
+                onChanged: provider.ramazanOnizlemeDegistir,
               ),
-              const Divider(height: 1),
-            ],
-            _buildSwitchTile(
-              r,
-              title: "Ramazan görünümünü önizle",
-              subtitle: provider.hicriGunler.values.any((h) => h.ay == 9) && !provider.ramazanOnizleme
-                  ? "Ramazan'da ana sayfa kendiliğinden değişir"
-                  : "Ramazan dışında ana sayfadaki Ramazan kartını dener (örnek: 12. gün)",
-              icon: Icons.nightlight_round,
-              value: provider.ramazanOnizleme,
-              onChanged: provider.ramazanOnizlemeDegistir,
-            ),
-          ]),
-          SizedBox(height: Responsive.h(16)),
+            ]),
+            SizedBox(height: Responsive.h(16)),
+          ],
           _buildSectionHeader(r, "Görünüm"),
           _buildThemeSelector(r, themeProvider),
           SizedBox(height: Responsive.h(12)),
@@ -303,7 +308,7 @@ class AyarlarSayfasi extends StatelessWidget {
               icon: Icons.share_outlined,
               onTap: () {
                 Share.share(
-                  'Namaz Vakti uygulamasını indir! \n\nhttps://play.google.com/store/apps/details?id=com.example.namaz_app',
+                  'Takva Yolum uygulamasını indir! \n\nhttps://play.google.com/store/apps/details?id=com.takvayolum.app',
                 );
               },
             ),
