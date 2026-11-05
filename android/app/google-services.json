@@ -66,6 +66,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "976857623627-kuj04uels8odjsmkibj39e5snkd13isp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.takvayolum.app",
+            "certificate_hash": "d05a4a4b6731cdfea746b76350e94c4f00582e6e"
+          }
+        },
+        {
           "client_id": "976857623627-b7uirord9sa99vsk5mjef6fiv0k26mft.apps.googleusercontent.com",
           "client_type": 3
         }
