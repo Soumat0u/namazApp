@@ -9,6 +9,7 @@ import '../providers/namaz_provider.dart';
 import '../providers/theme_provider.dart';
 import 'widgets/sayfa_arka_plani.dart';
 import 'widgets/sehir_secici.dart';
+import 'widgets/destek_ol.dart';
 
 class AyarlarSayfasi extends StatelessWidget {
   const AyarlarSayfasi({super.key});
@@ -285,6 +286,15 @@ class AyarlarSayfasi extends StatelessWidget {
           SizedBox(height: Responsive.h(16)),
           _buildSectionHeader(r, "Uygulama"),
           _buildSettingsCard(r, [
+            if (DestekBilgisi.hazir) ...[
+              _buildActionTile(
+                r,
+                title: "Bize Destek Ol",
+                icon: Icons.volunteer_activism_outlined,
+                onTap: () => destekOlGoster(context, r),
+              ),
+              const Divider(height: 1),
+            ],
             _buildActionTile(
               r,
               title: "Bize Ulaşın",

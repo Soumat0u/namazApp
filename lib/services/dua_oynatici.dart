@@ -1,16 +1,27 @@
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 import '../core/constants/dualar.dart';
+import 'kelime_deposu.dart';
 import 'kuran_okuyucu.dart';
 
 /// Bir duayı sesli okur. Kur'an'dan olan dualar Afâsî tilavetiyle (kelime kelime zamanlamalı),
-/// Kur'an dışı dualar telefonun Arapça yazıdan-sese motoruyla okunur; her iki durumda da
-/// okunan kelime [aktifKelime] (0'dan) / ayet bazında [kuran] üzerinden izlenir.
+/// Kur'an dışı dualar kayıtlı sesleri varsa onunla (kelime zamanlamalı, ayetlerdeki gibi takip),
+/// yoksa telefonun Arapça yazıdan-sese motoruyla okunur. Okunan kelime [aktifKelime] (0'dan) ve
+/// kelime içi [ilerleme] / ayet bazında [kuran] üzerinden izlenir.
 class DuaOynatici extends ChangeNotifier {
   final Dua dua;
   KuranOkuyucu? _kuran;
   FlutterTts? _tts;
+  AudioPlayer? _kayit;
+  final List<StreamSubscription> _abonelikler = [];
+  late final AyetKelime? _kayitZamani = dua.ses == null
+      ? null
+      : AyetKelime([for (final k in kelimeler) k.$1], dua.sesZamanlari);
+  double _ilerleme = 0;
 
   bool _caliyor = false;
   bool _yukleniyor = false;
@@ -32,6 +43,8 @@ class DuaOynatici extends ChangeNotifier {
   bool get yukleniyor => _kuran?.yukleniyor ?? _yukleniyor;
   /// Kur'an dışı duada okunan kelimenin sırası (0'dan)
   int? get aktifKelime => _ttsKelime;
+  /// Kayıtlı seste okunan kelimenin ne kadarının okunduğu (0..1). TTS'te null: süre tahmin edilir.
+  double? get ilerleme => _kayitZamani == null ? null : _ilerleme;
 
   static List<(String, int)> _kelimelereAyir(String metin) => [
         for (final m in RegExp(r'\S+').allMatches(metin)) (m.group(0)!, m.start),
@@ -46,7 +59,41 @@ class DuaOynatici extends ChangeNotifier {
       return;
     }
     if (_caliyor) return durdur();
+    if (dua.ses != null) return _kayitCal();
     await _ttsOku();
+  }
+
+  Future<void> _kayitCal() async {
+    _yukleniyor = true;
+    hata = null;
+    _bildir();
+    try {
+      final o = _kayit ??= _kayitOynaticisi();
+      _caliyor = true;
+      await o.play(AssetSource('sounds/dualar/${dua.ses}.mp3'));
+    } catch (e) {
+      debugPrint('🔊 Dua sesi hatası: $e');
+      hata = 'Dua sesli okunamadı.';
+      _caliyor = false;
+    } finally {
+      _yukleniyor = false;
+      _bildir();
+    }
+  }
+
+  AudioPlayer _kayitOynaticisi() {
+    final o = AudioPlayer();
+    _abonelikler
+      ..add(o.onPlayerComplete.listen((_) => _bitti()))
+      ..add(o.onPositionChanged.listen((sure) {
+        if (!_caliyor) return;
+        final k = _kayitZamani!.konum(sure.inMilliseconds);
+        if (k == null) return;
+        _ttsKelime = k.$1 - 1;
+        _ilerleme = k.$2;
+        _bildir();
+      }));
+    return o;
   }
 
   Future<void> _ttsOku() async {
@@ -97,12 +144,14 @@ class DuaOynatici extends ChangeNotifier {
   void _bitti() {
     _caliyor = false;
     _ttsKelime = null;
+    _ilerleme = 0;
     _bildir();
   }
 
   Future<void> durdur() async {
     await _kuran?.durdur();
     await _tts?.stop();
+    await _kayit?.stop();
     _bitti();
   }
 
@@ -115,6 +164,10 @@ class DuaOynatici extends ChangeNotifier {
     _kapatildi = true;
     _kuran?.dispose();
     _tts?.stop();
+    for (final a in _abonelikler) {
+      a.cancel();
+    }
+    _kayit?.dispose();
     super.dispose();
   }
 }

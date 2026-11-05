@@ -276,10 +276,15 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
                 ],
               );
             }
-            // Kur'an dışı: yazıdan-sese motorunun okuduğu kelime aydınlatılır
+            // Kur'an dışı: okunan kelime aydınlatılır
             // Motor yalnızca kelime sınırını bildirir: ışık kelime boyunca tahmini sürede sağdan sola kayar
             final kelimeler = [for (final k in _oynatici.kelimeler) k.$1];
             final aktif = _oynatici.aktifKelime;
+            // Kayıtlı ses: ışık, ayetlerdeki gibi sesin gerçek konumuyla harf harf ilerler
+            final ilerleme = _oynatici.ilerleme;
+            if (ilerleme != null) {
+              return IsikliKelimeler(kelimeler: kelimeler, aktif: aktif, ilerleme: ilerleme, stil: arapcaStil);
+            }
             return TweenAnimationBuilder<double>(
               key: ValueKey(aktif),
               tween: Tween(begin: 0, end: 1),

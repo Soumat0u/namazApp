@@ -11,6 +11,10 @@ class Dua {
   final String? _meal;
   final int? sure;
   final List<int> ayetler;
+  /// Kur'an dışı duanın kayıtlı sesi (`assets/sounds/dualar/<ses>.mp3`) ve kelime zamanları:
+  /// (kelime sırası 1'den, başlangıç ms, bitiş ms). Ses yoksa telefonun yazıdan-sese motoru okur.
+  final String? ses;
+  final List<(int, int, int)> sesZamanlari;
 
   const Dua({
     required this.baslik,
@@ -20,6 +24,8 @@ class Dua {
     String? meal,
     this.sure,
     this.ayetler = const [],
+    this.ses,
+    this.sesZamanlari = const [],
   })  : _arapca = arapca,
         _meal = meal;
 
@@ -48,6 +54,8 @@ const List<Dua> dualar = [
   Dua(
     baslik: 'Sübhâneke',
     kategori: namazDualari,
+    ses: 'subhaneke',
+    sesZamanlari: [(1, 0, 1060), (2, 1060, 1680), (3, 1680, 2880), (4, 2880, 3760), (5, 3760, 4640), (6, 4640, 5460), (7, 5460, 6460), (8, 6460, 7160), (9, 7160, 7780), (10, 7780, 8360)],
     arapca: 'سُبْحَانَكَ اللّٰهُمَّ وَبِحَمْدِكَ وَتَبَارَكَ اسْمُكَ وَتَعَالٰى جَدُّكَ وَلَا اِلٰهَ غَيْرُكَ',
     okunus: 'Sübhânekellâhümme ve bi-hamdik, ve tebârekesmük, ve teâlâ ceddük, ve lâ ilâhe ğayrük.',
     meal: "Allah'ım! Sen eksik sıfatlardan pak ve uzaksın. Seni daima böyle tenzih eder ve överim. "
@@ -65,6 +73,8 @@ const List<Dua> dualar = [
   Dua(
     baslik: 'Ettehiyyâtü',
     kategori: namazDualari,
+    ses: 'ettehiyyatu',
+    sesZamanlari: [(1, 0, 880), (2, 880, 1700), (3, 1700, 2600), (4, 2600, 3820), (5, 3820, 4460), (6, 4460, 5040), (7, 5040, 5420), (8, 5420, 6040), (9, 6040, 6800), (10, 6800, 7200), (11, 7200, 8380), (12, 8380, 8960), (13, 8960, 9800), (14, 9800, 10280), (15, 10280, 10760), (16, 10760, 11100), (17, 11100, 12260), (18, 12260, 12820), (19, 12820, 13180), (20, 13180, 13580), (21, 13580, 14060), (22, 14060, 14500), (23, 14500, 15120), (24, 15120, 15880), (25, 15880, 16220), (26, 16220, 17300), (27, 17300, 17800), (28, 17800, 18520)],
     arapca: 'اَلتَّحِيَّاتُ لِلّٰهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ اَلسَّلَامُ عَلَيْكَ اَيُّهَا النَّبِيُّ وَرَحْمَةُ اللّٰهِ وَبَرَكَاتُهُ '
         'اَلسَّلَامُ عَلَيْنَا وَعَلٰى عِبَادِ اللّٰهِ الصَّالِحِينَ اَشْهَدُ اَنْ لَا اِلٰهَ اِلَّا اللّٰهُ وَاَشْهَدُ اَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ',
     okunus: 'Et-tahiyyâtü lillâhi ve\'s-salavâtü ve\'t-tayyibât. Es-selâmü aleyke eyyühe\'n-nebiyyü ve rahmetullâhi ve berakâtüh. '
@@ -76,6 +86,8 @@ const List<Dua> dualar = [
   Dua(
     baslik: 'Allâhümme Salli',
     kategori: namazDualari,
+    ses: 'salli',
+    sesZamanlari: [(1, 0, 780), (2, 780, 1260), (3, 1260, 1500), (4, 1500, 2620), (5, 2620, 3060), (6, 3060, 3360), (7, 3360, 4200), (8, 4200, 4700), (9, 4700, 5380), (10, 5380, 5600), (11, 5600, 6780), (12, 6780, 7420), (13, 7420, 7660), (14, 7660, 8700), (15, 8700, 9440), (16, 9440, 10240), (17, 10240, 10880)],
     arapca: 'اَللّٰهُمَّ صَلِّ عَلٰى مُحَمَّدٍ وَعَلٰى اٰلِ مُحَمَّدٍ كَمَا صَلَّيْتَ عَلٰى اِبْرَاهِيمَ وَعَلٰى اٰلِ اِبْرَاهِيمَ اِنَّكَ حَمِيدٌ مَجِيدٌ',
     okunus: 'Allâhümme salli alâ Muhammedin ve alâ âli Muhammed, kemâ salleyte alâ İbrâhîme ve alâ âli İbrâhîm, inneke hamîdün mecîd.',
     meal: "Allah'ım! Muhammed'e ve Muhammed'in ümmetine rahmet eyle, şerefini yücelt; İbrahim'e ve İbrahim'in ümmetine "
@@ -84,6 +96,8 @@ const List<Dua> dualar = [
   Dua(
     baslik: 'Allâhümme Bârik',
     kategori: namazDualari,
+    ses: 'barik',
+    sesZamanlari: [(1, 0, 800), (2, 800, 1360), (3, 1360, 1660), (4, 1660, 2740), (5, 2740, 3240), (6, 3240, 3580), (7, 3580, 4460), (8, 4460, 4900), (9, 4900, 5520), (10, 5520, 5760), (11, 5760, 6780), (12, 6780, 7460), (13, 7460, 7780), (14, 7780, 8760), (15, 8760, 9620), (16, 9620, 10600), (17, 10600, 11100)],
     arapca: 'اَللّٰهُمَّ بَارِكْ عَلٰى مُحَمَّدٍ وَعَلٰى اٰلِ مُحَمَّدٍ كَمَا بَارَكْتَ عَلٰى اِبْرَاهِيمَ وَعَلٰى اٰلِ اِبْرَاهِيمَ اِنَّكَ حَمِيدٌ مَجِيدٌ',
     okunus: 'Allâhümme bârik alâ Muhammedin ve alâ âli Muhammed, kemâ bârekte alâ İbrâhîme ve alâ âli İbrâhîm, inneke hamîdün mecîd.',
     meal: "Allah'ım! Muhammed'e ve Muhammed'in ümmetine hayır ve bereket ver; İbrahim'e ve İbrahim'in ümmetine verdiğin gibi. "
@@ -106,6 +120,8 @@ const List<Dua> dualar = [
   Dua(
     baslik: 'Kunut Duası 1',
     kategori: namazDualari,
+    ses: 'kunut1',
+    sesZamanlari: [(1, 0, 700), (2, 700, 1300), (3, 1300, 2320), (4, 2320, 3440), (5, 3440, 4800), (6, 4800, 5460), (7, 5460, 6060), (8, 6060, 6820), (9, 6820, 7600), (10, 7600, 8580), (11, 8580, 9360), (12, 9360, 10020), (13, 10020, 10460), (14, 10460, 11040), (15, 11040, 11720), (16, 11720, 12780), (17, 12780, 13100), (18, 13100, 14040), (19, 14040, 15080), (20, 15080, 15800), (21, 15800, 16060), (22, 16060, 16780)],
     arapca: 'اَللّٰهُمَّ اِنَّا نَسْتَعِينُكَ وَنَسْتَغْفِرُكَ وَنَسْتَهْدِيكَ وَنُؤْمِنُ بِكَ وَنَتُوبُ اِلَيْكَ وَنَتَوَكَّلُ عَلَيْكَ '
         'وَنُثْنِي عَلَيْكَ الْخَيْرَ كُلَّهُ نَشْكُرُكَ وَلَا نَكْفُرُكَ وَنَخْلَعُ وَنَتْرُكُ مَنْ يَفْجُرُكَ',
     okunus: 'Allâhümme innâ nesteînüke ve nestağfirüke ve nestehdîk, ve nü\'minü bike ve netûbü ileyk, ve netevekkelü aleyk, '
@@ -117,6 +133,8 @@ const List<Dua> dualar = [
   Dua(
     baslik: 'Kunut Duası 2',
     kategori: namazDualari,
+    ses: 'kunut2',
+    sesZamanlari: [(1, 0, 900), (2, 900, 1500), (3, 1500, 2100), (4, 2100, 2460), (5, 2460, 3260), (6, 3260, 4220), (7, 4220, 4940), (8, 4940, 5620), (9, 5620, 6580), (10, 6580, 7100), (11, 7100, 7940), (12, 7940, 8600), (13, 8600, 9500), (14, 9500, 10000), (15, 10000, 10840), (16, 10840, 11760), (17, 11760, 12380)],
     arapca: 'اَللّٰهُمَّ اِيَّاكَ نَعْبُدُ وَلَكَ نُصَلِّي وَنَسْجُدُ وَاِلَيْكَ نَسْعٰى وَنَحْفِدُ نَرْجُو رَحْمَتَكَ وَنَخْشٰى عَذَابَكَ '
         'اِنَّ عَذَابَكَ بِالْكُفَّارِ مُلْحِقٌ',
     okunus: 'Allâhümme iyyâke na\'büdü ve leke nusallî ve nescüdü, ve ileyke nes\'â ve nahfidü, nercû rahmeteke ve nahşâ azâbek, '
