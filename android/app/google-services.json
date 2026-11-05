@@ -12,7 +12,28 @@
           "package_name": "com.example.namaz_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "976857623627-3n0jq7laqgugap5mcap3q3nln9pvqf8o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.namaz_app",
+            "certificate_hash": "d05a4a4b6731cdfea746b76350e94c4f00582e6e"
+          }
+        },
+        {
+          "client_id": "976857623627-fpk9rid1rsurrp2rb30r3grfmdvd2b1u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.namaz_app",
+            "certificate_hash": "5309b37c415c4b344d265a1cb6706583f8ae7ca8"
+          }
+        },
+        {
+          "client_id": "976857623627-b7uirord9sa99vsk5mjef6fiv0k26mft.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBDR5N9gXfw-M4dS-MWwpn8uD7moug3DK0"
@@ -20,7 +41,55 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "976857623627-b7uirord9sa99vsk5mjef6fiv0k26mft.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "976857623627-gncvsgdts33kej9ed4uf7n8nh0tsbalq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.namazApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:976857623627:android:cb63ea9be19352e807b1ce",
+        "android_client_info": {
+          "package_name": "com.takvayolum.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "976857623627-b7uirord9sa99vsk5mjef6fiv0k26mft.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDR5N9gXfw-M4dS-MWwpn8uD7moug3DK0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "976857623627-b7uirord9sa99vsk5mjef6fiv0k26mft.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "976857623627-gncvsgdts33kej9ed4uf7n8nh0tsbalq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.namazApp"
+              }
+            }
+          ]
         }
       }
     }
