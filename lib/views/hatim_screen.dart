@@ -1,3 +1,4 @@
+import '../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -249,7 +250,6 @@ class _OrtakHatimler extends StatelessWidget {
 
   Future<void> _hatimOlustur(BuildContext context, String uid) async {
     final r = context.renklerOku; // Düğme olayında: dinlemeden oku
-    final messenger = ScaffoldMessenger.of(context);
     final adController = TextEditingController(text: "Arkadaşlar Hatmi");
     final secili = <String>{};
     final profil = await FirebaseService().getUserProfileFuture(uid);
@@ -318,7 +318,7 @@ class _OrtakHatimler extends StatelessWidget {
                   final ad = adController.text.trim().isEmpty ? "Arkadaşlar Hatmi" : adController.text.trim();
                   Navigator.pop(sheet);
                   final hata = await HatimServisi().olustur(uid: uid, ad: ad, davetliler: secili.toList());
-                  messenger.showSnackBar(SnackBar(content: Text(hata ?? "Hatim başlatıldı. Cüzünü seçmeyi unutma!")));
+                  Bildirim.snackBar(SnackBar(content: Text(hata ?? "Hatim başlatıldı. Cüzünü seçmeyi unutma!")));
                 },
                 child: const Text("Başlat", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
@@ -442,11 +442,10 @@ class _OrtakHatimDetay extends StatelessWidget {
 
   Future<void> _cuzaDokun(BuildContext context, OrtakHatim hatim, int cuz, String uid, NamazProvider provider) async {
     final d = hatim.cuzler[cuz]!;
-    final messenger = ScaffoldMessenger.of(context);
     final servis = HatimServisi();
     if (d.bos) {
       final hata = await servis.cuzAl(hatim.id, cuz, uid, provider.currentUsername);
-      messenger.showSnackBar(SnackBar(content: Text(hata ?? "$cuz. cüzü üstlendin.")));
+      Bildirim.snackBar(SnackBar(content: Text(hata ?? "$cuz. cüzü üstlendin.")));
     } else if (d.uid == uid) {
       if (!context.mounted) return;
       showModalBottomSheet(
@@ -478,7 +477,7 @@ class _OrtakHatimDetay extends StatelessWidget {
         ),
       );
     } else {
-      messenger.showSnackBar(SnackBar(
+      Bildirim.snackBar(SnackBar(
         content: Text("$cuz. cüz ${d.ad} arkadaşımızda${d.bitti ? ', okundu' : ''}."),
       ));
     }

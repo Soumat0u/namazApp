@@ -1,3 +1,4 @@
+import '../../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -25,8 +26,7 @@ Future<void> sehirSeciciGoster(BuildContext context) async {
   );
   if (secim == null || !context.mounted) return;
 
-  final messenger = ScaffoldMessenger.of(context);
-  messenger.showSnackBar(
+  Bildirim.snackBar(
     SnackBar(
       content: Text(secim == _gpsSecimi ? 'Konum alınıyor...' : '$secim vakitleri alınıyor...'),
       duration: const Duration(seconds: 1),
@@ -34,7 +34,7 @@ Future<void> sehirSeciciGoster(BuildContext context) async {
   );
   final hata = await provider.sehirSec(secim == _gpsSecimi ? null : secim);
   if (hata != null) {
-    messenger.showSnackBar(SnackBar(content: Text(hata)));
+    Bildirim.snackBar(SnackBar(content: Text(hata)));
   }
 }
 

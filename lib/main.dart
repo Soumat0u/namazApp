@@ -1,3 +1,4 @@
+import 'core/utils/bildirim.dart';
 import 'views/widgets/cinsiyet_secici.dart';
 import 'views/widgets/sayfa_arka_plani.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import 'core/utils/responsive.dart';
 import 'services/namaz_servis.dart';
 import 'services/notification_service.dart';
 import 'services/firebase_service.dart';
+import 'services/updater.dart';
 import 'providers/namaz_provider.dart';
 import 'providers/theme_provider.dart';
 import 'views/ana_sayfa.dart';
@@ -63,6 +65,7 @@ void main() async {
               NamazProvider(namazServisi, notificationService, firebaseService),
         ),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => Updater()..check()),
       ],
       child: const NamazTakipApp(),
     ),
@@ -77,6 +80,7 @@ class NamazTakipApp extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
 
     return MaterialApp(
+      navigatorKey: Bildirim.navigatorKey, // üstten inen bildirimler (core/utils/bildirim.dart)
       debugShowCheckedModeBanner: false,
       title: 'Takva Yolum',
       theme: themeProvider.buildThemeData(),
@@ -194,6 +198,7 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _updateStatus(true);
+      context.read<Updater>().resumed();
     } else {
       _updateStatus(false);
     }
@@ -232,93 +237,161 @@ class _AnaUygulamaEkraniState extends State<AnaUygulamaEkrani>
             mod: temaProvider.arkaPlanModu,
             vakitTemasi: vakitTemasi,
             zemin: tema.arkaPlanRengi,
+            vurgu: tema.anaRenk,
             koyuTema: tema.brightness == Brightness.dark,
           ),
-          // İçerik menünün altına girmesin: menü yüksekliği kadar boşluk bırakılır
-          Builder(
-            builder: (context) => Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.paddingOf(context).bottom,
-              ),
-              child: MediaQuery.removePadding(
-                context: context,
-                removeBottom: true,
-                child: IndexedStack(
-                  index: _seciliSayfaIndex,
-                  children: _sayfalar,
-                ),
-              ),
-            ),
+          // Sayfalar ekranın en altına kadar uzanır; içerik kaydırılınca yüzen
+          // menünün arkasından geçer. extendBody sayesinde MediaQuery'nin alt
+          // padding'i menü (+ güncelleme çubuğu) yüksekliğine eşittir; her sayfa
+          // kaydırma içeriğinin sonuna bu kadar boşluk ekler.
+          IndexedStack(
+            index: _seciliSayfaIndex,
+            children: _sayfalar,
           ),
         ],
       ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Container(
-          margin: EdgeInsets.fromLTRB(
-            Responsive.w(16),
-            0,
-            Responsive.w(16),
-            Responsive.h(10),
-          ),
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: tema.kartRengi,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: tema.anaRenk.withOpacity(0.12)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.25),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _GuncellemeCubugu(),
+            Container(
+              margin: EdgeInsets.fromLTRB(
+                Responsive.w(16),
+                0,
+                Responsive.w(16),
+                Responsive.h(10),
               ),
-            ],
-          ),
-          // Her sekme ayrı düğme: dokununca yalnızca basılan düğme hafifçe aydınlanır
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: Row(
-              children: [
-                for (final (i, ikon, ad) in const [
-                  (0, Icons.home_rounded, 'Ana Sayfa'),
-                  (1, Icons.bar_chart_rounded, 'İstatistik'),
-                  (2, Icons.people_alt_rounded, 'Sosyal'),
-                ])
-                  Expanded(
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        splashColor: tema.anaRenk.withOpacity(0.12),
-                        highlightColor: tema.anaRenk.withOpacity(0.06),
-                        onTap: () => setState(() => _seciliSayfaIndex = i),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: Responsive.h(4)),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(ikon,
-                                  size: Responsive.w(22),
-                                  color: _seciliSayfaIndex == i ? tema.anaRenk : tema.pasifRenk),
-                              SizedBox(height: Responsive.h(1)),
-                              Text(
-                                ad,
-                                style: TextStyle(
-                                  fontSize: Responsive.sp(_seciliSayfaIndex == i ? 11 : 10),
-                                  fontWeight: _seciliSayfaIndex == i ? FontWeight.w700 : FontWeight.w500,
-                                  color: _seciliSayfaIndex == i ? tema.anaRenk : tema.pasifRenk,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: tema.kartRengi,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: tema.anaRenk.withOpacity(0.12)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              // Her sekme ayrı düğme: dokununca yalnızca basılan düğme hafifçe aydınlanır
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    for (final (i, ikon, ad) in const [
+                      (0, Icons.home_rounded, 'Ana Sayfa'),
+                      (1, Icons.bar_chart_rounded, 'İstatistik'),
+                      (2, Icons.people_alt_rounded, 'Sosyal'),
+                    ])
+                      Expanded(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(22),
+                            // Dalga yok: basılıyken yalnızca hafif bir yuvarlak vurgu
+                            splashFactory: NoSplash.splashFactory,
+                            highlightColor: tema.anaRenk.withOpacity(0.08),
+                            onTap: () {
+                              if (_seciliSayfaIndex != i) setState(() => _seciliSayfaIndex = i);
+                            },
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: Responsive.h(4)),
+                              child: TweenAnimationBuilder<Color?>(
+                                // Renk yumuşak geçer; boyut sabit kalır (yazı büyüyüp küçülünce ikonlar kıpırdıyordu)
+                                tween: ColorTween(end: _seciliSayfaIndex == i ? tema.anaRenk : tema.pasifRenk),
+                                duration: const Duration(milliseconds: 200),
+                                builder: (_, renk, _) => Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(ikon, size: Responsive.w(22), color: renk),
+                                    SizedBox(height: Responsive.h(1)),
+                                    Text(
+                                      ad,
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: Responsive.sp(11),
+                                        height: 1.2,
+                                        fontWeight: _seciliSayfaIndex == i ? FontWeight.w700 : FontWeight.w500,
+                                        color: renk,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Sunucuda yeni sürüm varsa alt menünün üstünde çıkan çubuk
+class _GuncellemeCubugu extends StatelessWidget {
+  const _GuncellemeCubugu();
+
+  @override
+  Widget build(BuildContext context) {
+    final u = context.watch<Updater>();
+    if (u.available == null) return const SizedBox.shrink();
+    final tema = context.watch<ThemeProvider>().aktifTema;
+    final String yazi;
+    switch (u.step) {
+      case UpdateStep.downloading:
+        yazi = 'İndiriliyor… ${u.progress == null ? '' : '%${(u.progress! * 100).round()}'}';
+      case UpdateStep.needsPermission:
+        yazi = 'Ayarlardan "Bu kaynaktan izin ver"i açıp geri dönün';
+      case UpdateStep.installing:
+        yazi = 'Yükleyici açılıyor…';
+      case UpdateStep.failed:
+        yazi = 'Güncelleme olmadı: ${u.error}';
+      case UpdateStep.idle:
+        yazi = 'Yeni sürüm hazır: ${u.availableName ?? ''} (${u.available})'.replaceFirst(':  (', ': (');
+    }
+    final mesgul = u.step == UpdateStep.downloading || u.step == UpdateStep.installing;
+    return Container(
+      margin: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(6)),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: tema.anaRenk,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (u.step == UpdateStep.downloading)
+            LinearProgressIndicator(
+              value: u.progress,
+              minHeight: 2,
+              color: Colors.white,
+              backgroundColor: Colors.white24,
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 6, 2),
+            child: Row(
+              children: [
+                const Icon(Icons.system_update_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(yazi, style: const TextStyle(color: Colors.white))),
+                TextButton(
+                  onPressed: mesgul ? null : u.update,
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  child: Text(u.step == UpdateStep.failed ? 'Tekrar dene' : 'Güncelle'),
+                ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -1,7 +1,7 @@
 name: namaz_app
 description: "Takva Yolum - Namaz ve Maneviyat Takip Uygulaması"
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.0+35
 
 environment:
   sdk: ^3.10.4
@@ -29,7 +29,6 @@ dependencies:
   audioplayers: ^6.6.0
   sensors_plus: ^6.1.1
   vibration: ^3.1.8
-  sound_mode: ^3.1.1
   firebase_core: ^3.12.1
   firebase_auth: ^5.6.1
   cloud_firestore: ^5.6.5
@@ -63,6 +62,7 @@ flutter:
     - assets/images/
     - assets/images/streak_icon.png
     - assets/images/app_icon.png
+    - assets/ansiklopedi.json
 
 flutter_launcher_icons:
   android: "launcher_icon"

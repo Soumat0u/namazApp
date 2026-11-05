@@ -110,6 +110,34 @@ class AppThemeData {
     brightness: Brightness.dark,
   );
 
+  // ─── GÜL ───
+  factory AppThemeData.gul() => const AppThemeData(
+    id: 'gul',
+    isim: 'Gül',
+    arkaPlanRengi: Color(0xFFFFF0F4),
+    kartRengi: Color(0xFFFFFFFF),
+    anaRenk: Color(0xFFD6457A),
+    yaziRengi: Color(0xFF4A1C2C),
+    pasifRenk: Color(0xFFCBAAB6),
+    aktifRenk: Color(0xFFF48FB1),
+    kirmizi: Color(0xFFD32F2F),
+    brightness: Brightness.light,
+  );
+
+  // ─── GÜL KARANLIK ───
+  factory AppThemeData.gulKaranlik() => const AppThemeData(
+    id: 'gul_karanlik',
+    isim: 'Gül Karanlık',
+    arkaPlanRengi: Color(0xFF121212),
+    kartRengi: Color(0xFF1E1E1E),
+    anaRenk: Color(0xFFF48FB1),
+    yaziRengi: Color(0xFFE0E0E0),
+    pasifRenk: Color(0xFF757575),
+    aktifRenk: Color(0xFFF8BBD0),
+    kirmizi: Color(0xFFEF5350),
+    brightness: Brightness.dark,
+  );
+
   /// Tüm mevcut temalar
   static List<AppThemeData> tumTemalar = [
     AppThemeData.varsayilan(),
@@ -118,6 +146,8 @@ class AppThemeData {
     AppThemeData.zumrutKaranlik(),
     AppThemeData.okyanus(),
     AppThemeData.okyanusKaranlik(),
+    AppThemeData.gul(),
+    AppThemeData.gulKaranlik(),
   ];
 
   /// ID'ye göre tema bul

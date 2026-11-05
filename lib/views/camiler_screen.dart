@@ -1,3 +1,4 @@
+import '../core/utils/bildirim.dart';
 import 'dart:math';
 import 'dart:convert';
 
@@ -119,7 +120,7 @@ class _CamilerScreenState extends State<CamilerScreen> {
     final url = Uri.parse(
         'https://www.google.com/maps/dir/?api=1&destination=${c.konum.latitude},${c.konum.longitude}&travelmode=walking');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication) && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Harita uygulaması açılamadı.')));
+      Bildirim.snackBar(const SnackBar(content: Text('Harita uygulaması açılamadı.')));
     }
   }
 

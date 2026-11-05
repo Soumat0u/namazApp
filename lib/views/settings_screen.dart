@@ -1,3 +1,4 @@
+import '../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -163,7 +164,7 @@ class AyarlarSayfasi extends StatelessWidget {
                   size: Responsive.w(20),
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  Bildirim.snackBar(
                     const SnackBar(
                       content: Text("Vakitler güncelleniyor..."),
                       duration: Duration(seconds: 1),
@@ -172,6 +173,34 @@ class AyarlarSayfasi extends StatelessWidget {
                   provider.konumVeApiIstegi(kullaniciTetikledi: true);
                 },
               ),
+            ),
+          ]),
+          SizedBox(height: Responsive.h(16)),
+          _buildSectionHeader(r, "Ramazan"),
+          _buildSettingsCard(r, [
+            // Yalnızca Ramazan'da (ya da Ramazan dışında açık kalmışsa, kapatılabilsin diye)
+            if (provider.ramazanda || provider.orucModu) ...[
+              _buildSwitchTile(
+                r,
+                title: "Sahur ve iftar bildirimleri",
+                subtitle: provider.bildirimlerAcik
+                    ? "İmsaktan 45 dakika önce sahur, akşam vaktinde iftar bildirimi"
+                    : "Önce yukarıdan bildirimleri açın",
+                icon: Icons.notifications_active_outlined,
+                value: provider.orucModu,
+                onChanged: provider.bildirimlerAcik ? provider.orucModuDegistir : (_) {},
+              ),
+              const Divider(height: 1),
+            ],
+            _buildSwitchTile(
+              r,
+              title: "Ramazan görünümünü önizle",
+              subtitle: provider.hicriGunler.values.any((h) => h.ay == 9) && !provider.ramazanOnizleme
+                  ? "Ramazan'da ana sayfa kendiliğinden değişir"
+                  : "Ramazan dışında ana sayfadaki Ramazan kartını dener (örnek: 12. gün)",
+              icon: Icons.nightlight_round,
+              value: provider.ramazanOnizleme,
+              onChanged: provider.ramazanOnizlemeDegistir,
             ),
           ]),
           SizedBox(height: Responsive.h(16)),
@@ -195,7 +224,7 @@ class AyarlarSayfasi extends StatelessWidget {
                 color: r.pasifRenk,
               ),
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
+                Bildirim.snackBar(
                   const SnackBar(
                     content: Text("Şu an sadece Diyanet metodu aktiftir."),
                   ),
@@ -314,7 +343,7 @@ class AyarlarSayfasi extends StatelessWidget {
                         onPressed: () {
                           Navigator.pop(ctx);
                           context.read<NamazProvider>().verileriSifirla();
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          Bildirim.snackBar(
                             SnackBar(
                               content: const Text("Veriler sıfırlandı."),
                               backgroundColor: r.anaRenk,
@@ -466,6 +495,7 @@ class AyarlarSayfasi extends StatelessWidget {
                                           mod: mod,
                                           vakitTemasi: vakitTemasi,
                                           zemin: r.arkaPlanRengi,
+                                          vurgu: r.anaRenk,
                                           koyuTema: koyu,
                                         ),
                                         // Örnek kartlar: arka planın içerikle nasıl duracağı
@@ -593,6 +623,15 @@ class AyarlarSayfasi extends StatelessWidget {
                 darkId: 'okyanus_karanlik',
                 baseLightColor: const Color(0xFF1565C0),
                 baseDarkColor: const Color(0xFF42A5F5),
+                themeProvider: themeProvider,
+                r: r,
+              ),
+              _ThemeGroupWidget(
+                isim: 'Gül',
+                lightId: 'gul',
+                darkId: 'gul_karanlik',
+                baseLightColor: const Color(0xFFD6457A),
+                baseDarkColor: const Color(0xFFF48FB1),
                 themeProvider: themeProvider,
                 r: r,
               ),

@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../core/theme/vakit_paleti.dart';
+
 /// Kullanıcının seçtiği arka plan modu
 enum ArkaPlanModu {
   sade('Sade', 'Düz tema rengi'),
@@ -9,7 +11,7 @@ enum ArkaPlanModu {
   canli('Canlı', 'Çok yavaş hareketli yıldızlar ve ışık'),
   desen('Desen', 'Soluk geometrik yıldız deseni, rengi vakte göre'),
   gokyuzu('Gökyüzü', 'Vakte göre gökyüzü, ufukta cami silueti'),
-  minimal('Minimal', 'Tek tonlu derin zemin, sade ve sakin'),
+  minimal('Minimal', 'Temanın renginde tek tonlu zemin, sade ve sakin'),
   mushaf('Mushaf', 'Kâğıt dokusu ve köşelerde ince tezhip');
 
   final String ad;
@@ -27,6 +29,8 @@ class SayfaArkaPlani extends StatefulWidget {
   /// NamazProvider.vaktinTemasi: dawn | morning | day | afternoon | sunset | night
   final String vakitTemasi;
   final Color zemin;
+  /// Temanın ana rengi (Minimal zemin bu renkten tonlanır)
+  final Color vurgu;
   final bool koyuTema;
 
   const SayfaArkaPlani({
@@ -34,6 +38,7 @@ class SayfaArkaPlani extends StatefulWidget {
     required this.mod,
     required this.vakitTemasi,
     required this.zemin,
+    required this.vurgu,
     required this.koyuTema,
   });
 
@@ -74,22 +79,20 @@ class _SayfaArkaPlaniState extends State<SayfaArkaPlani> with SingleTickerProvid
     super.dispose();
   }
 
-  /// Vaktin renkleri (üst, alt); zemin rengiyle hafifçe karıştırılır
+  /// Vaktin renkleri (üst, orta). Temanın zemini baskın kalır; vakit, saat
+  /// kartıyla aynı renk ailesinden (VakitPaleti) yalnızca üstte hafif bir ton
+  /// olarak gelir. Böylece turuncu temada mor, mavi kartın yanında pembe gibi
+  /// birbirini tutmayan renkler oluşmaz.
   (Color, Color) _vakitRenkleri() {
-    const renkler = {
-      'dawn': (Color(0xFFB39DDB), Color(0xFFFFCCBC)),
-      'morning': (Color(0xFF81D4FA), Color(0xFFFFF59D)),
-      'day': (Color(0xFF64B5F6), Color(0xFFB3E5FC)),
-      'afternoon': (Color(0xFFFFCC80), Color(0xFFFFF3E0)),
-      'sunset': (Color(0xFFFF8A65), Color(0xFF9575CD)),
-      'night': (Color(0xFF1A237E), Color(0xFF4A148C)),
-    };
-    final (ust, alt) = renkler[widget.vakitTemasi] ?? renkler['night']!;
-    final oran = widget.koyuTema ? 0.55 : 0.45;
-    return (
-      Color.lerp(widget.zemin, ust, oran)!,
-      Color.lerp(widget.zemin, alt, oran * 0.85)!,
-    );
+    var ton = VakitPaleti.ton(widget.vakitTemasi);
+    if (widget.koyuTema) {
+      return (Color.lerp(widget.zemin, ton, 0.35)!, Color.lerp(widget.zemin, ton, 0.12)!);
+    }
+    // Açık temada koyu bir gece rengi kremi grileştirir: rengin tonu korunur,
+    // kendisi açılıp yumuşatılır
+    final hsl = HSLColor.fromColor(ton);
+    ton = hsl.withLightness(0.80).withSaturation(hsl.saturation.clamp(0.0, 0.55)).toColor();
+    return (Color.lerp(widget.zemin, ton, 0.55)!, Color.lerp(widget.zemin, ton, 0.20)!);
   }
 
   /// Vaktin vurgu rengi (desen ve tezhipte)
@@ -121,8 +124,12 @@ class _SayfaArkaPlaniState extends State<SayfaArkaPlani> with SingleTickerProvid
       case ArkaPlanModu.gokyuzu:
         return _gokyuzu();
       case ArkaPlanModu.minimal:
-        // Koyu temada derin zümrüt, açık temada kırık beyaz; hafif köşe gölgesi derinlik verir
-        final ana = widget.koyuTema ? const Color(0xFF0C1F1A) : const Color(0xFFF4F6F3);
+        // Temanın renginden tek ton: koyu temada o rengin derin hâli (Zümrüt'te
+        // koyu yeşil, Gül'de koyu gül kurusu), açık temada zeminin bir tık
+        // daha sakin hâli. Hafif köşe gölgesi derinlik verir.
+        final ana = widget.koyuTema
+            ? Color.lerp(const Color(0xFF0B0B0B), widget.vurgu, 0.13)!
+            : Color.lerp(Color.lerp(widget.zemin, Colors.white, 0.35)!, widget.vurgu, 0.04)!;
         return DecoratedBox(
           decoration: BoxDecoration(
             gradient: RadialGradient(
@@ -154,7 +161,7 @@ class _SayfaArkaPlaniState extends State<SayfaArkaPlani> with SingleTickerProvid
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [ust, alt, widget.zemin],
-          stops: const [0, 0.65, 1],
+          stops: const [0, 0.45, 0.85],
         ),
       ),
     );

@@ -1,7 +1,9 @@
+import '../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
+import 'widgets/bolum_paneli.dart';
 import '../providers/namaz_provider.dart';
 import 'package:intl/intl.dart';
 import '../models/religious_day.dart';
@@ -11,6 +13,11 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/kuran_hedefi.dart';
+import '../services/ansiklopedi_servisi.dart';
 
 class IstatistikSayfasi extends StatefulWidget {
   const IstatistikSayfasi({super.key});
@@ -144,155 +151,249 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
       final String enSadikVakit = veri['enSadikVakit'];
       final int haftalikXp = veri['haftalikXp'];
       final gunAdlari = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+      final ibadetler = await _haftalikIbadetler(provider);
+      final rozetler = provider.rozetler.where((x) => x.kazanildi).toList();
+      final toplamRozet = provider.rozetler.length;
 
-      // 1. KRİTİK DEĞİŞİKLİK: Ekran genişliği yerine SABİT bir genişlik veriyoruz.
-      // Bu sayede paylaşım görseli her zaman standart bir oranda (örneğin 400px genişlikte) oluşur.
-      final double fixedWidth = 400.0; 
 
+      // Haftalık karne: tek bakışta okunan, kompakt paylaşım görseli
+      final sanalBugun = DateFormat('yyyy-MM-dd').parse(provider.getSanalGun());
+      final pzt = sanalBugun.subtract(Duration(days: sanalBugun.weekday - 1));
+      final paz = pzt.add(const Duration(days: 6));
+      final aralik = pzt.month == paz.month
+          ? "${pzt.day}–${DateFormat('d MMMM y', 'tr_TR').format(paz)}"
+          : "${DateFormat('d MMM', 'tr_TR').format(pzt)} – ${DateFormat('d MMM y', 'tr_TR').format(paz)}";
+      final oran = toplamVakit / 35;
       final shareWidget = Container(
-        width: fixedWidth,
-        padding: const EdgeInsets.all(28), // Kenar boşluklarını biraz artırdım, daha ferah durur
+        width: 400,
+        padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: r.arkaPlanRengi, // Koyu tema arka planı
+          color: r.arkaPlanRengi,
           borderRadius: BorderRadius.circular(24),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Başlık Alanı
+            // Başlık
             Row(
               children: [
-                Icon(Icons.bar_chart_rounded, color: r.anaRenk, size: 28),
-                const SizedBox(width: 8),
-                Text(
-                  "Haftalık Özet",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: r.yaziRengi,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("HAFTALIK KARNE",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: r.yaziRengi)),
+                      const SizedBox(height: 2),
+                      Text(aralik, style: TextStyle(fontSize: 12, color: r.yaziRengi.withOpacity(0.55))),
+                    ],
                   ),
                 ),
-                const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: r.anaRenk.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    provider.mevcutUnvan, // Talip, Arif vb.
-                    style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(color: r.anaRenk, borderRadius: BorderRadius.circular(10)),
+                  child: Text(provider.mevcutUnvan,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
-            
-            // Bar Grafiği Alanı
-            SizedBox(
-              height: 160,
+            const SizedBox(height: 16),
+
+            // Namaz: halka + 7 günlük şerit
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(16)),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(7, (i) {
-                  final count = gunlukSayilar[i];
-                  final barH = count == 0 ? 8.0 : (count / 5) * 120.0; // 120'ye çıkardım daha belirgin olsun
-                  final isTam = count == 5;
-                  
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            "$count",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: isTam ? r.anaRenk : r.yaziRengi.withOpacity(0.5),
-                            ),
+                children: [
+                  SizedBox(
+                    width: 74,
+                    height: 74,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox.expand(
+                          child: CircularProgressIndicator(
+                            value: oran.clamp(0.0, 1.0),
+                            strokeWidth: 7,
+                            strokeCap: StrokeCap.round,
+                            backgroundColor: r.anaRenk.withOpacity(0.12),
+                            valueColor: AlwaysStoppedAnimation(r.anaRenk),
                           ),
-                          const SizedBox(height: 6),
-                          Container(
-                            height: barH,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(6),
-                              gradient: isTam
-                                  ? LinearGradient(
-                                      begin: Alignment.bottomCenter,
-                                      end: Alignment.topCenter,
-                                      colors: [r.anaRenk, r.anaRenk.withOpacity(0.7)],
-                                    )
-                                  : LinearGradient(
-                                      begin: Alignment.bottomCenter,
-                                      end: Alignment.topCenter,
-                                      colors: [
-                                        r.anaRenk.withOpacity(0.3),
-                                        r.anaRenk.withOpacity(0.15),
-                                      ],
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text("$toplamVakit",
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: r.yaziRengi, height: 1)),
+                            Text("/ 35", style: TextStyle(fontSize: 10, color: r.yaziRengi.withOpacity(0.5))),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Namaz", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: r.yaziRengi)),
+                        Text("En sadık vakit: $enSadikVakit",
+                            style: TextStyle(fontSize: 11, color: r.yaziRengi.withOpacity(0.55))),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: List.generate(7, (i) {
+                            final c = gunlukSayilar[i];
+                            return Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      height: 24,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: c == 0
+                                            ? r.pasifRenk.withOpacity(0.12)
+                                            : r.anaRenk.withOpacity(0.25 + 0.75 * c / 5),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(c == 5 ? "✓" : "$c",
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900,
+                                              color: c >= 3 ? Colors.white : r.yaziRengi.withOpacity(0.7))),
                                     ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            gunAdlari[i],
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: r.yaziRengi.withOpacity(0.4),
-                            ),
+                                    const SizedBox(height: 3),
+                                    Text(gunAdlari[i],
+                                        style: TextStyle(fontSize: 9, color: r.yaziRengi.withOpacity(0.45))),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Diğer ibadetler: karne satırları (iki sütun)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(16)),
+              child: Column(
+                children: [
+                  for (int i = 0; i < ibadetler.length; i += 2)
+                    Container(
+                      decoration: BoxDecoration(
+                        border: i + 2 < ibadetler.length
+                            ? Border(bottom: BorderSide(color: r.pasifRenk.withOpacity(0.15)))
+                            : null,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(child: _karneSatiri(r, ibadetler[i])),
+                          Container(width: 1, height: 22, color: r.pasifRenk.withOpacity(0.15)),
+                          Expanded(
+                            child: i + 1 < ibadetler.length
+                                ? Padding(
+                                    padding: const EdgeInsets.only(left: 12),
+                                    child: _karneSatiri(r, ibadetler[i + 1]),
+                                  )
+                                : const SizedBox.shrink(),
                           ),
                         ],
                       ),
                     ),
-                  );
-                }),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            Divider(color: r.pasifRenk.withOpacity(0.2), thickness: 1),
-            const SizedBox(height: 16),
-            
-            // Metrikler Alanı
+            const SizedBox(height: 10),
+
+            // Rozetler: yalnızca simgeler, kompakt
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              decoration: BoxDecoration(color: r.kartRengi, borderRadius: BorderRadius.circular(16)),
+              child: Row(
+                children: [
+                  Icon(Icons.military_tech_rounded, size: 18, color: Colors.amber.shade700),
+                  const SizedBox(width: 6),
+                  Text("${rozetler.length}/$toplamRozet",
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: r.yaziRengi)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: rozetler.isEmpty
+                        ? Text("Henüz rozet yok", style: TextStyle(fontSize: 11, color: r.yaziRengi.withOpacity(0.5)))
+                        : Wrap(
+                            spacing: 5,
+                            runSpacing: 5,
+                            children: [
+                              for (final rz in rozetler)
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.amber.withOpacity(0.18),
+                                    border: Border.all(color: Colors.amber.withOpacity(0.55)),
+                                  ),
+                                  child: Icon(rz.ikon, size: 13, color: Colors.amber.shade800),
+                                ),
+                            ],
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _shareMetrik(r, Icons.mosque_rounded, "Toplam", "$toplamVakit vakit"),
-                _shareMetrik(r, Icons.favorite_rounded, "En Sadık", enSadikVakit),
-                _shareMetrik(r, Icons.star_rounded, "Kazanılan", "$haftalikXp XP"),
+                Icon(Icons.star_rounded, size: 14, color: r.anaRenk),
+                const SizedBox(width: 4),
+                Text("Bu hafta $haftalikXp XP",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: r.anaRenk)),
+                Text("  ·  🌙 Takva Yolu",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: r.yaziRengi.withOpacity(0.35))),
               ],
-            ),
-            const SizedBox(height: 24),
-            
-            // Alt Marka (Branding)
-            Center(
-              child: Text(
-                "🌙 Takva Yolu ile paylaşıldı",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: r.yaziRengi.withOpacity(0.3),
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
             ),
           ],
         ),
       );
 
       // 2. KRİTİK DEĞİŞİKLİK: Directionality ekliyoruz.
-      final image = await _screenshotController.captureFromWidget(
-        Directionality(
-          textDirection: ui.TextDirection.ltr,
-          child: Material(
-            color: Colors.transparent,
-            child: shareWidget,
-          ),
-        ),
-        pixelRatio: 3.0,
-        delay: const Duration(milliseconds: 200),
-      );
+      // captureFromWidget ekran boyutunda çeker ve taşan kısmı keser (rozetler kayboluyordu);
+      // captureFromLongWidget içeriğin gerçek yüksekliğini kullanır
+      Future<Uint8List> yakala(double pixelRatio) => _screenshotController.captureFromLongWidget(
+            Directionality(
+              textDirection: ui.TextDirection.ltr,
+              child: Material(
+                color: Colors.transparent,
+                child: shareWidget,
+              ),
+            ),
+            pixelRatio: pixelRatio,
+            delay: const Duration(milliseconds: 200),
+            context: context,
+            constraints: const BoxConstraints(maxWidth: 400),
+          );
+      final image = await yakala(3.0);
+
+      // Takva Yolu hikayesi Firestore belgesinde base64 olarak saklanır; belge
+      // sınırı 1 MiB. Görsel sığmıyorsa daha düşük çözünürlükte yeniden çekilir.
+      Future<Uint8List?> hikayeGorseli() async {
+        const sinir = 900 * 1024; // base64 hali + diğer alanlar için pay
+        bool sigar(Uint8List b) => (b.length + 2) ~/ 3 * 4 < sinir;
+        if (sigar(image)) return image;
+        for (final oran in [2.0, 1.5, 1.0]) {
+          final b = await yakala(oran);
+          if (sigar(b)) return b;
+        }
+        return null;
+      }
 
       if (!mounted) return;
 
@@ -355,15 +456,26 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
                 onTap: () async {
                   Navigator.pop(context);
                   try {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Bildirim.snackBar(
                       SnackBar(content: Text("Hikaye yükleniyor..."), backgroundColor: r.anaRenk),
                     );
-                    await provider.paylasHaftalikStory(image);
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    final gorsel = await hikayeGorseli();
+                    if (gorsel == null) {
+                      Bildirim.snackBar(
+                        const SnackBar(content: Text("Görsel hikaye için çok büyük, paylaşılamadı."), backgroundColor: Colors.red),
+                      );
+                      return;
+                    }
+                    await provider.paylasHaftalikStory(gorsel);
+                    Bildirim.snackBar(
                       SnackBar(content: Text("Hikayen başarıyla paylaşıldı!"), backgroundColor: Colors.green),
                     );
+                  } on StateError {
+                    Bildirim.snackBar(
+                      SnackBar(content: Text("Hikaye paylaşmak için Takva Yolu hesabına giriş yapmalısın."), backgroundColor: Colors.red),
+                    );
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Bildirim.snackBar(
                       SnackBar(content: Text("Hikaye paylaşılırken bir hata oluştu."), backgroundColor: Colors.red),
                     );
                   }
@@ -379,14 +491,72 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
     }
   }
 
-  Widget _shareMetrik(AppThemeColors r, IconData icon, String baslik, String deger) {
-    return Expanded(
-      child: Column(
+  /// Bu haftanın (Pzt–Paz) namaz dışı ibadetleri (karnede sıfırlar "—" gösterilir)
+  Future<List<({IconData ikon, String deger, String baslik, String? alt})>> _haftalikIbadetler(
+      NamazProvider provider) async {
+    final sanalBugun = DateFormat('yyyy-MM-dd').parse(provider.getSanalGun());
+    final pazartesi = sanalBugun.subtract(Duration(days: sanalBugun.weekday - 1));
+    final gunler = [for (int i = 0; i < 7; i++) DateFormat('yyyy-MM-dd').format(pazartesi.add(Duration(days: i)))];
+    int topla(Map<String, int> m) => gunler.fold(0, (t, g) => t + (m[g] ?? 0));
+
+    await KuranHedefi.ornek.yukle();
+    final kuran = gunler.fold<int>(0, (t, g) => t + (KuranHedefi.ornek.gecmis[g] ?? 0));
+    final prefs = await SharedPreferences.getInstance();
+    int makale = 0;
+    try {
+      final tarihler = json.decode(prefs.getString(AnsiklopediServisi.okunmaTarihiAnahtari) ?? '{}') as Map;
+      makale = tarihler.values.where((t) => gunler.contains(t)).length;
+    } catch (_) {}
+
+    final kazaNamaz = topla(provider.kazaGecmisi);
+    final oruc = gunler.where(provider.orucGunleri.contains).length;
+    final kazaOruc = gunler.where(provider.kazaOrucGunleri.contains).length;
+    final teravih = gunler.where(provider.teravihGunleri.contains).length;
+    final zikir = topla(provider.zikirGecmisi);
+
+    return [
+      (ikon: Icons.history_rounded, deger: kazaNamaz > 0 ? "$kazaNamaz" : "—", baslik: "Kaza namazı", alt: null),
+      (
+        ikon: Icons.nightlight_round,
+        deger: oruc > 0 ? "$oruc gün" : "—",
+        baslik: "Oruç",
+        alt: kazaOruc > 0 ? "$kazaOruc kaza" : null,
+      ),
+      (ikon: Icons.menu_book_rounded, deger: kuran > 0 ? "$kuran sf." : "—", baslik: "Kur'an", alt: null),
+      (ikon: Icons.radio_button_checked_rounded, deger: zikir > 0 ? "$zikir" : "—", baslik: "Zikir", alt: null),
+      (ikon: Icons.auto_stories_rounded, deger: makale > 0 ? "$makale" : "—", baslik: "Makale", alt: null),
+      if (teravih > 0) (ikon: Icons.mosque_outlined, deger: "$teravih gece", baslik: "Teravih", alt: null)
+      else (ikon: Icons.star_rounded, deger: "${provider.streakCount}", baslik: "Seri (gün)", alt: null),
+    ];
+  }
+
+  Widget _karneSatiri(AppThemeColors r, ({IconData ikon, String deger, String baslik, String? alt}) i) {
+    final bos = i.deger == "—";
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
         children: [
-          Icon(icon, color: r.anaRenk, size: 20),
-          SizedBox(height: 4),
-          Text(deger, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: r.yaziRengi)),
-          Text(baslik, style: TextStyle(fontSize: 10, color: r.yaziRengi.withOpacity(0.5))),
+          Icon(i.ikon, size: 15, color: bos ? r.pasifRenk.withOpacity(0.5) : r.anaRenk),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(i.baslik,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: r.yaziRengi.withOpacity(0.7))),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(i.deger,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: bos ? r.yaziRengi.withOpacity(0.3) : r.yaziRengi)),
+              if (i.alt != null)
+                Text(i.alt!, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: r.anaRenk)),
+            ],
+          ),
+          const SizedBox(width: 4),
         ],
       ),
     );
@@ -651,7 +821,10 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
       ),
       body: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(Responsive.w(16)),
+        // Alt boşluk: içerik yüzen menünün arkasından geçer, son öğe menünün üstüne kaydırılabilir
+        padding: EdgeInsets.all(Responsive.w(16)).copyWith(
+          bottom: Responsive.w(16) + MediaQuery.paddingOf(context).bottom,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -670,6 +843,12 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
 
             SizedBox(height: Responsive.h(24)),
 
+            // 🌙 Oruç ve Ramazan
+            if (provider.ramazanda || provider.orucGunleri.isNotEmpty || provider.kazaOrucBorcu > 0) ...[
+              _buildOrucPaneli(context, provider),
+              SizedBox(height: Responsive.h(24)),
+            ],
+
             // 🏅 Rozetler
             _buildRozetler(context, provider),
 
@@ -680,11 +859,128 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
     );
   }
 
+  Widget _buildOrucPaneli(BuildContext context, NamazProvider provider) {
+    final r = context.renkler;
+    final simdi = DateTime.now();
+    final yil = '${simdi.year}-';
+    final ay = DateFormat('yyyy-MM').format(simdi);
+    final buYil = provider.orucGunleri.where((g) => g.startsWith(yil)).length;
+    final buAy = provider.orucGunleri.where((g) => g.startsWith(ay)).length;
+    final gunler = provider.buRamazaninGunleri;
+    final bugun = DateFormat('yyyy-MM-dd').format(simdi);
+    final ramazanTutulan = gunler.where(provider.orucGunleri.contains).length;
+    final ramazanTeravih = gunler.where(provider.teravihGunleri.contains).length;
+
+    Widget metrik(String deger, String ad, IconData ikon) => Expanded(
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: Responsive.h(10)),
+            decoration: BoxDecoration(color: r.icYuzey, borderRadius: BorderRadius.circular(14)),
+            child: Column(
+              children: [
+                Icon(ikon, color: r.anaRenk, size: Responsive.w(18)),
+                Text(deger, style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w900, fontSize: Responsive.sp(18))),
+                Text(ad, textAlign: TextAlign.center, style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10))),
+              ],
+            ),
+          ),
+        );
+
+    return BolumPaneli(
+      margin: EdgeInsets.zero,
+      padding: EdgeInsets.all(Responsive.w(16)),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.nightlight_round, color: r.anaRenk, size: Responsive.w(20)),
+            SizedBox(width: Responsive.w(8)),
+            Text(provider.ramazanda ? "Ramazan" : "Oruç",
+                style: TextStyle(fontSize: Responsive.sp(17), fontWeight: FontWeight.w900, color: r.yaziRengi)),
+            const Spacer(),
+            if (provider.ramazanda)
+              Text("${provider.ramazanGunu}. gün",
+                  style: TextStyle(color: r.anaRenk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(13))),
+          ],
+        ),
+        if (provider.ramazanda) ...[
+          SizedBox(height: Responsive.h(12)),
+          // Ramazan'ın günleri: tutulan oruçlar dolu, teravih kılınan geceler yıldızlı
+          GridView.count(
+            crossAxisCount: 10,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 5,
+            crossAxisSpacing: 5,
+            children: [
+              for (int i = 0; i < gunler.length; i++)
+                Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: provider.orucGunleri.contains(gunler[i])
+                        ? r.anaRenk
+                        : gunler[i].compareTo(bugun) < 0
+                            ? r.kartUstunde(r.kirmizi, 0.12)
+                            : r.icYuzey,
+                    borderRadius: BorderRadius.circular(8),
+                    border: gunler[i] == bugun ? Border.all(color: r.anaRenk, width: 2) : null,
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Text("${i + 1}",
+                          style: TextStyle(
+                            fontSize: Responsive.sp(10),
+                            fontWeight: FontWeight.bold,
+                            color: provider.orucGunleri.contains(gunler[i]) ? Colors.white : r.yaziRengi.withOpacity(0.6),
+                          )),
+                      if (provider.teravihGunleri.contains(gunler[i]))
+                        Positioned(
+                          top: 1,
+                          right: 1,
+                          child: Icon(Icons.star_rounded, size: Responsive.w(8),
+                              color: provider.orucGunleri.contains(gunler[i]) ? Colors.white : r.anaRenk),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(height: Responsive.h(8)),
+          Text("Dolu: oruç tutuldu  •  ★: teravih kılındı  •  kırmızımsı: tutulmadı",
+              style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(10))),
+          SizedBox(height: Responsive.h(12)),
+          Row(
+            children: [
+              metrik("$ramazanTutulan", "Ramazan\norucu", Icons.nightlight_round),
+              SizedBox(width: Responsive.w(8)),
+              metrik("$ramazanTeravih", "Teravih", Icons.mosque_rounded),
+              SizedBox(width: Responsive.w(8)),
+              metrik("${provider.kazaOrucBorcu}", "Kaza\nborcu", Icons.event_repeat_rounded),
+            ],
+          ),
+        ] else ...[
+          SizedBox(height: Responsive.h(12)),
+          Row(
+            children: [
+              metrik("$buAy", "Bu ay", Icons.calendar_month_rounded),
+              SizedBox(width: Responsive.w(8)),
+              metrik("$buYil", "Bu yıl", Icons.nightlight_round),
+              SizedBox(width: Responsive.w(8)),
+              metrik("${provider.kazaOrucBorcu}", "Kaza\nborcu", Icons.event_repeat_rounded),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildRozetler(BuildContext context, NamazProvider provider) {
     final r = context.renkler;
     final rozetler = provider.rozetler;
     final kazanilan = rozetler.where((x) => x.kazanildi).length;
-    return Column(
+    return BolumPaneli(
+      margin: EdgeInsets.zero,
+      padding: EdgeInsets.all(Responsive.w(16)),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -726,7 +1022,7 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
                         ),
                         CircleAvatar(
                           radius: Responsive.w(21),
-                          backgroundColor: rozet.kazanildi ? Colors.amber.withOpacity(0.18) : r.kartRengi,
+                          backgroundColor: rozet.kazanildi ? r.kartUstunde(Colors.amber, 0.18) : r.icYuzey,
                           child: Icon(rozet.ikon,
                               color: rozet.kazanildi ? Colors.amber.shade700 : r.pasifRenk.withOpacity(0.5),
                               size: Responsive.w(22)),
@@ -1138,6 +1434,16 @@ class _IstatistikSayfasiState extends State<IstatistikSayfasi> {
           child: Stack(
             alignment: Alignment.center,
             children: [
+              if (provider.orucGunleri.contains(dateKey))
+                Positioned(
+                  bottom: 2,
+                  left: 2,
+                  child: Icon(
+                    Icons.nightlight_round,
+                    color: Colors.white,
+                    size: Responsive.w(8),
+                  ),
+                ),
               if (isDiniGun) ...[
                 Positioned(
                   top: 2,

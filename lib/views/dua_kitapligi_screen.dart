@@ -1,3 +1,4 @@
+import '../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -5,6 +6,8 @@ import '../core/constants/app_colors.dart';
 import '../core/constants/dualar.dart';
 import '../core/utils/responsive.dart';
 import '../services/dua_oynatici.dart';
+import '../services/ezber_servisi.dart';
+import 'dua_ezber_screen.dart';
 import 'widgets/ayet_metni.dart';
 
 /// Namaz ve sabah-akşam duaları: Arapça, okunuş ve meal. Her duanın sağındaki düğmeyle dinlenir.
@@ -34,8 +37,14 @@ class _DuaKitapligiScreenState extends State<DuaKitapligiScreen> {
     final h = _oynatici?.hata;
     if (h != null && mounted) {
       _oynatici!.hata = null;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(h)));
+      Bildirim.snackBar(SnackBar(content: Text(h)));
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    EzberServisi.ornek.yukle();
   }
 
   @override
@@ -44,11 +53,45 @@ class _DuaKitapligiScreenState extends State<DuaKitapligiScreen> {
     super.dispose();
   }
 
+  void _ezberAc(Dua dua) async {
+    await _oynatici?.durdur();
+    if (!mounted) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => DuaEzberScreen(dua: dua)));
+  }
+
+  /// Satırdaki ezber durumu
+  Widget? _ezberEtiketi(AppThemeColors r, Dua dua) {
+    final d = EzberServisi.ornek.durum(dua.baslik);
+    if (d == null) return null;
+    final (String yazi, Color renk) = d.tekrarZamani
+        ? ("Tekrar zamanı", r.anaRenk)
+        : d.ezberlendi
+            ? ("Ezberlendi", const Color(0xFF2E9D57))
+            : ("Ezber ${d.kutu}/${EzberDurumu.enUstKutu}", r.pasifRenk);
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: renk.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+      child: Text(yazi, style: TextStyle(color: renk, fontSize: Responsive.sp(10), fontWeight: FontWeight.bold)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
     final r = context.renkler;
     const kategoriler = [namazDualari, sabahAksam];
+    return ListenableBuilder(
+      listenable: EzberServisi.ornek,
+      builder: (context, _) => _govde(context, r, kategoriler),
+    );
+  }
+
+  Widget _govde(BuildContext context, AppThemeColors r, List<String> kategoriler) {
+    final bekleyen = [
+      for (final b in EzberServisi.ornek.tekrarBekleyenler)
+        if (dualar.where((d) => d.baslik == b).firstOrNull case final d?) d,
+    ];
 
     return DefaultTabController(
       length: kategoriler.length,
@@ -72,6 +115,24 @@ class _DuaKitapligiScreenState extends State<DuaKitapligiScreen> {
               ListView(
                 padding: EdgeInsets.all(Responsive.w(16)),
                 children: [
+                  if (bekleyen.isNotEmpty)
+                    Card(
+                      color: r.anaRenk,
+                      elevation: 0,
+                      margin: EdgeInsets.only(bottom: Responsive.h(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        leading: const Icon(Icons.school_rounded, color: Colors.white),
+                        title: Text("Bugün tekrar: ${bekleyen.length} dua",
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        subtitle: Text(bekleyen.map((d) => d.baslik).join(", "),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white.withOpacity(0.85))),
+                        trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                        onTap: () => _ezberAc(bekleyen.first),
+                      ),
+                    ),
                   for (final dua in dualar.where((d) => d.kategori == k))
                     Card(
                       color: r.kartRengi,
@@ -80,9 +141,15 @@ class _DuaKitapligiScreenState extends State<DuaKitapligiScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       child: ListTile(
                         title: Text(dua.baslik, style: TextStyle(fontWeight: FontWeight.bold, color: r.yaziRengi)),
-                        subtitle: Text(
-                          dua.kaynak ?? "Okuyan: telefonun Arapça sesi",
-                          style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              dua.kaynak ?? "Okuyan: telefonun Arapça sesi",
+                              style: TextStyle(color: r.pasifRenk, fontSize: Responsive.sp(11)),
+                            ),
+                            ?_ezberEtiketi(r, dua),
+                          ],
                         ),
                         trailing: _OynatDugmesi(
                           oynatici: _oynatici?.dua == dua ? _oynatici : null,
@@ -143,7 +210,7 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
     final h = _oynatici.hata;
     if (h != null && mounted) {
       _oynatici.hata = null;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(h)));
+      Bildirim.snackBar(SnackBar(content: Text(h)));
     }
   }
 
@@ -235,6 +302,15 @@ class _DuaDetayScreenState extends State<DuaDetayScreen> {
         centerTitle: true,
         title: Text(dua.baslik, style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.bold)),
         actions: [
+          IconButton(
+            tooltip: "Ezberle",
+            icon: Icon(Icons.school_rounded, color: r.anaRenk),
+            onPressed: () async {
+              await _oynatici.durdur();
+              if (!context.mounted) return;
+              Navigator.push(context, MaterialPageRoute(builder: (_) => DuaEzberScreen(dua: dua)));
+            },
+          ),
           IconButton(
             icon: Icon(Icons.share_rounded, color: r.anaRenk),
             onPressed: () => Share.share(

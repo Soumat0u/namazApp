@@ -68,6 +68,12 @@ class DiniGunlerUtil {
     return (ay: ay, gun: gun, ayUzunlugu: ayUzunlugu);
   }
 
+  /// Bir günün Diyanet takvimine göre hicrî ayı ve günü (Ramazan modunun tespiti için)
+  static ({int ay, int gun}) diyanetHicriTarih(Map<String, dynamic> dayData) {
+    final h = _diyanetHicri(dayData['date']['hijri']);
+    return (ay: h.ay, gun: h.gun);
+  }
+
   /// Aladhan'dan gelen günlük objeyi analiz edip ReligiousDay listesine dönüştürür.
   /// Tarihler Diyanet'in takvim kuralına göre hesaplanır (kandiller bir önceki akşam).
   static List<ReligiousDay> parseAladhanDay(Map<String, dynamic> dayData) {

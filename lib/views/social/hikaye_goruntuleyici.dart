@@ -122,11 +122,36 @@ class _StoryViewerContentState extends State<_StoryViewerContent> with TickerPro
   late PageController _pageController;
   late AnimationController _progressController;
   int _currentIndex = 0;
+  // base64 her build'de yeniden çözülmesin (görsel titremesin, boşa iş olmasın)
+  final Map<int, Uint8List> _gorseller = {};
+
+  Uint8List _gorsel(int i) => _gorseller.putIfAbsent(i, () {
+        try {
+          return base64Decode(widget.stories[i].imageUrl);
+        } catch (_) {
+          return Uint8List(0);
+        }
+      });
+
+  /// Arkadaşın hikayesi ekrana geldiğinde izlenme kaydı (yalnızca ilk açılan değil, kaydırılarak gelenler de)
+  void _izlenmeKaydet(int i) {
+    final p = context.read<NamazProvider>();
+    final s = widget.stories[i];
+    if (p.currentUid == null || s.uid == p.currentUid) return;
+    FirebaseService().recordStoryView(
+      storyUid: s.uid,
+      viewerUid: p.currentUid!,
+      viewerDisplayName: p.currentUsername,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _izlenmeKaydet(_currentIndex);
+    });
     _pageController = PageController(initialPage: widget.initialIndex);
     _progressController = AnimationController(
       vsync: this,
@@ -190,6 +215,7 @@ class _StoryViewerContentState extends State<_StoryViewerContent> with TickerPro
             setState(() {
               _currentIndex = index;
             });
+            _izlenmeKaydet(index);
             _startStory();
           },
         itemBuilder: (context, index) {
@@ -201,8 +227,10 @@ class _StoryViewerContentState extends State<_StoryViewerContent> with TickerPro
               // 1. BULANIK ARKA PLAN
               Positioned.fill(
                 child: Image.memory(
-                  base64Decode(story.imageUrl),
+                  _gorsel(index),
                   fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),
               Positioned.fill(
@@ -305,7 +333,9 @@ class _StoryViewerContentState extends State<_StoryViewerContent> with TickerPro
                     // Hikaye Görseli
                     Expanded(
                       child: GestureDetector(
-                        onTapDown: (details) {
+                        // onTapUp: basılı tutup durdururken hikaye atlanmasın
+                        // (onTapDown parmak değer değmez çalışıyordu)
+                        onTapUp: (details) {
                           final screenWidth = MediaQuery.of(context).size.width;
                           if (details.globalPosition.dx < screenWidth / 3) {
                             _previousStory();
@@ -325,8 +355,12 @@ class _StoryViewerContentState extends State<_StoryViewerContent> with TickerPro
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
                             child: Image.memory(
-                              base64Decode(story.imageUrl),
+                              _gorsel(index),
                               fit: BoxFit.contain,
+                              gaplessPlayback: true,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Text("Hikaye görüntülenemedi.", style: TextStyle(color: Colors.white70)),
+                              ),
                             ),
                           ),
                         ),

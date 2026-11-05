@@ -8,13 +8,12 @@ part of '../social_screen.dart';
 void duaSecenekleriniGoster(BuildContext context, AppThemeColors r, PrayerPost prayer, String? currentUid) {
   if (currentUid == null) return;
   final servis = FirebaseService();
-  final messenger = ScaffoldMessenger.of(context);
   final benim = prayer.senderUid == currentUid;
 
   Future<void> calistir(BuildContext sheet, Future<String?> islem, String basari) async {
     Navigator.pop(sheet);
     final hata = await islem;
-    messenger.showSnackBar(SnackBar(content: Text(hata ?? basari)));
+    Bildirim.snackBar(SnackBar(content: Text(hata ?? basari)));
   }
 
   showModalBottomSheet(
@@ -30,7 +29,14 @@ void duaSecenekleriniGoster(BuildContext context, AppThemeColors r, PrayerPost p
             ListTile(
               leading: Icon(Icons.delete_outline_rounded, color: r.kirmizi),
               title: Text("Duayı Sil", style: TextStyle(color: r.kirmizi, fontWeight: FontWeight.bold)),
-              onTap: () => calistir(sheet, servis.duayiSil(prayer.id), "Dua silindi."),
+              onTap: () async {
+                final provider = context.read<NamazProvider>();
+                Navigator.pop(sheet);
+                final hata = await servis.duayiSil(prayer.id);
+                // Paylaşırken verilen XP geri alınır: sil-paylaş döngüsüyle XP kasılmasın
+                if (hata == null) await provider.xpEkle(-SeviyeServisi.duaXp);
+                Bildirim.snackBar(SnackBar(content: Text(hata ?? "Dua silindi.")));
+              },
             )
           else ...[
             ListTile(

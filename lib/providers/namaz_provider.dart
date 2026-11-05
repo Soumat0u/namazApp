@@ -1022,6 +1022,13 @@ class NamazProvider extends ChangeNotifier {
     orucGunleri = (prefs.getStringList('oruc_gunleri') ?? []).toSet();
     kazaOrucBorcu = prefs.getInt('kaza_oruc_borcu') ?? 0;
     kilinanKazaOrucu = prefs.getInt('kilinan_kaza_orucu') ?? 0;
+    kazaOrucGunleri = (prefs.getStringList('kaza_oruc_gunleri') ?? []).toSet();
+    teravihGunleri = (prefs.getStringList('teravih_gunleri') ?? []).toSet();
+    ramazanOnizleme = prefs.getBool('ramazan_onizleme') ?? false;
+    try {
+      final h = json.decode(prefs.getString('hicri_takvim') ?? '{}') as Map<String, dynamic>;
+      hicriGunler = {for (final e in h.entries) e.key: (ay: (e.value[0] as num).toInt(), gun: (e.value[1] as num).toInt())};
+    } catch (_) {}
 
     String? cachedVakitlerString = prefs.getString('cached_vakitler');
     if (cachedVakitlerString != null) {
@@ -1148,6 +1155,22 @@ class NamazProvider extends ChangeNotifier {
     await _rozetKontrol();
     notifyListeners();
     return kilinan;
+  }
+
+  /// Yanlışlıkla işaretlenen kaza namazını geri alır (kılınan sayısı, XP ve günlük geçmiş düşer)
+  Future<void> kazaGeriAl(String vakit, {int adet = 1}) async {
+    final mevcut = _kazaBorclari[vakit] ?? {'toplamBorc': 0, 'kilinmis': 0};
+    final kilinmis = mevcut['kilinmis'] ?? 0;
+    final geri = min(adet, kilinmis);
+    if (geri <= 0) return;
+    _kazaBorclari[vakit] = {'toplamBorc': mevcut['toplamBorc'] ?? 0, 'kilinmis': kilinmis - geri};
+    await _localDbService.updateKazaBorc(vakit, kilinmis: kilinmis - geri);
+    await xpEkle(-SeviyeServisi.kazaXp * geri);
+    final bugunStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    kazaGecmisi[bugunStr] = max(0, (kazaGecmisi[bugunStr] ?? 0) - geri);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('kazaGecmisi', json.encode(kazaGecmisi));
+    notifyListeners();
   }
 
   /// Tüm vakitler için toplu kaza kılar (1 günlük paket = her vakitten 1). Kılınan toplam adedi döner.
@@ -2082,6 +2105,8 @@ class NamazProvider extends ChangeNotifier {
   Set<String> orucGunleri = {}; // Tutulan oruçlar ("yyyy-MM-dd")
   int kazaOrucBorcu = 0;
   int kilinanKazaOrucu = 0;
+  /// Kaza orucu tutulan günler ("yyyy-MM-dd"); haftalık paylaşım için
+  Set<String> kazaOrucGunleri = {};
 
   bool get bugunOrucTutuldu => orucGunleri.contains(_gunFormati.format(DateTime.now()));
 
@@ -2099,6 +2124,7 @@ class NamazProvider extends ChangeNotifier {
     await prefs.setStringList('oruc_gunleri', orucGunleri.toList());
     await prefs.setInt('kaza_oruc_borcu', kazaOrucBorcu);
     await prefs.setInt('kilinan_kaza_orucu', kilinanKazaOrucu);
+    await prefs.setStringList('kaza_oruc_gunleri', kazaOrucGunleri.toList());
   }
 
   Future<void> orucModuDegistir(bool acik) async {
@@ -2108,10 +2134,14 @@ class NamazProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> bugunOrucDegistir(bool tuttu) async {
-    final bugun = _gunFormati.format(DateTime.now());
+  Future<void> bugunOrucDegistir(bool tuttu) => orucGunuDegistir(_gunFormati.format(DateTime.now()), tuttu);
+
+  /// Bir günün orucunu işaretler/kaldırır ("yyyy-MM-dd"; geçmişte unutulan günler için de)
+  Future<void> orucGunuDegistir(String gun, bool tuttu) async {
+    final bugun = gun;
     if (tuttu == orucGunleri.contains(bugun)) return;
     tuttu ? orucGunleri.add(bugun) : orucGunleri.remove(bugun);
+    if (!tuttu) kazaOrucGunleri.remove(bugun);
     await _xpGuncelle(tuttu ? orucXp : -orucXp);
     await _orucKaydet();
     notifyListeners();
@@ -2123,11 +2153,66 @@ class NamazProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ══════════════════════════════════════════
+  // 🌙 RAMAZAN MODU
+  // ══════════════════════════════════════════
+
+  static const int teravihXp = 15;
+
+  /// Günlerin Diyanet'e göre hicrî tarihi ("yyyy-MM-dd" → ay, gün)
+  Map<String, ({int ay, int gun})> hicriGunler = {};
+  Set<String> teravihGunleri = {}; // Teravih kılınan geceler ("yyyy-MM-dd", o günün tarihi)
+  /// Ramazan dışında Ramazan görünümünü denemek için (Ayarlar)
+  bool ramazanOnizleme = false;
+  static const int _onizlemeGunu = 12;
+
+  /// Bugün Ramazan'ın kaçıncı günü (Ramazan değilse null)
+  int? get ramazanGunu {
+    if (ramazanOnizleme) return _onizlemeGunu;
+    final h = hicriGunler[_gunFormati.format(DateTime.now())];
+    return h != null && h.ay == 9 ? h.gun : null;
+  }
+
+  bool get ramazanda => ramazanGunu != null;
+
+  /// Bu Ramazan'ın günleri, sırayla ("yyyy-MM-dd"). Takvimde henüz olmayan
+  /// sonraki günler bugünden ileri sayılarak tamamlanır (30 güne kadar).
+  List<String> get buRamazaninGunleri {
+    final gun = ramazanGunu;
+    if (gun == null) return const [];
+    final bugun = DateTime.now();
+    final bas = DateTime(bugun.year, bugun.month, bugun.day - (gun - 1));
+    final bilinenSon = ramazanOnizleme
+        ? 30
+        : (hicriGunler.values.where((h) => h.ay == 9).map((h) => h.gun).fold<int>(0, max)).clamp(29, 30);
+    return [for (int i = 0; i < bilinenSon; i++) _gunFormati.format(DateTime(bas.year, bas.month, bas.day + i))];
+  }
+
+  bool get buGeceTeravihKilindi => teravihGunleri.contains(_gunFormati.format(DateTime.now()));
+
+  Future<void> teravihDegistir(bool kildi) async {
+    final bugun = _gunFormati.format(DateTime.now());
+    if (kildi == teravihGunleri.contains(bugun)) return;
+    kildi ? teravihGunleri.add(bugun) : teravihGunleri.remove(bugun);
+    await _xpGuncelle(kildi ? teravihXp : -teravihXp);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('teravih_gunleri', teravihGunleri.toList());
+    notifyListeners();
+  }
+
+  Future<void> ramazanOnizlemeDegistir(bool acik) async {
+    ramazanOnizleme = acik;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('ramazan_onizleme', acik);
+    notifyListeners();
+  }
+
   /// Bir kaza orucu tutuldu: borçtan düşer, bugünü de tutulmuş sayar
   Future<void> kazaOrucuTuttum() async {
     if (kazaOrucBorcu <= 0) return;
     kazaOrucBorcu--;
     kilinanKazaOrucu++;
+    kazaOrucGunleri.add(_gunFormati.format(DateTime.now()));
     await _orucKaydet();
     await bugunOrucDegistir(true);
   }
@@ -2149,6 +2234,16 @@ class NamazProvider extends ChangeNotifier {
       for (var d in liste) {
         tumDiniGunler[d.dateStr] = d;
       }
+      // Hicrî tarihler (Ramazan modu): aynı istekten gelir, çevrimdışı da bilinsin diye saklanır
+      final hicri = await _namazServisi.hicriTarihleriGetir(year, month, position: pos);
+      if (hicri.isNotEmpty) {
+        hicriGunler.addAll(hicri);
+        final esik = _gunFormati.format(DateTime.now().subtract(const Duration(days: 40)));
+        hicriGunler.removeWhere((k, _) => k.compareTo(esik) < 0);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('hicri_takvim',
+            json.encode({for (final e in hicriGunler.entries) e.key: [e.value.ay, e.value.gun]}));
+      }
       _aylikDiniGunlerCache.add(cacheKey);
     } catch (_) {}
 
@@ -2161,12 +2256,13 @@ class NamazProvider extends ChangeNotifier {
 
   /// Haftalık özeti story olarak paylaşır
   Future<void> paylasHaftalikStory(Uint8List imageBytes) async {
-    if (currentUid == null) return;
+    // Giriş yoksa sessizce dönmek "paylaşıldı" sanılmasına yol açıyordu
+    if (currentUid == null) throw StateError('giris_yok');
 
     try {
       // Future sürümünü kullanarak profil verisini al
       final user = await _firebaseService.getUserProfileFuture(currentUid!);
-      if (user == null) return;
+      if (user == null) throw StateError('profil_yok');
 
       final base64Image = base64Encode(imageBytes);
       

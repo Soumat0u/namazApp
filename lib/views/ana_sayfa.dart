@@ -1,3 +1,9 @@
+import '../services/ansiklopedi_servisi.dart';
+import 'ansiklopedi_screen.dart';
+import '../core/constants/esmaul_husna.dart';
+import 'esma_screen.dart';
+import 'widgets/ramazan_karti.dart';
+import '../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
@@ -31,12 +37,26 @@ class _AnaSayfaState extends State<AnaSayfa> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    AnsiklopediServisi.ornek.addListener(_ansiklopediDegisti);
+    AnsiklopediServisi.ornek.yukle();
+  }
+
+  void _ansiklopediDegisti() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    AnsiklopediServisi.ornek.removeListener(_ansiklopediDegisti);
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// Günün bilgisi (ansiklopedi): bugünün hicrî tarihine ayrılmış madde öncelikli
+  Madde? _gununBilgisi(NamazProvider provider) {
+    final b = DateTime.now();
+    final anahtar = '${b.year}-${b.month.toString().padLeft(2, '0')}-${b.day.toString().padLeft(2, '0')}';
+    return AnsiklopediServisi.ornek.gununMaddesi(hicri: provider.hicriGunler[anahtar]);
   }
 
   @override
@@ -49,7 +69,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
       provider.yeniRozet = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          Bildirim.snackBar(
             SnackBar(
               content: Row(
                 children: [
@@ -71,9 +91,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
       provider.seriDondurmaMesaji = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(mesaj)));
+          Bildirim.snackBar(SnackBar(content: Text(mesaj)));
       });
     }
 
@@ -86,9 +104,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
     if (provider.hataMesaji.contains("çevrimdışı") &&
         provider.vakitler != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(provider.hataMesaji)));
+        Bildirim.snackBar(SnackBar(content: Text(provider.hataMesaji)));
         provider.hataMesaji = "";
       });
     }
@@ -101,6 +117,9 @@ class _AnaSayfaState extends State<AnaSayfa> {
     return SafeArea(
       left: false,
       right: false,
+      // Alt boşluk SafeArea ile değil kaydırma içeriğiyle verilir: içerik yüzen
+      // menünün arkasından geçebilsin, son öğe yine de menünün üstüne kaydırılabilsin
+      bottom: false,
       child: RefreshIndicator(
         color: context.renkler.anaRenk,
         backgroundColor: context.renkler.kartRengi,
@@ -109,6 +128,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
         ),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -171,6 +191,9 @@ class _AnaSayfaState extends State<AnaSayfa> {
 
               SizedBox(height: Responsive.h(16)),
 
+              // Ramazan'da oruç ana sayfadan işaretlenir (zorunlu ibadet: araçlarda saklı kalmasın)
+              if (provider.ramazanda) const RamazanKarti(),
+
               _buildDiniGunBanner(context, provider),
               _buildCumaVeGeriSayim(context, provider),
 
@@ -193,6 +216,13 @@ class _AnaSayfaState extends State<AnaSayfa> {
                     _buildKerahatUyarisi(context, provider),
                     SizedBox(height: Responsive.h(16)),
                     _buildPrayerButton(context, provider),
+                    // Günün ismi ve bilgisi: vakit takibinin altında ayrı kartlar
+                    SizedBox(height: Responsive.h(20)),
+                    const _GununEsmasiCard(),
+                    if (_gununBilgisi(provider) case final madde?) ...[
+                      SizedBox(height: Responsive.h(16)),
+                      _GununBilgisiAnaKarti(madde: madde),
+                    ],
                   ],
                 ),
               ),
@@ -239,11 +269,12 @@ class _AnaSayfaState extends State<AnaSayfa> {
             ],
           ),
         ),
-        if (provider.gununAyetiMeali.isNotEmpty) ...[
+        ...[
           SizedBox(height: Responsive.h(8)),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(2, (index) {
+            children: List.generate(
+                1 + (provider.gununAyetiMeali.isNotEmpty ? 1 : 0), (index) {
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -786,6 +817,15 @@ class _AnaSayfaState extends State<AnaSayfa> {
                     color: r.yaziRengi.withOpacity(0.7),
                   ),
                 ),
+                if (provider.ramazanda)
+                  Text(
+                    "Ramazan'ın ${provider.ramazanGunu}. günü",
+                    style: TextStyle(
+                      fontSize: Responsive.sp(12),
+                      fontWeight: FontWeight.w800,
+                      color: r.anaRenk,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -844,7 +884,7 @@ class _AnaSayfaState extends State<AnaSayfa> {
             children: [
               InkWell(
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  Bildirim.snackBar(
                     const SnackBar(
                       content: Text("Konum güncelleniyor..."),
                       duration: Duration(seconds: 1),
@@ -1171,10 +1211,9 @@ void _vakteDokunuldu(
   NamazProvider provider,
   String vakit,
 ) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger.hideCurrentSnackBar();
+  Bildirim.kapat();
   if (!provider.vakitIsimleri.contains(vakit)) {
-    messenger.showSnackBar(
+    Bildirim.snackBar(
       const SnackBar(content: Text("Güneş doğuşu bir namaz vakti değil.")),
     );
     return;
@@ -1183,7 +1222,7 @@ void _vakteDokunuldu(
     final sira = provider.vakitIsimleri.indexOf(vakit);
     final aktifSira = provider.vakitIsimleri.indexOf(provider.aktifVakit);
     final gecti = aktifSira == -1 ? sira == 0 : sira < aktifSira;
-    messenger.showSnackBar(
+    Bildirim.snackBar(
       SnackBar(
         content: Text(
           gecti
@@ -1196,7 +1235,7 @@ void _vakteDokunuldu(
   }
   final yeniDurum = !(provider.kildiMi[vakit] ?? false);
   provider.vaktiKildimIsaretle(vakit, yeniDurum);
-  messenger.showSnackBar(
+  Bildirim.snackBar(
     SnackBar(
       content: Text(
         yeniDurum
@@ -1390,6 +1429,180 @@ class _VakitIkonuState extends State<_VakitIkonu>
         size: widget.size,
         color: widget.color,
         shadows: [Shadow(color: widget.color.withOpacity(0.5), blurRadius: 10)],
+      ),
+    );
+  }
+}
+
+/// Günün ismi (Esmâ-ül Hüsnâ): dokununca ismin sayfası ve zikir sayacı açılır
+/// Tema renginin tonu: [acik] 0..1 arası açıklık (HSL lightness)
+Color _ton(Color renk, double acik) {
+  final hsl = HSLColor.fromColor(renk);
+  return hsl.withLightness(acik.clamp(0.0, 1.0)).toColor();
+}
+
+/// Ana sayfada günün esması: temanın koyu tonunda, yatay ve kompakt kart
+class _GununEsmasiCard extends StatelessWidget {
+  const _GununEsmasiCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.renkler;
+    final e = Esma.gunun();
+    final koyu = _ton(r.anaRenk, 0.18);
+    final orta = _ton(r.anaRenk, 0.30);
+    final vurgu = _ton(r.anaRenk, 0.80);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(Responsive.w(20)),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EsmaScreen(acilacak: e))),
+        child: Ink(
+          padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(14), Responsive.w(18), Responsive.h(14)),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [koyu, orta],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(Responsive.w(20)),
+            boxShadow: [BoxShadow(color: koyu.withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 6))],
+          ),
+          child: Row(
+            children: [
+              // Arapça isim, açık tonlu bir madalyon içinde
+              Container(
+                width: Responsive.w(76),
+                height: Responsive.w(76),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.08),
+                  border: Border.all(color: vurgu.withOpacity(0.6), width: 1.5),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(Responsive.w(8)),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(e.arapca, style: TextStyle(color: vurgu, fontSize: Responsive.sp(26), height: 1.4)),
+                  ),
+                ),
+              ),
+              SizedBox(width: Responsive.w(14)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.auto_awesome, color: vurgu, size: Responsive.w(13)),
+                        SizedBox(width: Responsive.w(6)),
+                        Text("GÜNÜN İSMİ",
+                            style: TextStyle(
+                                color: vurgu, fontWeight: FontWeight.w900, fontSize: Responsive.sp(11), letterSpacing: 1.8)),
+                      ],
+                    ),
+                    SizedBox(height: Responsive.h(4)),
+                    Text(e.okunus,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: Responsive.sp(18))),
+                    SizedBox(height: Responsive.h(2)),
+                    Text(e.anlam,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: Responsive.sp(13), height: 1.3)),
+                    SizedBox(height: Responsive.h(6)),
+                    Text("Dokun, zikret: ${e.zikir}",
+                        style: TextStyle(color: vurgu, fontWeight: FontWeight.w700, fontSize: Responsive.sp(11))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ana sayfada günün bilgisi: temanın açık tonunda, daha geniş içerikli kart
+class _GununBilgisiAnaKarti extends StatelessWidget {
+  final Madde madde;
+  const _GununBilgisiAnaKarti({required this.madde});
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.renkler;
+    final k = kategoriBul(madde.kategori);
+    final koyuTema = r.kartRengi.computeLuminance() < 0.2;
+    // Açık temada renk ağırlıklı pastel, koyu temada kart rengine karışmış hafif ton
+    final zemin = koyuTema
+        ? Color.alphaBlend(r.anaRenk.withOpacity(0.14), r.kartRengi)
+        : _ton(r.anaRenk, 0.93);
+    final serit = r.anaRenk;
+    final baslikRengi = koyuTema ? _ton(r.anaRenk, 0.80) : _ton(r.anaRenk, 0.25);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(Responsive.w(20)),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MaddeScreen(madde: madde))),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: zemin,
+            borderRadius: BorderRadius.circular(Responsive.w(20)),
+            border: Border.all(color: serit.withOpacity(0.25)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(Responsive.w(20)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(Responsive.w(7)),
+                      decoration: BoxDecoration(color: serit.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                      child: Icon(Icons.menu_book_rounded, color: serit, size: Responsive.w(16)),
+                    ),
+                    SizedBox(width: Responsive.w(10)),
+                    Text("GÜNÜN BİLGİSİ",
+                        style: TextStyle(
+                            color: baslikRengi, fontWeight: FontWeight.w900, fontSize: Responsive.sp(12), letterSpacing: 2)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(color: serit.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                      child: Text(k.ad,
+                          style: TextStyle(color: baslikRengi, fontSize: Responsive.sp(10), fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                SizedBox(height: Responsive.h(14)),
+                Text(madde.baslik,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: r.yaziRengi, fontWeight: FontWeight.w900, fontSize: Responsive.sp(21))),
+                SizedBox(height: Responsive.h(6)),
+                Text(madde.ozet,
+                    maxLines: 5,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: r.yaziRengi.withOpacity(0.8), fontSize: Responsive.sp(14), height: 1.45)),
+                SizedBox(height: Responsive.h(12)),
+                Row(
+                  children: [
+                    Text("Devamını oku",
+                        style: TextStyle(color: serit, fontWeight: FontWeight.w800, fontSize: Responsive.sp(13))),
+                    SizedBox(width: Responsive.w(4)),
+                    Icon(Icons.arrow_forward_rounded, color: serit, size: Responsive.w(16)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1996,9 +2209,7 @@ class _TilavetButonu extends StatelessWidget {
             final h = okuyucu.hata;
             if (h == null) return;
             okuyucu.hata = null;
-            ScaffoldMessenger.maybeOf(
-              context,
-            )?.showSnackBar(SnackBar(content: Text(h)));
+            Bildirim.snackBar(SnackBar(content: Text(h)));
           });
         }
         return IconButton(

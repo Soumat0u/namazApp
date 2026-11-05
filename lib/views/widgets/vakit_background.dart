@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
+import '../../core/theme/vakit_paleti.dart';
+
 // 1. ADIM: Sınıfı en dışa (top-level) taşıdık.
 class ShootingStar {
   final double startX;
@@ -92,45 +94,13 @@ class _VakitBackgroundState extends State<VakitBackground>
   }
 
   LinearGradient _getGradient(String tema) {
-    switch (tema) {
-      case 'dawn':
-        return const LinearGradient(
-          colors: [Color(0xFF2C3E50), Color(0xFFFD746C)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        );
-      case 'morning':
-        return const LinearGradient(
-          colors: [Color(0xFF4facfe), Color(0xFF00f2fe)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case 'day':
-        return const LinearGradient(
-          colors: [Color(0xFF2980B9), Color(0xFF6DD5FA)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        );
-      case 'afternoon':
-        return const LinearGradient(
-          colors: [Color(0xFFf093fb), Color(0xFFf5576c)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        );
-      case 'sunset':
-        return const LinearGradient(
-          colors: [Color(0xFF434343), Color(0xFF000000)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        );
-      case 'night':
-      default:
-        return const LinearGradient(
-          colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        );
-    }
+    // Renkler VakitPaleti'nden: sayfa arka planı da aynı renk ailesini kullanır
+    final (begin, end) = switch (tema) {
+      'morning' => (Alignment.topLeft, Alignment.bottomRight),
+      'afternoon' => (Alignment.topRight, Alignment.bottomLeft),
+      _ => (Alignment.topCenter, Alignment.bottomCenter),
+    };
+    return LinearGradient(colors: VakitPaleti.gecis(tema), begin: begin, end: end);
   }
 }
 

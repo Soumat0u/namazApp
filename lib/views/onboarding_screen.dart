@@ -1,3 +1,4 @@
+import '../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -87,7 +88,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          Bildirim.snackBar(
             const SnackBar(content: Text('Konum servisi kapalı. Lütfen ayarlardan açın.')),
           );
         }

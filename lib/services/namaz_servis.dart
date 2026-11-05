@@ -122,6 +122,18 @@ class NamazServisi {
     return sonuc;
   }
 
+  /// Ayın her günü için Diyanet'e göre hicrî ay ve gün. Anahtar: "yyyy-MM-dd"
+  Future<Map<String, ({int ay, int gun})>> hicriTarihleriGetir(int year, int month, {required Position position}) async {
+    final gunler = await _aylikTakvim(year, month, position);
+    return {
+      for (final gun in gunler)
+        () {
+          final p = (gun['date']['gregorian']['date'] as String).split('-'); // DD-MM-YYYY
+          return '${p[2]}-${p[1]}-${p[0]}';
+        }(): DiniGunlerUtil.diyanetHicriTarih(Map<String, dynamic>.from(gun)),
+    };
+  }
+
   Future<List<ReligiousDay>> diniGunleriGetir(int year, int month, {required Position position}) async {
     try {
       final days = await _aylikTakvim(year, month, position);

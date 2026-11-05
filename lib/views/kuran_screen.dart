@@ -1,3 +1,4 @@
+import '../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:quran/quran.dart' as quran;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,7 +8,11 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../core/constants/app_colors.dart';
 import '../core/utils/responsive.dart';
 import '../services/kuran_okuyucu.dart';
+import 'dart:async';
+
+import '../services/kuran_hedefi.dart';
 import 'widgets/ayet_metni.dart';
+import 'widgets/kuran_hedef_karti.dart';
 
 /// "Kaldığın yer" ve okuma ayarları (telefonda saklanır)
 class KuranAyarlari {
@@ -96,6 +101,10 @@ class _KuranScreenState extends State<KuranScreen> {
         ),
         body: Column(
           children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(12), Responsive.w(16), 0),
+              child: const KuranHedefKarti(),
+            ),
             if (_kaldigim != null)
               Padding(
                 padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(12), Responsive.w(16), 0),
@@ -220,6 +229,12 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
   // Tembel liste: yalnızca ekrandaki ayetler çizilir (Bakara gibi uzun surelerde donmayı önler);
   // ayete numarasıyla atlanabilir.
   final ItemScrollController _kaydirma = ItemScrollController();
+  // Günlük hedef: bir sayfa ekranda toplam 20 sn kalınca okunmuş sayılır
+  // (hızla kaydırılıp geçilen sayfalar sayılmaz)
+  final ItemPositionsListener _konumlar = ItemPositionsListener.create();
+  final Map<int, int> _sayfaSuresi = {};
+  Timer? _sayfaSayaci;
+  static const _okunduEsigi = 20;
   bool get _besmele => widget.sure != 1 && widget.sure != 9; // Fâtiha'da 1. ayet, Tevbe besmelesiz
   int _ayetIndeksi(int ayet) => ayet - 1 + (_besmele ? 1 : 0);
   bool _mealGoster = true;
@@ -234,6 +249,24 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
     super.initState();
     _ayarlariYukle();
     _okuyucu.addListener(_okunaniTakipEt);
+    KuranHedefi.ornek.yukle();
+    _sayfaSayaci = Timer.periodic(const Duration(seconds: 1), (_) => _sayfalariSay());
+  }
+
+  void _sayfalariSay() {
+    if (!mounted || WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
+    final sayfalar = <int>{};
+    for (final k in _konumlar.itemPositions.value) {
+      if (k.itemTrailingEdge <= 0 || k.itemLeadingEdge >= 1) continue; // ekranda değil
+      final ayet = k.index + 1 - (_besmele ? 1 : 0);
+      if (ayet < 1 || ayet > _ayetSayisi) continue;
+      sayfalar.add(quran.getPageNumber(widget.sure, ayet));
+    }
+    for (final s in sayfalar) {
+      final sure = (_sayfaSuresi[s] ?? 0) + 1;
+      _sayfaSuresi[s] = sure;
+      if (sure == _okunduEsigi) KuranHedefi.ornek.sayfaOkundu(s);
+    }
   }
 
   Future<void> _ayarlariYukle() async {
@@ -271,6 +304,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
 
   @override
   void dispose() {
+    _sayfaSayaci?.cancel();
     _okuyucu.removeListener(_okunaniTakipEt);
     _okuyucu.dispose();
     super.dispose();
@@ -278,7 +312,6 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
 
   Future<void> _ayetSecenekleri(int ayet) async {
     final r = context.renklerOku; // Düğme olayında: dinlemeden oku
-    final messenger = ScaffoldMessenger.of(context);
     final s = widget.sure;
 
     Widget secenek(BuildContext sheet, IconData ikon, String baslik, String aciklama, VoidCallback onTap) => Material(
@@ -347,7 +380,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
                   "Kur'an'ı açınca buradan devam edersin", () async {
                 await KuranAyarlari.kaldigimYeriKaydet(s, ayet);
                 if (mounted) setState(() => _kaldigimAyet = ayet);
-                messenger.showSnackBar(const SnackBar(content: Text("Kaldığın yer kaydedildi.")));
+                Bildirim.snackBar(const SnackBar(content: Text("Kaldığın yer kaydedildi.")));
               }),
               const SizedBox(height: 10),
               secenek(sheet, Icons.share_rounded, "Paylaş", "Arapça metin ve meal", () {
@@ -367,11 +400,10 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
 
 
   Future<void> _indirmeIslemi() async {
-    final messenger = ScaffoldMessenger.of(context);
     if (_indirildi) {
       await KuranSesDeposu.sil(widget.sure);
       setState(() => _indirildi = false);
-      messenger.showSnackBar(const SnackBar(content: Text("İndirilen ses silindi.")));
+      Bildirim.snackBar(const SnackBar(content: Text("İndirilen ses silindi.")));
       return;
     }
     setState(() => _indirmeIlerlemesi = 0);
@@ -383,7 +415,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
       _indirmeIlerlemesi = null;
       _indirildi = hata == null;
     });
-    messenger.showSnackBar(SnackBar(content: Text(hata ?? "İndirildi. Bu sure artık internetsiz dinlenebilir.")));
+    Bildirim.snackBar(SnackBar(content: Text(hata ?? "İndirildi. Bu sure artık internetsiz dinlenebilir.")));
   }
 
   Future<void> _ayarlar() async {
@@ -610,7 +642,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
           if (_okuyucu.hata != null) {
             final h = _okuyucu.hata!;
             _okuyucu.hata = null;
-            WidgetsBinding.instance.addPostFrameCallback((_) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            WidgetsBinding.instance.addPostFrameCallback((_) => Bildirim.snackBar(SnackBar(
                 content: Text(_indirildi ? h : "$h İnternetsiz dinlemek için sağ üstten sureyi indirebilirsin."))));
           }
           return FloatingActionButton(
@@ -628,6 +660,7 @@ class _KuranSureScreenState extends State<KuranSureScreen> {
       // Kaldığın ayet doğrudan açılır (listede konum indeksle sabitlenir; ayarlar yüklenince kaymaz)
       body: ScrollablePositionedList.builder(
         itemScrollController: _kaydirma,
+        itemPositionsListener: _konumlar,
         initialScrollIndex: widget.baslangicAyet <= 1 ? 0 : _ayetIndeksi(widget.baslangicAyet),
         initialAlignment: widget.baslangicAyet <= 1 ? 0 : 0.05,
         padding: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), 100),

@@ -1,4 +1,6 @@
+import '../core/utils/bildirim.dart';
 import 'widgets/profil_avatar.dart';
+import 'widgets/bolum_paneli.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
@@ -140,57 +142,66 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         behavior: HitTestBehavior.translucent,
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
+          // Alt boşluk: içerik yüzen menünün arkasından geçer, son öğe menünün üstüne kaydırılabilir
+          padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
           child: Column(
           children: [
             // 1. ÜST GİRİŞ PANELİ (ÖZET BAR)
             _buildOzetBar(context, provider, r, toplamBugunXp),
-            _buildSectionHeader(
-              title: "Arkadaşlarım", 
-              icon: Icons.people_alt_rounded,
-              buttonText: "Tümünü Gör",
-              onSeeAll: () { FocusScope.of(context).unfocus(); _showFriendsModal(context, r, provider); }
-            ),
-            _buildFriendsPreview(context, r, provider),
-            _buildOrtakHedef(r, provider),
-            
-            // 2. LİDERLİK TABLOSU ÖN İZLEME
-            _buildSectionHeader(
-              title: "Liderlik Tablosu", 
-              icon: Icons.emoji_events_rounded,
-              buttonText: "Tümünü Gör",
-              onSeeAll: () { FocusScope.of(context).unfocus(); _showFullLeaderboard(context, r, provider); }
-            ),
-            // Arkadaşı yoksa "Arkadaşlar" seçenekleri gizlenir (boş durum yalnızca Arkadaşlarım'da görünür)
-            _arkadasVarsa(
-              (arkadasVar) => Column(
-                children: [
-                  if (arkadasVar)
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
-                      child: Row(
-                        children: [
-                          _siralamaSecimi(r, "Genel", false),
-                          SizedBox(width: Responsive.w(8)),
-                          _siralamaSecimi(r, "Arkadaşlar • Bu Hafta", true),
-                        ],
-                      ),
-                    ),
-                  arkadasVar && _kardesSiralamasi
-                      ? _buildKardesSiralamasi(r, provider, limit: 5)
-                      : _buildIstikametPreview(context, r, provider),
-                ],
-              ),
+            BolumPaneli(
+              children: [
+                _buildSectionHeader(
+                  title: "Arkadaşlarım",
+                  icon: Icons.people_alt_rounded,
+                  buttonText: "Tümünü Gör",
+                  onSeeAll: () { FocusScope.of(context).unfocus(); _showFriendsModal(context, r, provider); }
+                ),
+                _buildFriendsPreview(context, r, provider),
+                _buildOrtakHedef(r, provider),
+              ],
             ),
 
-            const SizedBox(height: 10),
+            // 2. LİDERLİK TABLOSU ÖN İZLEME
+            BolumPaneli(
+              children: [
+                _buildSectionHeader(
+                  title: "Liderlik Tablosu",
+                  icon: Icons.emoji_events_rounded,
+                  buttonText: "Tümünü Gör",
+                  onSeeAll: () { FocusScope.of(context).unfocus(); _showFullLeaderboard(context, r, provider); }
+                ),
+                // Arkadaşı yoksa "Arkadaşlar" seçenekleri gizlenir (boş durum yalnızca Arkadaşlarım'da görünür)
+                _arkadasVarsa(
+                  (arkadasVar) => Column(
+                    children: [
+                      if (arkadasVar)
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(4)),
+                          child: Row(
+                            children: [
+                              _siralamaSecimi(r, "Genel", false),
+                              SizedBox(width: Responsive.w(8)),
+                              _siralamaSecimi(r, "Arkadaşlar • Bu Hafta", true),
+                            ],
+                          ),
+                        ),
+                      arkadasVar && _kardesSiralamasi
+                          ? _buildKardesSiralamasi(r, provider, limit: 5)
+                          : _buildIstikametPreview(context, r, provider),
+                      SizedBox(height: Responsive.h(6)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
             // 3. DUA MECLİSİ ÖN İZLEME VE SEKMELER
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: Responsive.w(20), vertical: Responsive.h(10)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+            BolumPaneli(
+              children: [
+                // Başlık üstte, sekmeler altında tam genişlikte: dar ekranda birbirine yapışmasın
+                Padding(
+                  padding: EdgeInsets.fromLTRB(Responsive.w(20), Responsive.h(10), Responsive.w(20), Responsive.h(10)),
+                  child: Row(
                     children: [
                       Container(
                         padding: EdgeInsets.all(Responsive.w(6)),
@@ -204,28 +215,29 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                       Text("Meclis", style: TextStyle(fontSize: Responsive.sp(17), fontWeight: FontWeight.w900, color: r.yaziRengi, letterSpacing: -0.3)),
                     ],
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: r.anaRenk.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(20),
+                ),
+                Container(
+                  margin: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(4)),
+                  decoration: BoxDecoration(
+                    color: r.anaRenk.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: _arkadasVarsa(
+                    (arkadasVar) => Row(
+                      children: [
+                        Expanded(child: _buildMeclisTabButton("Dualarım", 0, r)),
+                        if (arkadasVar) Expanded(child: _buildMeclisTabButton("Arkadaşlar", 1, r)),
+                        Expanded(child: _buildMeclisTabButton("Global", 2, r)),
+                      ],
                     ),
-                    padding: const EdgeInsets.all(4),
-                    child: _arkadasVarsa(
-                      (arkadasVar) => Row(
-                        children: [
-                          _buildMeclisTabButton("Dualarım", 0, r),
-                          if (arkadasVar) _buildMeclisTabButton("Arkadaşlar", 1, r),
-                          _buildMeclisTabButton("Global", 2, r),
-                        ],
-                      ),
-                    ),
-                  )
-                ],
-              ),
-            ),
+                  ),
+                ),
             _buildDuaPreview(context, r, provider),
-            
-            const SizedBox(height: 20),
+              ],
+            ),
+
+            const SizedBox(height: 12),
 
             // 4. DUA EKLEME FORMU
             _buildDuaEklemeFormu(r, provider),
@@ -270,9 +282,10 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           });
         },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? r.arkaPlanRengi : Colors.transparent,
+          color: isSelected ? r.kartRengi : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : [],
         ),
@@ -281,7 +294,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           style: TextStyle(
             fontWeight: FontWeight.bold, 
             fontSize: 12, 
-            color: isSelected ? r.anaRenk : r.pasifRenk
+            color: isSelected ? r.anaRenk : r.yaziRengi.withOpacity(0.55)
           )
         ),
       ),
@@ -344,11 +357,10 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
   // --- PROFİL KARTI (GİRİŞ PANELİ) ---
   void _profilFotoSecenekleri(BuildContext context, AppThemeColors r, NamazProvider provider) {
-    final messenger = ScaffoldMessenger.of(context);
     Future<void> calistir(Future<String?> Function() islem) async {
       Navigator.pop(context);
       final hata = await islem();
-      if (hata != null) messenger.showSnackBar(SnackBar(content: Text(hata)));
+      if (hata != null) Bildirim.snackBar(SnackBar(content: Text(hata)));
     }
 
     showModalBottomSheet(
@@ -661,7 +673,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         margin: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(10)),
         padding: EdgeInsets.all(Responsive.w(14)),
         decoration: BoxDecoration(
-          color: r.kartRengi,
+          color: r.icYuzey,
           borderRadius: BorderRadius.circular(Responsive.w(16)),
           border: Border.all(color: r.anaRenk.withOpacity(0.2)),
         ),
@@ -764,14 +776,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   return GestureDetector(
                     onTap: () async {
                       if (hasActiveStory) {
-                        // Eğer kendi hikayesi değilse izlenme kaydı yap (Arka planda)
-                        if (friend.uid != provider.currentUid) {
-                          _firebaseService.recordStoryView(
-                            storyUid: friend.uid,
-                            viewerUid: provider.currentUid!,
-                            viewerDisplayName: provider.currentUsername,
-                          );
-                        }
+                        // İzlenme kaydı görüntüleyicide, ekrana gelen her hikaye için yapılır
                         _openStoryViewerWithContext(context, provider, friend.uid, r);
                       }
                     },
@@ -883,7 +888,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
         return Column(
           children: List.generate(
             users.length,
-            (index) => _buildLeaderboardItem(r, index, users[index], provider.currentUid),
+            (index) => _buildLeaderboardItem(r, index, users[index], provider.currentUid, panelde: true),
           ),
         );
       },
@@ -926,7 +931,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       final gosterilen = limit == null ? liste : liste.take(limit).toList();
       final ogeler = [
         for (int i = 0; i < gosterilen.length; i++)
-          _buildLeaderboardItem(r, i, gosterilen[i], provider.currentUid, xpEtiketi: "${xp[gosterilen[i].uid]} XP"),
+          _buildLeaderboardItem(r, i, gosterilen[i], provider.currentUid, xpEtiketi: "${xp[gosterilen[i].uid]} XP", panelde: scrollController == null),
       ];
       return scrollController == null
           ? Column(children: ogeler)
@@ -983,31 +988,33 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
     });
   }
 
-  Widget _buildLeaderboardItem(AppThemeColors r, int index, UserProfile user, String? currentUid, {String? xpEtiketi}) {
+  Widget _buildLeaderboardItem(AppThemeColors r, int index, UserProfile user, String? currentUid, {String? xpEtiketi, bool panelde = false}) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _kullaniciProfiliniGoster(context, r, user),
-      child: _leaderboardSatiri(r, index, user, currentUid, xpEtiketi: xpEtiketi),
+      child: _leaderboardSatiri(r, index, user, currentUid, xpEtiketi: xpEtiketi, panelde: panelde),
     );
   }
 
-  Widget _leaderboardSatiri(AppThemeColors r, int index, UserProfile user, String? currentUid, {String? xpEtiketi}) {
+  Widget _leaderboardSatiri(AppThemeColors r, int index, UserProfile user, String? currentUid, {String? xpEtiketi, bool panelde = false}) {
     bool isCurrentUser = user.uid == currentUid;
     bool constitutesTopThree = index < 3;
-    Color? bgColor = constitutesTopThree 
-        ? (index == 0 ? const Color(0xFFFFD700).withOpacity(0.1) : (index == 1 ? const Color(0xFFC0C0C0).withOpacity(0.1) : (index == 2 ? const Color(0xFFCD7F32).withOpacity(0.1) : null))) 
+    // Renkler kart renginin üstüne karıştırılır: satır opaktır, arka plan içinden görünmez
+    Color? bgColor = constitutesTopThree
+        ? r.kartUstunde(index == 0 ? const Color(0xFFFFD700) : (index == 1 ? const Color(0xFFC0C0C0) : const Color(0xFFCD7F32)), 0.14)
         : null;
 
     // Mevcut kullanıcıyı vurgula
     if (isCurrentUser && !constitutesTopThree) {
-      bgColor = r.anaRenk.withOpacity(0.06);
+      bgColor = r.kartUstunde(r.anaRenk, 0.08);
     }
+    bgColor ??= panelde ? r.icYuzey : r.kartRengi;
     
     return Container(
       margin: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(5)),
       padding: EdgeInsets.all(Responsive.w(12)),
       decoration: BoxDecoration(
-        color: bgColor ?? r.kartRengi,
+        color: bgColor,
         borderRadius: BorderRadius.circular(Responsive.w(16)),
         border: Border.all(
           color: isCurrentUser
@@ -1119,7 +1126,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
             margin: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(10)),
             padding: EdgeInsets.all(Responsive.w(24)),
             decoration: BoxDecoration(
-              color: r.kartRengi,
+              color: r.icYuzey,
               borderRadius: BorderRadius.circular(Responsive.w(20)),
               border: Border.all(color: r.pasifRenk.withOpacity(0.1)),
             ),
@@ -1354,7 +1361,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       },
       child: Card(
         margin: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(8)),
-        color: r.kartRengi,
+        color: r.icYuzey, // Meclis panelinin içinde
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Responsive.w(20)), side: BorderSide(color: r.pasifRenk.withOpacity(0.1))),
         child: Padding(
@@ -1424,7 +1431,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                         }
 
                       if (isAdded != null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        Bildirim.snackBar(
                           SnackBar(
                             content: Text(isAdded ? "Dua meclisine katıldınız. Amîn!" : "Amîn geri alındı."), 
                             duration: const Duration(seconds: 1)
@@ -1734,7 +1741,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                 // Mükerrer kayıt kontrolü
                 if (text == _lastSubmittedText) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Bildirim.snackBar(
                       const SnackBar(content: Text("Aynı duayı az önce paylaştınız.")),
                     );
                   }
@@ -1745,7 +1752,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                 final validationError = ContentModeration.metinDogrula(text);
                 if (validationError != null) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Bildirim.snackBar(
                       SnackBar(content: Text(validationError), backgroundColor: r.kirmizi),
                     );
                   }
@@ -1754,7 +1761,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
                 if (provider.currentUid == null || provider.currentUsername.isEmpty) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Bildirim.snackBar(
                       const SnackBar(content: Text("Dua paylaşmak için önce profil oluşturmalısınız.")),
                     );
                   }
@@ -1779,13 +1786,13 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
                   _duaController.clear();
                   
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Bildirim.snackBar(
                       const SnackBar(content: Text("Duanız meclise iletildi. Allah kabul etsin!")),
                     );
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Bildirim.snackBar(
                       SnackBar(content: Text("Hata oluştu: $e")),
                     );
                   }
@@ -1824,7 +1831,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       margin: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(10)),
       padding: EdgeInsets.all(Responsive.w(24)),
       decoration: BoxDecoration(
-        color: r.kartRengi,
+        color: r.icYuzey, // her zaman bir bölüm panelinin içinde
         borderRadius: BorderRadius.circular(Responsive.w(20)),
         border: Border.all(color: r.pasifRenk.withOpacity(0.1)),
       ),
@@ -2009,7 +2016,6 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
   }
 
   Future<void> _istegiCevapla(BuildContext context, NamazProvider provider, AppNotification notif, {required bool kabul}) async {
-    final messenger = ScaffoldMessenger.of(context);
     Navigator.pop(context);
     final hata = await _firebaseService.respondToFriendRequest(
       currentUid: provider.currentUid!,
@@ -2018,7 +2024,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       currentUsername: provider.currentHandle,
       currentDisplayName: provider.currentUsername,
     );
-    messenger.showSnackBar(SnackBar(
+    Bildirim.snackBar(SnackBar(
       content: Text(hata ?? (kabul
           ? "${notif.fromDisplayName} ile artık arkadaşsınız."
           : "İstek reddedildi.")),
@@ -2027,14 +2033,13 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
   void _showAddFriendModal(BuildContext context, AppThemeColors r, NamazProvider provider) {
     if (provider.currentUid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Giriş yapmanız gerekiyor.")));
+      Bildirim.snackBar(const SnackBar(content: Text("Giriş yapmanız gerekiyor.")));
       return;
     }
     
     final TextEditingController searchController = TextEditingController();
     bool isSearching = false;
     String errorMessage = "";
-    final messenger = ScaffoldMessenger.of(context);
 
     Future<void> istekGonder(String kullaniciAdi, StateSetter setState) async {
       final hedef = kullaniciAdi.trim().replaceFirst('@', '');
@@ -2051,7 +2056,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
 
       if (err == null || err == FirebaseService.arkadasOlduMesaji) {
         Navigator.of(this.context).pop();
-        messenger.showSnackBar(SnackBar(
+        Bildirim.snackBar(SnackBar(
           content: Text(err == null
               ? "Arkadaşlık isteği gönderildi!"
               : "@$hedef sana zaten istek göndermişti, artık arkadaşsınız!"),
@@ -2241,7 +2246,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
             onPressed: () {
               context.read<NamazProvider>().arkadasiSil(user.uid);
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
+              Bildirim.snackBar(
                 SnackBar(
                   content: Text("${user.displayName} arkadaşlıktan çıkarıldı."),
                   backgroundColor: r.anaRenk,
@@ -2469,7 +2474,6 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
       tooltip: "$vakit namazını hatırlat",
       icon: Icon(Icons.waving_hand_rounded, color: r.anaRenk, size: 20),
       onPressed: () async {
-        final messenger = ScaffoldMessenger.of(context);
         final hata = await _firebaseService.durtGonder(
           fromUid: provider.currentUid!,
           fromUsername: provider.currentHandle,
@@ -2478,7 +2482,7 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
           vakit: vakit,
           gun: provider.getSanalGun(),
         );
-        messenger.showSnackBar(SnackBar(
+        Bildirim.snackBar(SnackBar(
           content: Text(hata ?? "${user.displayName} arkadaşına $vakit namazı hatırlatıldı."),
         ));
       },
@@ -2554,9 +2558,8 @@ class _SosyalSayfasiState extends State<SosyalSayfasi> {
               if (value == 'delete') {
                 _showDeleteFriendDialog(context, r, user);
               } else if (value == 'block' && currentUid != null) {
-                final messenger = ScaffoldMessenger.of(context);
                 final hata = await _firebaseService.kullaniciyiEngelle(currentUid, user.uid);
-                messenger.showSnackBar(SnackBar(content: Text(hata ?? "@${user.username} engellendi.")));
+                Bildirim.snackBar(SnackBar(content: Text(hata ?? "@${user.username} engellendi.")));
               }
             },
             itemBuilder: (context) => [

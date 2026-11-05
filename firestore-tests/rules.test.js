@@ -9,6 +9,7 @@ import {
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch,
   arrayUnion, arrayRemove, Timestamp,
+  collection, query, where, getDocs,
 } from 'firebase/firestore';
 
 let env;
@@ -31,6 +32,8 @@ beforeEach(async () => {
     await setDoc(doc(db, 'users/ayse'), { username: 'ayse', friends: [], cinsiyet: 'kadin' });
     await setDoc(doc(db, 'usernames/ali'), { uid: 'ali' });
     await setDoc(doc(db, 'prayers/p1'), { senderUid: 'veli', text: 'dua', aminBy: [], aminCount: 0 });
+    await setDoc(doc(db, 'ansiklopedi/acik'), { baslik: 'Yayında', yayinda: true });
+    await setDoc(doc(db, 'ansiklopedi/taslak'), { baslik: 'Taslak', yayinda: false });
     await setDoc(doc(db, 'stories/veli'), {
       viewers: [], viewerProfiles: [], createdAt: Timestamp.now(),
     });
@@ -201,4 +204,26 @@ test('süresi dolan hikayeyi herkes temizleyebilir', async () => {
       createdAt: Timestamp.fromMillis(Date.now() - 25 * 3600 * 1000),
     }));
   await assertSucceeds(deleteDoc(doc(db('ali'), 'stories/veli')));
+});
+
+// ───────────── İslam Ansiklopedisi ─────────────
+
+const EDITOR = 'TjjDhAT8r9dpDQaJRb53HOz2eEy2';
+const anonim = () => env.unauthenticatedContext().firestore();
+
+test('yayındaki maddeyi giriş yapmayan da okur', async () => {
+  await assertSucceeds(getDoc(doc(anonim(), 'ansiklopedi/acik')));
+  await assertSucceeds(getDocs(query(collection(anonim(), 'ansiklopedi'), where('yayinda', '==', true))));
+});
+
+test('taslağı yalnızca editör okur', async () => {
+  await assertFails(getDoc(doc(db('ali'), 'ansiklopedi/taslak')));
+  await assertFails(getDocs(collection(db('ali'), 'ansiklopedi')));
+  await assertSucceeds(getDoc(doc(db(EDITOR), 'ansiklopedi/taslak')));
+  await assertSucceeds(getDocs(collection(db(EDITOR), 'ansiklopedi')));
+});
+
+test('ansiklopediye uygulamadan kimse yazamaz', async () => {
+  await assertFails(setDoc(doc(db(EDITOR), 'ansiklopedi/yeni'), { yayinda: true }));
+  await assertFails(updateDoc(doc(db('ali'), 'ansiklopedi/acik'), { baslik: 'x' }));
 });

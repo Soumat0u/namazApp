@@ -10,9 +10,8 @@ import 'tesbihat_screen.dart';
 import 'kuran_screen.dart';
 import 'dua_kitapligi_screen.dart';
 import 'hatim_screen.dart';
-import 'oruc_screen.dart';
 import 'camiler_screen.dart';
-import 'zekat_screen.dart';
+import 'ansiklopedi_screen.dart';
 
 
 class AraclarSayfasi extends StatelessWidget {
@@ -93,6 +92,13 @@ class AraclarSayfasi extends StatelessWidget {
             ),
             _buildAracCard(
               context: context,
+              icon: Icons.local_library_rounded,
+              title: "İslam Ansiklopedisi",
+              color: Colors.purple.shade700,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AnsiklopediScreen())),
+            ),
+            _buildAracCard(
+              context: context,
               icon: Icons.auto_stories_rounded,
               title: "Hatim Takibi",
               color: Colors.brown,
@@ -100,22 +106,10 @@ class AraclarSayfasi extends StatelessWidget {
             ),
             _buildAracCard(
               context: context,
-              icon: Icons.nightlight_round,
-              title: "Oruç Takibi",
-              color: Colors.deepPurple,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrucScreen())),
-            ),
-            _buildAracCard(
-              context: context,
               icon: Icons.event_repeat_rounded,
-              title: "Kaza Planlayıcı",
+              title: "Kaza",
               color: Colors.orange,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const KazaTakipSayfasi()),
-                );
-              },
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KazaScreen())),
             ),
             _buildAracCard(
               context: context,
@@ -123,13 +117,6 @@ class AraclarSayfasi extends StatelessWidget {
               title: "Yakındaki Camiler",
               color: Colors.cyan.shade700,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CamilerScreen())),
-            ),
-            _buildAracCard(
-              context: context,
-              icon: Icons.calculate_rounded,
-              title: "Zekât Hesaplayıcı",
-              color: Colors.amber.shade800,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ZekatScreen())),
             ),
             _buildAracCard(
               context: context,

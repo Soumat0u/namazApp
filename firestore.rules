@@ -76,6 +76,18 @@ service cloud.firestore {
       allow delete: if girisli() && resource.data.uid == request.auth.uid;
     }
 
+    // ───────────── İslam Ansiklopedisi ─────────────
+    // İçerik yalnızca tools/ansiklopedi/yukle.mjs ile (yönetici anahtarıyla) yazılır.
+    // Yayındaki maddeleri herkes okur; taslakları yalnızca editörler görür.
+    match /ansiklopedi/{id} {
+      allow read: if resource.data.yayinda == true || editor();
+      allow write: if false;
+    }
+
+    function editor() {
+      return girisli() && request.auth.uid in ['TjjDhAT8r9dpDQaJRb53HOz2eEy2'];
+    }
+
     // ───────────── Dualar ─────────────
     match /prayers/{id} {
       allow read: if girisli();

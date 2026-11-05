@@ -1,3 +1,4 @@
+import '../core/utils/bildirim.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -5,10 +6,10 @@ import 'package:flutter_qiblah/flutter_qiblah.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
-import 'package:flutter_compass_v2/flutter_compass_v2.dart';
 import 'package:vibration/vibration.dart';
 import '../core/utils/responsive.dart';
 import '../providers/theme_provider.dart';
+import '../services/pusula_kalibrasyonu.dart';
 
 class QiblaScreen extends StatefulWidget {
   const QiblaScreen({super.key});
@@ -27,11 +28,24 @@ class _QiblaScreenState extends State<QiblaScreen> {
   StreamSubscription? _compassSub;
   StreamSubscription<Position>? _positionSub;
   double _smoothHeading = 0;   // Yumuşatılmış cihaz açısı (Kuzeye göre)
+  // Titreşim motoru bir mıknatıstır: titrerken ve hemen ardından manyetometre
+  // sapar, ok bir anlığına kırılıp geri döner. Bu süre içindeki okumalar atlanır.
+  DateTime _titresimSonu = DateTime(0);
+  // Ani sıçrama ayıklama: büyük bir sapma ancak art arda birkaç okumada sürerse kabul edilir
+  int _sapmaSayaci = 0;
+  static const _hedefGiris = 4.0; // Kıble yönüne girildi sayılan açı
+  static const _hedefCikis = 8.0; // Çıkış eşiği daha geniş: sınırda gidip gelince tekrar tekrar titremesin
   double? _qiblaFixedAngle;    // Kabe'nin Kuzeye göre sabit açısı (Hesaplanana kadar null)
   double _smoothOffset = 0;    // Kıble'nin cihaza göre anlık fark açısı (yumuşatılmış)
-  bool _isAccuracyLow = false; // Sensör doğruluğu düşük mü?
-  bool? _oncekiDusukMu;        // Bir önceki doğruluk durumu (kalibrasyon bildirimi için)
-  static const double _kabulEdilenHataPayi = 20; // derece; Android'de yalnızca "yüksek" (15) geçer
+  bool _isAccuracyLow = false; // Hassasiyet tam değil (uyarı şeridi)
+  bool _parazit = false;       // Yakında mıknatıs/metal var gibi
+  // Kalibrasyon: null = henüz okunmadı. Rehber bunu canlı gösterir.
+  final ValueNotifier<PusulaOkuma?> _pusula = ValueNotifier(null);
+  bool _bozukGoruldu = false;  // Bu açılışta kalibrasyon bozuk görüldü mü (düzelince bildirmek için)
+  bool _rehberGosterildi = false; // Otomatik rehber bu açılışta yalnızca bir kez açılır
+  BuildContext? _rehberContext;   // Açık rehber (kalibrasyon düzelince kapatmak için)
+  Timer? _rehberZamanlayici;
+  final List<double> _siddetler = [];
 
   @override
   void initState() {
@@ -92,45 +106,82 @@ class _QiblaScreenState extends State<QiblaScreen> {
       });
     });
 
-    // 2. Pusula doğruluğunu (accuracy) FlutterCompass üzerinden takip et.
-    // accuracy derece cinsinden hata payıdır, küçük değer daha iyidir
-    // (Android: 15 = yüksek, 30 = orta, 45 = düşük; bilinmiyorsa null).
-    _compassSub = FlutterCompass.events?.listen((event) {
-      if (!mounted) return;
-      final hataPayi = event.accuracy;
-      final dusuk = hataPayi != null && hataPayi > _kabulEdilenHataPayi;
-      if (dusuk == _isAccuracyLow && _oncekiDusukMu != null) return; // Değişiklik yoksa yeniden çizme
-
-      setState(() {
-        // Kalibrasyon düşükten yükseğe çıktıysa bildirim ver
-        if (_oncekiDusukMu == true && !dusuk) {
-          if (_canVibrate) {
-            Vibration.vibrate(duration: 200);
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pusula Kalibre Edildi'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        _isAccuracyLow = dusuk;
-        _oncekiDusukMu = dusuk;
-      });
-    });
+    // 2. Kalibrasyonu doğrudan manyetometreden takip et. Bozuksa (Android
+    // "güvenilmez"/"düşük") rehber kendiliğinden açılır; düzelince kapanır.
+    _compassSub = PusulaKalibrasyonu.okumalar().listen(_pusulaOkundu, onError: (_) {});
 
     // 3. Sadece cihazın pusula dönüşünü sürekli dinle
     _qiblahSub = FlutterQiblah.qiblahStream.listen((QiblahDirection direction) {
       if (mounted) {
+        if (DateTime.now().isBefore(_titresimSonu)) return; // titreşimin manyetik etkisi
+        // Tek okumalık büyük sıçramaları yok say (gerçek dönüşler birkaç okuma sürer)
+        var fark = (direction.direction - _smoothHeading) % 360;
+        if (fark > 180) fark -= 360;
+        if (fark.abs() > 25 && _sapmaSayaci < 3) {
+          _sapmaSayaci++;
+          return;
+        }
+        _sapmaSayaci = 0;
         setState(() {
           // Sadece cihazın Kuzey'e olan açısını (heading) alıyoruz.
           // Kıble açısı (_qiblaFixedAngle) GPS ile sabit hesaplandığı için diske çakılı kalır.
           _smoothHeading = _lerpAngle(_smoothHeading, direction.direction, 0.15);
           _smoothOffset = _lerpAngle(_smoothOffset, direction.offset, 0.15);
         });
+        _hedefKontrol();
       }
     });
+  }
+
+  void _pusulaOkundu(PusulaOkuma o) {
+    if (!mounted) return;
+    final onceki = _pusula.value;
+    _pusula.value = o;
+
+    // Alan şiddetinin son ~2 sn ortalaması: tek tük sıçramalar uyarı çıkarmasın
+    _siddetler.add(o.siddet);
+    if (_siddetler.length > 10) _siddetler.removeAt(0);
+    final ort = _siddetler.reduce((a, b) => a + b) / _siddetler.length;
+    final parazit = _siddetler.length >= 5 && (ort < 20 || ort > 70);
+
+    final dusuk = o.durum <= 2;
+    if (dusuk != _isAccuracyLow || parazit != _parazit) {
+      setState(() {
+        _isAccuracyLow = dusuk;
+        _parazit = parazit;
+      });
+    }
+
+    if (o.bozuk) {
+      _bozukGoruldu = true;
+      // Sensör açılışta kısa bir an "güvenilmez" diyebilir: 1,5 sn sürerse rehberi aç
+      if (!_rehberGosterildi && _rehberZamanlayici == null) {
+        _rehberZamanlayici = Timer(const Duration(milliseconds: 1500), () {
+          _rehberZamanlayici = null;
+          if (mounted && (_pusula.value?.bozuk ?? false) && !_rehberGosterildi) {
+            _showCalibrationDialog(context, context.read<ThemeProvider>().aktifTema);
+          }
+        });
+      }
+    } else if (onceki != null && onceki.bozuk && _bozukGoruldu) {
+      // Bozuktan çalışır hâle geldi: rehberi kapat, haber ver
+      _bozukGoruldu = false;
+      _rehberZamanlayici?.cancel();
+      _rehberZamanlayici = null;
+      final rehber = _rehberContext;
+      if (rehber != null && rehber.mounted) Navigator.of(rehber).pop();
+      if (_canVibrate) {
+        Vibration.vibrate(duration: 200);
+        _titresimSonu = DateTime.now().add(const Duration(milliseconds: 600));
+      }
+      Bildirim.snackBar(
+        const SnackBar(
+          content: Text('Pusula kalibre edildi'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   double _lerpAngle(double oldAngle, double newAngle, double t) {
@@ -236,7 +287,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_isAccuracyLow)
+            if (_isAccuracyLow || _parazit)
               Padding(
                 padding: EdgeInsets.only(bottom: Responsive.h(16)),
                 child: GestureDetector(
@@ -254,7 +305,11 @@ class _QiblaScreenState extends State<QiblaScreen> {
                         Icon(Icons.warning_amber_rounded, color: Colors.amber, size: Responsive.w(20)),
                         SizedBox(width: Responsive.w(8)),
                         Text(
-                          'Pusula hassasiyeti düşük. Kalibre edin',
+                          (_pusula.value?.bozuk ?? false)
+                              ? 'Pusula kalibre edilmeli. Rehber için dokunun'
+                              : _parazit
+                                  ? 'Yakında mıknatıs veya metal olabilir'
+                                  : 'Pusula hassasiyeti düşük. Kalibre edin',
                           style: TextStyle(
                             color: tema.yaziRengi,
                             fontSize: Responsive.sp(13),
@@ -315,8 +370,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
                 ),
               ],
             ),
-            // Çizim üstüne değil ekranda sabit duran haptic mantığı
-            _handleVibration(kalanAci),
             SizedBox(height: Responsive.h(60)),
             _buildStatusIndicator(tema, kalanAci),
           ],
@@ -374,27 +427,25 @@ class _QiblaScreenState extends State<QiblaScreen> {
     return Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: Responsive.sp(size)));
   }
 
-  // 4. Görseller ve Titreşim (< 5 Derece Kuralı)
-  Widget _handleVibration(double kalanAci) {
-    if (kalanAci < 5.0 && !_vibratedTarget) {
-      Future.microtask(() {
-        if (mounted) {
-          setState(() => _vibratedTarget = true);
-          if (_canVibrate) {
-            Vibration.vibrate(duration: 100);
-          }
-        }
-      });
-    } else if (kalanAci >= 5.0 && _vibratedTarget) {
-      Future.microtask(() {
-        if (mounted) setState(() => _vibratedTarget = false);
-      });
+  /// Kıble yönüne girince bir kez titreşir (giriş/çıkış eşikleri farklı)
+  void _hedefKontrol() {
+    if (_qiblaFixedAngle == null) return;
+    var diff = (_qiblaFixedAngle! - _smoothHeading) % 360;
+    if (diff > 180) diff -= 360;
+    final kalan = diff.abs();
+    if (!_vibratedTarget && kalan < _hedefGiris) {
+      _vibratedTarget = true;
+      if (_canVibrate) {
+        Vibration.vibrate(duration: 60);
+        _titresimSonu = DateTime.now().add(const Duration(milliseconds: 450));
+      }
+    } else if (_vibratedTarget && kalan > _hedefCikis) {
+      _vibratedTarget = false;
     }
-    return const SizedBox.shrink();
   }
 
   Widget _buildStatusIndicator(tema, double kalanAci) {
-    bool onTarget = kalanAci < 5.0; // 5 derece hedef marjı
+    final onTarget = _vibratedTarget; // giriş 4°, çıkış 8° (sınırda yanıp sönmez)
     return Container(
       padding: EdgeInsets.symmetric(horizontal: Responsive.w(24), vertical: Responsive.h(12)),
       decoration: BoxDecoration(
@@ -446,6 +497,8 @@ class _QiblaScreenState extends State<QiblaScreen> {
   }
 
   void _showCalibrationDialog(BuildContext context, dynamic tema) {
+    if (_rehberContext != null) return; // zaten açık
+    _rehberGosterildi = true;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, // İçeriğin tam yükseklik almasına izin ver
@@ -455,6 +508,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(Responsive.w(25))),
       ),
       builder: (context) {
+        _rehberContext = context;
         return SingleChildScrollView(
           child: Container(
             padding: EdgeInsets.fromLTRB(
@@ -484,7 +538,18 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              SizedBox(height: Responsive.h(32)),
+              SizedBox(height: Responsive.h(10)),
+              Text(
+                'Telefon kılıfındaki mıknatıstan, metal masalardan ve elektronik cihazlardan uzaklaşın.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: tema.yaziRengi.withOpacity(0.65), fontSize: Responsive.sp(13)),
+              ),
+              SizedBox(height: Responsive.h(18)),
+              ValueListenableBuilder<PusulaOkuma?>(
+                valueListenable: _pusula,
+                builder: (_, o, _) => _kalibrasyonDurumu(tema, o),
+              ),
+              SizedBox(height: Responsive.h(18)),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -512,11 +577,50 @@ class _QiblaScreenState extends State<QiblaScreen> {
         ),
       );
       },
+    ).whenComplete(() => _rehberContext = null);
+  }
+
+  /// Rehberde canlı kalibrasyon durumu
+  Widget _kalibrasyonDurumu(dynamic tema, PusulaOkuma? o) {
+    final (String yazi, Color renk, double oran) = switch (o?.durum) {
+      null => ('Sensör okunuyor…', tema.pasifRenk as Color, 0.0),
+      0 => ('Kalibrasyon gerekli', Colors.red.shade400, 0.15),
+      1 => ('Düşük. 8 çizmeye devam edin', Colors.orange, 0.4),
+      2 => ('Orta. Biraz daha', Colors.amber.shade700, 0.75),
+      _ => ('Hazır', Colors.green, 1.0),
+    };
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.explore_rounded, color: renk, size: Responsive.w(18)),
+            SizedBox(width: Responsive.w(6)),
+            Text(yazi, style: TextStyle(color: renk, fontWeight: FontWeight.bold, fontSize: Responsive.sp(14))),
+          ],
+        ),
+        SizedBox(height: Responsive.h(8)),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: oran),
+            duration: const Duration(milliseconds: 400),
+            builder: (_, v, _) => LinearProgressIndicator(
+              value: v,
+              minHeight: 6,
+              color: renk,
+              backgroundColor: (tema.pasifRenk as Color).withOpacity(0.2),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   @override
   void dispose() {
+    _rehberZamanlayici?.cancel();
+    _pusula.dispose();
     _qiblahSub?.cancel();
     _compassSub?.cancel();
     _positionSub?.cancel();
