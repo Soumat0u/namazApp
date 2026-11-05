@@ -39,7 +39,11 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
   static const _modAnahtari = 'zikirGeriBildirim';
   static const _sesAnahtari = 'zikirSesi';
 
-  final AudioPlayer _tikPlayer = AudioPlayer();
+  /// Her ses için ayrı, önceden yüklenmiş düşük gecikmeli oynatıcı. Ses değiştirirken dosya
+  /// yeniden yüklenmez; yükleme ana iş parçacığını meşgul edip animasyonları takıltıyordu.
+  final Map<ZikirSesi, AudioPlayer> _sesOynaticilari = {};
+  AudioPlayer? get _tikPlayer => _sesOynaticilari[_ses];
+  late final AudioContext _karisik = AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers).build();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _canVibrate = false;
   ZikirGeriBildirim _mod = ZikirGeriBildirim.titresim;
@@ -68,21 +72,14 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
   }
 
   Future<void> _hazirla() async {
-    // Kısa tık sesi için düşük gecikmeli oynatıcı; arka plandaki müziği durdurmaz
-    final karisik = AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers).build();
     try {
-      await _tikPlayer.setPlayerMode(PlayerMode.lowLatency);
-      await _tikPlayer.setAudioContext(karisik);
-      await _tikPlayer.setReleaseMode(ReleaseMode.stop);
-      await _audioPlayer.setAudioContext(karisik);
+      await _audioPlayer.setAudioContext(_karisik);
     } catch (_) {}
     final titresim = await Vibration.hasVibrator();
     final prefs = await SharedPreferences.getInstance();
     final kayitli = prefs.getInt(_modAnahtari);
     _ses = ZikirSesi.values.asNameMap()[prefs.getString(_sesAnahtari)] ?? ZikirSesi.klasik;
-    try {
-      await _tikPlayer.setSource(AssetSource(_ses.dosya));
-    } catch (_) {}
+    await _sesYukle(_ses); // Önce seçili ses: zikir hemen sesli çekilebilsin
     if (!mounted) return;
     setState(() {
       _canVibrate = titresim;
@@ -90,14 +87,32 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
         _mod = ZikirGeriBildirim.values[kayitli];
       }
     });
+    // Diğer sesler arka planda, birer birer: seçiciye gelindiğinde hazır olurlar
+    for (final ses in ZikirSesi.values) {
+      if (!mounted) return;
+      await _sesYukle(ses);
+    }
+  }
+
+  /// Kısa tık sesi için düşük gecikmeli oynatıcı; arka plandaki müziği durdurmaz
+  Future<AudioPlayer?> _sesYukle(ZikirSesi ses) async {
+    final hazir = _sesOynaticilari[ses];
+    if (hazir != null) return hazir;
+    final o = AudioPlayer();
+    _sesOynaticilari[ses] = o;
+    try {
+      await o.setPlayerMode(PlayerMode.lowLatency);
+      await o.setAudioContext(_karisik);
+      await o.setReleaseMode(ReleaseMode.stop);
+      await o.setSource(AssetSource(ses.dosya));
+    } catch (_) {}
+    return o;
   }
 
   Future<void> _sesSec(ZikirSesi ses) async {
-    setState(() => _ses = ses);
-    try {
-      await _tikPlayer.setSource(AssetSource(ses.dosya));
-      await _tikPlayer.resume(); // Seçilen sesi hemen dinlet
-    } catch (_) {}
+    if (ses != _ses) setState(() => _ses = ses);
+    final o = await _sesYukle(ses);
+    o?.stop().then((_) => o.resume()).catchError((_) {}); // Seçilen sesi hemen dinlet
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_sesAnahtari, ses.name);
   }
@@ -161,7 +176,9 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
 
   @override
   void dispose() {
-    _tikPlayer.dispose();
+    for (final o in _sesOynaticilari.values) {
+      o.dispose();
+    }
     _audioPlayer.dispose();
     _dalga.dispose();
     _sayiPop.dispose();
@@ -173,7 +190,8 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
   void _dokunusGeriBildirimi() {
     if (_titresimAcik) Vibration.vibrate(duration: 40);
     if (_sesAcik) {
-      _tikPlayer.stop().then((_) => _tikPlayer.resume()).catchError((_) {});
+      final o = _tikPlayer;
+      o?.stop().then((_) => o.resume()).catchError((_) {});
     }
   }
 
