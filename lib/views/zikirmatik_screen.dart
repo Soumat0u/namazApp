@@ -1,3 +1,4 @@
+import 'dart:math';
 import '../core/utils/bildirim.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -13,19 +14,22 @@ import '../providers/theme_provider.dart';
 /// uygulama içinden seçilir
 enum ZikirGeriBildirim { titresim, ses, ikisi, kapali }
 
-/// Zikir çekerken çalan tık sesi seçenekleri (assets/sounds/...)
+/// Zikir çekerken çalan tık sesi seçenekleri (assets/sounds/...).
+/// Birden fazla dosyası olan seste her dokunuşta biri rastgele çalar (doğal, tekdüze olmayan ses).
 enum ZikirSesi {
-  klasik('Klasik', 'sounds/tik.wav', Icons.touch_app_rounded),
-  tesbih('Tesbih Tanesi', 'sounds/zikir/tesbih.wav', Icons.circle_outlined),
-  ahsap('Ahşap', 'sounds/zikir/ahsap.wav', Icons.forest_rounded),
-  damla('Damla', 'sounds/zikir/damla.wav', Icons.water_drop_outlined),
-  yumusak('Yumuşak', 'sounds/zikir/yumusak.wav', Icons.blur_on_rounded),
-  zil('Zil', 'sounds/zikir/zil.wav', Icons.notifications_none_rounded);
+  klasik('Klasik', ['sounds/tik.wav'], Icons.touch_app_rounded),
+  // Freesound CC0 kayıtlarından karışım: 817909 "Beads" (Torikari) + 347928 "rosary" (jaset13045)
+  tesbih('Tesbih Tanesi',
+      ['sounds/zikir/tesbih1.wav', 'sounds/zikir/tesbih2.wav', 'sounds/zikir/tesbih3.wav'], Icons.circle_outlined),
+  ahsap('Ahşap', ['sounds/zikir/ahsap.wav'], Icons.forest_rounded),
+  damla('Damla', ['sounds/zikir/damla.wav'], Icons.water_drop_outlined),
+  yumusak('Yumuşak', ['sounds/zikir/yumusak.wav'], Icons.blur_on_rounded),
+  zil('Zil', ['sounds/zikir/zil.wav'], Icons.notifications_none_rounded);
 
   final String ad;
-  final String dosya;
+  final List<String> dosyalar;
   final IconData ikon;
-  const ZikirSesi(this.ad, this.dosya, this.ikon);
+  const ZikirSesi(this.ad, this.dosyalar, this.ikon);
 }
 
 class ZikirmatikScreen extends StatefulWidget {
@@ -41,8 +45,19 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
 
   /// Her ses için ayrı, önceden yüklenmiş düşük gecikmeli oynatıcı. Ses değiştirirken dosya
   /// yeniden yüklenmez; yükleme ana iş parçacığını meşgul edip animasyonları takıltıyordu.
-  final Map<ZikirSesi, AudioPlayer> _sesOynaticilari = {};
-  AudioPlayer? get _tikPlayer => _sesOynaticilari[_ses];
+  final Map<String, AudioPlayer> _sesOynaticilari = {};
+  final _rastgele = Random();
+  String? _sonDosya;
+
+  /// Seçili sesin bu dokunuşta çalacak oynatıcısı; birden fazla dosya varsa
+  /// rastgele biri (art arda aynısı gelmesin)
+  AudioPlayer? get _tikPlayer {
+    final d = _ses.dosyalar;
+    var dosya = d[_rastgele.nextInt(d.length)];
+    if (d.length > 1 && dosya == _sonDosya) dosya = d[(d.indexOf(dosya) + 1) % d.length];
+    _sonDosya = dosya;
+    return _sesOynaticilari[dosya];
+  }
   late final AudioContext _karisik = AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers).build();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _canVibrate = false;
@@ -95,23 +110,24 @@ class _ZikirmatikScreenState extends State<ZikirmatikScreen> with TickerProvider
   }
 
   /// Kısa tık sesi için düşük gecikmeli oynatıcı; arka plandaki müziği durdurmaz
-  Future<AudioPlayer?> _sesYukle(ZikirSesi ses) async {
-    final hazir = _sesOynaticilari[ses];
-    if (hazir != null) return hazir;
-    final o = AudioPlayer();
-    _sesOynaticilari[ses] = o;
-    try {
-      await o.setPlayerMode(PlayerMode.lowLatency);
-      await o.setAudioContext(_karisik);
-      await o.setReleaseMode(ReleaseMode.stop);
-      await o.setSource(AssetSource(ses.dosya));
-    } catch (_) {}
-    return o;
+  Future<void> _sesYukle(ZikirSesi ses) async {
+    for (final dosya in ses.dosyalar) {
+      if (_sesOynaticilari.containsKey(dosya)) continue;
+      final o = AudioPlayer();
+      _sesOynaticilari[dosya] = o;
+      try {
+        await o.setPlayerMode(PlayerMode.lowLatency);
+        await o.setAudioContext(_karisik);
+        await o.setReleaseMode(ReleaseMode.stop);
+        await o.setSource(AssetSource(dosya));
+      } catch (_) {}
+    }
   }
 
   Future<void> _sesSec(ZikirSesi ses) async {
     if (ses != _ses) setState(() => _ses = ses);
-    final o = await _sesYukle(ses);
+    await _sesYukle(ses);
+    final o = _tikPlayer;
     o?.stop().then((_) => o.resume()).catchError((_) {}); // Seçilen sesi hemen dinlet
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_sesAnahtari, ses.name);
